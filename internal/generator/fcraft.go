@@ -284,14 +284,12 @@ func (g *fCraftMapGen) generateMap(lvl *Level) {
 		aboveWaterMultiplier = float64(args.MaxHeight) / (1 - desiredWaterLevel)
 	}
 
-	var blurred []float64
 	if args.CliffSmoothing {
-		blurred = GaussianBlur5X5(g.heightmap, width, length)
+		blurred := GaussianBlur5X5(g.heightmap, width, length)
 		g.slopemap = CalculateSlope(blurred, width, length)
 	} else {
 		g.slopemap = CalculateSlope(g.heightmap, width, length)
 	}
-	_ = blurred
 
 	var altmap []float64
 	if args.MaxHeightVariation != 0 || args.MaxDepthVariation != 0 {
@@ -308,9 +306,8 @@ func (g *fCraftMapGen) generateMap(lvl *Level) {
 	for z := 0; z < length; z++ {
 		for x := 0; x < width; x++ {
 			i := z*width + x
-			level, surface := g.fillColumn(lvl, x, z, i, desiredWaterLevel, aboveWaterMultiplier, altmap)
+			_, surface := g.fillColumn(lvl, x, z, i, desiredWaterLevel, aboveWaterMultiplier, altmap)
 			g.surfaceMap[i] = uint16(surface)
-			_ = level
 		}
 	}
 

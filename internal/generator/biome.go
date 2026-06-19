@@ -125,6 +125,7 @@ var (
 	}
 )
 
+// biomes maps lowercase biome names to their definitions.
 var biomes = map[string]Biome{
 	"forest": Forest,
 	"arctic": Arctic,

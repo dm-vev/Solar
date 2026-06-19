@@ -107,27 +107,29 @@ func abs(a int) int {
 	return a
 }
 
-// treeRegistry maps tree type names to constructors.
-var treeRegistry = map[string]func() Tree{
+// defaultTrees maps tree type names to constructors. It is populated at
+// package load time and may be extended via RegisterTree.
+var defaultTrees = map[string]func() Tree{
 	"Classic": func() Tree { return NewClassicTree() },
 }
 
 // FindTree returns a tree constructor by name.
 func FindTree(name string) (func() Tree, bool) {
-	t, ok := treeRegistry[name]
+	t, ok := defaultTrees[name]
 	return t, ok
 }
 
 // TreeNames returns all registered tree names.
 func TreeNames() []string {
-	names := make([]string, 0, len(treeRegistry))
-	for name := range treeRegistry {
+	names := make([]string, 0, len(defaultTrees))
+	for name := range defaultTrees {
 		names = append(names, name)
 	}
 	return names
 }
 
-// RegisterTree registers a tree constructor under a name.
+// RegisterTree registers a tree constructor under a name in the default
+// tree registry.
 func RegisterTree(name string, ctor func() Tree) {
-	treeRegistry[name] = ctor
+	defaultTrees[name] = ctor
 }

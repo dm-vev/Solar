@@ -18,11 +18,15 @@ type Config struct {
 	UsernamePrefix string
 	Scenario       string
 	CPE            bool
+	Logger         *slog.Logger
 }
 
 // Run connects multiple clients to the server and keeps them online for the duration.
 func Run(ctx context.Context, cfg Config) error {
-	logger := slog.Default()
+	logger := cfg.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
 
 	if cfg.Address == "" {
 		cfg.Address = "127.0.0.1:25565"

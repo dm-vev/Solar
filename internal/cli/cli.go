@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// ErrUsage is returned when the CLI arguments are invalid or incomplete.
 var ErrUsage = errors.New("usage")
 
 // Command is the parsed CLI command.

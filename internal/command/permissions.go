@@ -1,5 +1,6 @@
 package command
 
+// adminCommands lists commands that require operator privileges.
 var adminCommands = map[string]struct{}{
 	"tp":        {},
 	"setspawn":  {},
