@@ -11,7 +11,7 @@ import (
 )
 
 func runClient(ctx context.Context, cfg Config, index int) error {
-	username := fmt.Sprintf("%s-%03d", cfg.UsernamePrefix, index+1)
+	username := fmt.Sprintf("%s_%03d", cfg.UsernamePrefix, index+1)
 
 	conn, err := dialWithContext(ctx, cfg.Address)
 	if err != nil {

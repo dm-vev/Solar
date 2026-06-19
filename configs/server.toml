@@ -51,13 +51,13 @@ policy_file = "policy.json"
 # World file extension (saves are binary SWLD format).
 world_file_ext = ".swld"
 # Name of the primary world snapshot.
-main_world_name = "main"
+main_world_name = "airlobby"
 # Subdirectory for custom block definition JSON files.
 blockdefs_dir = "blockdefs"
 
 [commands]
 # Commands that require operator privileges.
-admin_commands = ["tp", "setspawn", "save", "kick", "ban", "unban", "whitelist", "newlvl"]
+admin_commands = ["tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl"]
 
 [player]
 # Start with whitelist enforcement on. Players not on the whitelist are rejected.

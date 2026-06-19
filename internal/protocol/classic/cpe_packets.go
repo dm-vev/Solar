@@ -468,26 +468,33 @@ func encodeDefineBlock(
 	topTex, sideTex, bottomTex byte,
 	blocksLight bool, walkSound byte, brightness byte,
 	blockDraw, fogDensity, fogR, fogG, fogB byte,
+	extTex bool,
 ) []byte {
-	packet := make([]byte, 80)
+	texSize := 1
+	if extTex {
+		texSize = 2
+	}
+	packet := make([]byte, 80+3*(texSize-1))
 	packet[0] = opcodeDefineBlock
 	packet[1] = blockID
 	writeFixedString(packet[2:66], name)
 	packet[66] = collideType
 	packet[67] = rawSpeed
-	packet[68] = topTex
-	packet[69] = sideTex
-	packet[70] = bottomTex
+	off := 68
+	writeTex(packet[off:], topTex, extTex); off += texSize
+	writeTex(packet[off:], sideTex, extTex); off += texSize
+	writeTex(packet[off:], bottomTex, extTex); off += texSize
 	if !blocksLight {
-		packet[71] = 1
+		packet[off] = 1
 	}
-	packet[72] = walkSound
-	packet[73] = brightness
-	packet[74] = blockDraw
-	packet[75] = fogDensity
-	packet[76] = fogR
-	packet[77] = fogG
-	packet[78] = fogB
+	off++
+	packet[off] = walkSound; off++
+	packet[off] = brightness; off++
+	packet[off] = blockDraw; off++
+	packet[off] = fogDensity; off++
+	packet[off] = fogR; off++
+	packet[off] = fogG; off++
+	packet[off] = fogB
 	return packet
 }
 
@@ -497,35 +504,54 @@ func encodeUndefineBlock(blockID byte) []byte {
 
 func encodeDefineBlockExt(
 	blockID byte, name string, collideType, rawSpeed byte,
-	topTex, sideTex, bottomTex byte,
+	topTex, leftTex, rightTex, frontTex, backTex, bottomTex byte,
 	blocksLight bool, walkSound byte, brightness byte,
 	minX, minZ, minY, maxX, maxZ, maxY byte,
 	blockDraw, fogDensity, fogR, fogG, fogB byte,
+	extTex bool,
 ) []byte {
-	packet := make([]byte, 85)
+	texSize := 1
+	if extTex {
+		texSize = 2
+	}
+	packet := make([]byte, 88+6*(texSize-1))
 	packet[0] = opcodeDefineBlockExt
 	packet[1] = blockID
 	writeFixedString(packet[2:66], name)
 	packet[66] = collideType
 	packet[67] = rawSpeed
-	packet[68] = topTex
-	packet[69] = sideTex
-	packet[70] = bottomTex
+	off := 68
+	writeTex(packet[off:], topTex, extTex); off += texSize
+	writeTex(packet[off:], leftTex, extTex); off += texSize
+	writeTex(packet[off:], rightTex, extTex); off += texSize
+	writeTex(packet[off:], frontTex, extTex); off += texSize
+	writeTex(packet[off:], backTex, extTex); off += texSize
+	writeTex(packet[off:], bottomTex, extTex); off += texSize
 	if !blocksLight {
-		packet[71] = 1
+		packet[off] = 1
 	}
-	packet[72] = walkSound
-	packet[73] = brightness
-	packet[74] = blockDraw
-	packet[75] = fogDensity
-	packet[76] = fogR
-	packet[77] = fogG
-	packet[78] = fogB
-	packet[79] = minX
-	packet[80] = minZ
-	packet[81] = minY
-	packet[82] = maxX
-	packet[83] = maxZ
-	packet[84] = maxY
+	off++
+	packet[off] = walkSound; off++
+	packet[off] = brightness; off++
+	packet[off] = blockDraw; off++
+	packet[off] = fogDensity; off++
+	packet[off] = fogR; off++
+	packet[off] = fogG; off++
+	packet[off] = fogB; off++
+	packet[off] = minX; off++
+	packet[off] = minZ; off++
+	packet[off] = minY; off++
+	packet[off] = maxX; off++
+	packet[off] = maxZ; off++
+	packet[off] = maxY
 	return packet
+}
+
+func writeTex(buf []byte, tex byte, extTex bool) {
+	if extTex {
+		buf[0] = 0
+		buf[1] = tex
+	} else {
+		buf[0] = tex
+	}
 }

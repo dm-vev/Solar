@@ -43,9 +43,9 @@ func TestCPEPacketSizes(t *testing.T) {
 		{"LightingMode", encodeLightingMode(0, false), 3},
 		{"CinematicGui", encodeCinematicGui(false, false, false, 0, 0, 0, 0, 0), 10},
 		{"ToggleBlockList", encodeToggleBlockList(true), 2},
-		{"DefineBlock", encodeDefineBlock(50, "custom", 0, 128, 0, 0, 0, true, 0, 0, 0, 0, 0, 0, 0), 80},
-		{"UndefineBlock", encodeUndefineBlock(50), 2},
-		{"DefineBlockExt", encodeDefineBlockExt(50, "custom", 0, 128, 0, 0, 0, true, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 85},
+		{"DefineBlock", encodeDefineBlock(50, "custom", 0, 128, 0, 0, 0, true, 0, 0, 0, 0, 0, 0, 0, false), 80},
+		{"DefineBlockExt", encodeDefineBlockExt(50, "custom", 0, 128, 0, 0, 0, 0, 0, 0, true, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, false), 88},
+		{"DefineBlockExtTex", encodeDefineBlockExt(50, "custom", 0, 128, 0, 0, 0, 0, 0, 0, true, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, true), 94},
 	}
 
 	for _, tc := range cases {

@@ -89,7 +89,7 @@ func NewRegistry() *Registry {
 		handlers: make(map[string]Handler),
 		admin:    make(map[string]struct{}),
 	}
-	for _, cmd := range []string{"tp", "setspawn", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb"} {
+	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb"} {
 		registry.admin[cmd] = struct{}{}
 	}
 	registry.Register("help", helpCommand(registry))
@@ -97,6 +97,7 @@ func NewRegistry() *Registry {
 	registry.Register("setblock", setBlockCommand)
 	registry.Register("tp", teleportCommand)
 	registry.Register("setspawn", setSpawnCommand)
+	registry.Register("setspawnpoint", setSpawnCommand)
 	registry.Register("save", saveCommand)
 	registry.Register("kick", kickCommand)
 	registry.Register("ban", banCommand)

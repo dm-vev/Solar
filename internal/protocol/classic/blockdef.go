@@ -25,13 +25,15 @@ func (s *session) sendBlockDefinitions() error {
 // encodeBlockDef chooses the appropriate packet variant based on which
 // CPE extension version the client supports.
 func (s *session) encodeBlockDef(def blockdef.BlockDefinition) []byte {
+	extTex := s.supportsExt(cpeExtExtTextures)
 	if !def.IsSprite() && s.supportsExt(cpeExtBlockDefinitionsExt) {
 		return encodeDefineBlockExt(
 			def.ID, def.Name, def.CollideType, def.RawSpeed(),
-			def.TopTex, def.RightTex, def.BottomTex,
+			def.TopTex, def.LeftTex, def.RightTex, def.FrontTex, def.BackTex, def.BottomTex,
 			def.BlocksLight, def.WalkSound, def.BrightnessByte(),
 			def.MinX, def.MinZ, def.MinY, def.MaxX, def.MaxZ, def.MaxY,
 			def.BlockDraw, def.FogDensity, def.FogR, def.FogG, def.FogB,
+			extTex,
 		)
 	}
 	return encodeDefineBlock(
@@ -39,6 +41,7 @@ func (s *session) encodeBlockDef(def blockdef.BlockDefinition) []byte {
 		def.TopTex, def.RightTex, def.BottomTex,
 		def.BlocksLight, def.WalkSound, def.BrightnessByte(),
 		def.BlockDraw, def.FogDensity, def.FogR, def.FogG, def.FogB,
+		extTex,
 	)
 }
 
