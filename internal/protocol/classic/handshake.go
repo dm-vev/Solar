@@ -28,7 +28,7 @@ func (s *session) handleHandshake() error {
 	if username == "" {
 		return s.writeKick("invalid username")
 	}
-	if !validUsername(username) {
+	if !s.validUsername(username) {
 		return s.writeKick("invalid username")
 	}
 	if s.players != nil {
@@ -76,7 +76,7 @@ func (s *session) handleHandshake() error {
 	return nil
 }
 
-func validUsername(username string) bool {
+func (s *session) validUsername(username string) bool {
 	if len(username) < 1 || len(username) > 32 {
 		return false
 	}

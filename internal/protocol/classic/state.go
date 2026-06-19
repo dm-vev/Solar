@@ -20,11 +20,9 @@ func (s *session) markJoined(joined bool) {
 	s.stateMu.Unlock()
 }
 
-func (s *session) setSupports(extPlayerList, twoWayPing, fastMap bool) {
+func (s *session) setCPESupport(exts map[string]uint32) {
 	s.stateMu.Lock()
-	s.supportsExtPlayerList = extPlayerList
-	s.supportsTwoWayPing = twoWayPing
-	s.supportsFastMap = fastMap
+	s.cpeExts = exts
 	s.stateMu.Unlock()
 }
 
@@ -37,13 +35,10 @@ func (s *session) sessionIdentity() (username string, entityID uint32, tracked b
 	return
 }
 
-func (s *session) sessionFlags() (loggedIn, joined, supportsExtPlayerList, supportsTwoWayPing, supportsFastMap bool) {
+func (s *session) sessionFlags() (loggedIn, joined bool) {
 	s.stateMu.RLock()
 	loggedIn = s.loggedIn
 	joined = s.joined
-	supportsExtPlayerList = s.supportsExtPlayerList
-	supportsTwoWayPing = s.supportsTwoWayPing
-	supportsFastMap = s.supportsFastMap
 	s.stateMu.RUnlock()
 	return
 }
@@ -62,23 +57,18 @@ func (s *session) currentEntityID() uint32 {
 	return entityID
 }
 
-func (s *session) currentSupportsExtPlayerList() bool {
+// supportsExt reports whether the client supports the given CPE extension.
+func (s *session) supportsExt(name string) bool {
 	s.stateMu.RLock()
-	enabled := s.supportsExtPlayerList
+	_, ok := s.cpeExts[name]
 	s.stateMu.RUnlock()
-	return enabled
-}
-
-func (s *session) currentSupportsTwoWayPing() bool {
-	s.stateMu.RLock()
-	enabled := s.supportsTwoWayPing
-	s.stateMu.RUnlock()
-	return enabled
+	return ok
 }
 
 func (s *session) currentSupportsFastMap() bool {
-	s.stateMu.RLock()
-	enabled := s.supportsFastMap
-	s.stateMu.RUnlock()
-	return enabled
+	return s.supportsExt(cpeExtFastMapName)
+}
+
+func (s *session) currentSupportsExtPlayerList() bool {
+	return s.supportsExt(cpeExtPlayerListName)
 }

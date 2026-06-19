@@ -8,7 +8,7 @@ func (s *session) joinRoom() {
 	}
 
 	_, entityID, _ := s.sessionIdentity()
-	_, joined, supportsExtPlayerList, _, _ := s.sessionFlags()
+	_, joined := s.sessionFlags()
 	if joined || entityID == 0 {
 		return
 	}
@@ -29,7 +29,7 @@ func (s *session) joinRoom() {
 			if err := s.writePacket(encodeAddEntity(byte(peerEntityID), peerUsername, peerState.Pos, peerState.Yaw, peerState.Pitch)); err != nil {
 				s.logger.Debug("send peer join packet", "username", s.currentUsername(), "peer", peerUsername, "error", err)
 			}
-			if supportsExtPlayerList {
+			if s.supportsExt(cpeExtPlayerListName) {
 				if err := s.writePacket(encodeExtAddPlayerName(byte(peerEntityID), peerUsername)); err != nil {
 					s.logger.Debug("send peer list packet", "username", s.currentUsername(), "peer", peerUsername, "error", err)
 				}
@@ -54,7 +54,7 @@ func (s *session) leaveRoom() {
 	}
 
 	_, entityID, _ := s.sessionIdentity()
-	_, joined, _, _, _ := s.sessionFlags()
+	_, joined := s.sessionFlags()
 	if !joined || entityID == 0 {
 		return
 	}

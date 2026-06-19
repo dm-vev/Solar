@@ -287,14 +287,14 @@ func (s *session) writeLoop() {
 			}
 			// Batch any additional packets already queued so that small
 			// broadcasts do not trigger a syscall per packet.
-			if !s.drainOutbox(32) {
+			if !s.drainOutbox(s.writeBatchSize) {
 				return
 			}
 			if !s.flushWriter() {
 				return
 			}
 		case <-s.stop:
-			if !s.drainOutbox(256) {
+			if !s.drainOutbox(s.shutdownBatchSize) {
 				return
 			}
 			if !s.flushWriter() {

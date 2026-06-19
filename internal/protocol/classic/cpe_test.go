@@ -124,17 +124,24 @@ func TestServeConnUsesFastMapAndTwoWayPing(t *testing.T) {
 	<-done
 }
 
-func loginWithCPE(t *testing.T, client net.Conn, username string, drainLevel bool, extensions ...string) {
-	t.Helper()
+func TestServeConnNegotiatesAllCPEExtensions(t *testing.T) {
+	t.Parallel()
 
-	if len(extensions) == 0 {
-		extensions = []string{cpeExtPlayerListName, cpeTwoWayPingName, cpeFastMapName}
-	}
+	codec := newTestCodec()
+	server, client := net.Pipe()
+	done := make(chan struct{})
 
-	if _, err := client.Write(encodeClientHandshake(7, username, 0x42)); err != nil {
+	go func() {
+		codec.ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	// Send CPE handshake
+	if _, err := client.Write(encodeClientHandshake(7, "tester", 0x42)); err != nil {
 		t.Fatalf("write handshake: %v", err)
 	}
 
+	// Read server ExtInfo
 	serverExtInfo := make([]byte, 67)
 	if _, err := io.ReadFull(client, serverExtInfo); err != nil {
 		t.Fatalf("read server ext info: %v", err)
@@ -142,44 +149,88 @@ func loginWithCPE(t *testing.T, client net.Conn, username string, drainLevel boo
 	if serverExtInfo[0] != opcodeExtInfo {
 		t.Fatalf("server ext info opcode = %d, want %d", serverExtInfo[0], opcodeExtInfo)
 	}
-	if got := bytes.TrimRight(serverExtInfo[1:65], " \x00"); string(got) != "Solar" {
-		t.Fatalf("server ext info app name = %q, want Solar", got)
-	}
-	serverExtensions := []struct {
-		name    string
-		version uint32
-	}{
-		{name: cpeExtPlayerListName, version: cpeExtPlayerListVersion},
-		{name: cpeTwoWayPingName, version: 1},
-		{name: cpeFastMapName, version: 1},
-	}
-	if got := binary.BigEndian.Uint16(serverExtInfo[65:67]); got != uint16(len(serverExtensions)) {
-		t.Fatalf("server ext count = %d, want %d", got, len(serverExtensions))
+	extCount := int(binary.BigEndian.Uint16(serverExtInfo[65:67]))
+	if extCount != len(serverExtensions) {
+		t.Fatalf("server ext count = %d, want %d", extCount, len(serverExtensions))
 	}
 
-	for _, expected := range serverExtensions {
-		serverExtEntry := make([]byte, 69)
-		if _, err := io.ReadFull(client, serverExtEntry); err != nil {
-			t.Fatalf("read server ext entry: %v", err)
+	// Read all server ExtEntry packets and verify they match
+	for i := 0; i < extCount; i++ {
+		entry := make([]byte, 69)
+		if _, err := io.ReadFull(client, entry); err != nil {
+			t.Fatalf("read server ext entry %d: %v", i, err)
 		}
-		if serverExtEntry[0] != opcodeExtEntry {
-			t.Fatalf("server ext entry opcode = %d, want %d", serverExtEntry[0], opcodeExtEntry)
+		if entry[0] != opcodeExtEntry {
+			t.Fatalf("server ext entry %d opcode = %d, want %d", i, entry[0], opcodeExtEntry)
 		}
-		if got := bytes.TrimRight(serverExtEntry[1:65], " \x00"); string(got) != expected.name {
-			t.Fatalf("server ext name = %q, want %s", got, expected.name)
+		name := bytes.TrimRight(entry[1:65], " \x00")
+		version := binary.BigEndian.Uint32(entry[65:69])
+		if string(name) != serverExtensions[i].name {
+			t.Fatalf("server ext entry %d name = %q, want %q", i, name, serverExtensions[i].name)
 		}
-		if got := binary.BigEndian.Uint32(serverExtEntry[65:69]); got != expected.version {
-			t.Fatalf("server ext version = %d, want %d", got, expected.version)
+		if version != serverExtensions[i].version {
+			t.Fatalf("server ext entry %d version = %d, want %d", i, version, serverExtensions[i].version)
 		}
 	}
 
+	// Client responds supporting all extensions
+	if _, err := client.Write(encodeClientExtInfo("ClassiCube", len(serverExtensions))); err != nil {
+		t.Fatalf("write client ext info: %v", err)
+	}
+	for _, ext := range serverExtensions {
+		if _, err := client.Write(encodeClientExtEntry(ext.name, ext.version)); err != nil {
+			t.Fatalf("write client ext entry %s: %v", ext.name, err)
+		}
+	}
+
+	// Read MOTD
+	if _, err := io.ReadFull(client, make([]byte, 131)); err != nil {
+		t.Fatalf("read motd: %v", err)
+	}
+
+	if err := client.Close(); err != nil {
+		t.Fatalf("close client: %v", err)
+	}
+	<-done
+}
+
+func loginWithCPE(t *testing.T, client net.Conn, username string, drainLevel bool, extensions ...string) {
+	t.Helper()
+
+	if len(extensions) == 0 {
+		extensions = []string{cpeExtPlayerListName, cpeExtTwoWayPingName, cpeExtFastMapName}
+	}
+
+	if _, err := client.Write(encodeClientHandshake(7, username, 0x42)); err != nil {
+		t.Fatalf("write handshake: %v", err)
+	}
+
+	// Read server ExtInfo
+	serverExtInfo := make([]byte, 67)
+	if _, err := io.ReadFull(client, serverExtInfo); err != nil {
+		t.Fatalf("read server ext info: %v", err)
+	}
+	if serverExtInfo[0] != opcodeExtInfo {
+		t.Fatalf("server ext info opcode = %d, want %d", serverExtInfo[0], opcodeExtInfo)
+	}
+	serverExtCount := int(binary.BigEndian.Uint16(serverExtInfo[65:67]))
+
+	// Read all server ExtEntry packets
+	for i := 0; i < serverExtCount; i++ {
+		entry := make([]byte, 69)
+		if _, err := io.ReadFull(client, entry); err != nil {
+			t.Fatalf("read server ext entry %d: %v", i, err)
+		}
+	}
+
+	// Client responds with its supported extensions
 	if _, err := client.Write(encodeClientExtInfo("ClassiCube", len(extensions))); err != nil {
 		t.Fatalf("write client ext info: %v", err)
 	}
 	for _, name := range extensions {
 		version := uint32(1)
 		if name == cpeExtPlayerListName {
-			version = cpeExtPlayerListVersion
+			version = 2
 		}
 		if _, err := client.Write(encodeClientExtEntry(name, version)); err != nil {
 			t.Fatalf("write client ext entry %s: %v", name, err)
@@ -192,7 +243,7 @@ func loginWithCPE(t *testing.T, client net.Conn, username string, drainLevel boo
 	if !drainLevel {
 		return
 	}
-	_ = readLevelStream(t, client, hasExtension(extensions, cpeFastMapName))
+	_ = readLevelStream(t, client, hasExtension(extensions, cpeExtFastMapName))
 }
 
 func readJoinSet(t *testing.T, client net.Conn, wantID byte, wantName string) {

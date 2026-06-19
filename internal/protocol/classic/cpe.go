@@ -6,34 +6,105 @@ import (
 	"io"
 )
 
+// CPE extension names — matches the ClassiCube CPE specification.
 const (
-	opcodeExtInfo             = 16
-	opcodeExtEntry            = 17
-	opcodeExtAddPlayerName    = 22
-	opcodeExtRemovePlayerName = 24
-
-	cpeExtPlayerListName    = "ExtPlayerList"
-	cpeExtPlayerListVersion = 2
-	cpeTwoWayPingName       = "TwoWayPing"
-	cpeFastMapName          = "FastMap"
+	cpeExtClickDistance       = "ClickDistance"
+	cpeExtCustomBlocks        = "CustomBlocks"
+	cpeExtHeldBlock           = "HeldBlock"
+	cpeExtTextHotkey          = "TextHotKey"
+	cpeExtPlayerListName      = "ExtPlayerList"
+	cpeExtEnvColors           = "EnvColors"
+	cpeExtSelectionCuboid     = "SelectionCuboid"
+	cpeExtBlockPermissions    = "BlockPermissions"
+	cpeExtChangeModel         = "ChangeModel"
+	cpeExtEnvMapAppearance    = "EnvMapAppearance"
+	cpeExtEnvWeatherType      = "EnvWeatherType"
+	cpeExtHackControl         = "HackControl"
+	cpeExtEmoteFix            = "EmoteFix"
+	cpeExtMessageTypes        = "MessageTypes"
+	cpeExtLongerMessages      = "LongerMessages"
+	cpeExtFullCP437           = "FullCP437"
+	cpeExtBlockDefinitions    = "BlockDefinitions"
+	cpeExtBlockDefinitionsExt = "BlockDefinitionsExt"
+	cpeExtTextColors          = "TextColors"
+	cpeExtBulkBlockUpdate     = "BulkBlockUpdate"
+	cpeExtEnvMapAspect        = "EnvMapAspect"
+	cpeExtPlayerClick         = "PlayerClick"
+	cpeExtEntityProperty      = "EntityProperty"
+	cpeExtExtEntityPositions  = "ExtEntityPositions"
+	cpeExtTwoWayPingName      = "TwoWayPing"
+	cpeExtInventoryOrder      = "InventoryOrder"
+	cpeExtInstantMOTD         = "InstantMOTD"
+	cpeExtFastMapName         = "FastMap"
+	cpeExtExtTextures         = "ExtendedTextures"
+	cpeExtSetHotbar           = "SetHotbar"
+	cpeExtSetSpawnpoint       = "SetSpawnpoint"
+	cpeExtVelocityControl     = "VelocityControl"
+	cpeExtCustomParticles     = "CustomParticles"
+	cpeExtCustomModels        = "CustomModels"
+	cpeExtPluginMessages      = "PluginMessages"
+	cpeExtExtEntityTeleport   = "ExtEntityTeleport"
+	cpeExtLightingMode        = "LightingMode"
+	cpeExtCinematicGui        = "CinematicGui"
+	cpeExtNotifyAction        = "NotifyAction"
+	cpeExtToggleBlockList     = "ToggleBlockList"
 )
 
-func (s *session) negotiateCPE() error {
-	extensions := []struct {
-		name    string
-		version uint32
-	}{
-		{name: cpeExtPlayerListName, version: cpeExtPlayerListVersion},
-		{name: cpeTwoWayPingName, version: 1},
-		{name: cpeFastMapName, version: 1},
-	}
+// serverExtensions lists every CPE extension the server advertises.
+// Version is the highest server-side version supported.
+var serverExtensions = []struct {
+	name    string
+	version uint32
+}{
+	{cpeExtClickDistance, 1},
+	{cpeExtCustomBlocks, 1},
+	{cpeExtHeldBlock, 1},
+	{cpeExtTextHotkey, 1},
+	{cpeExtPlayerListName, 2},
+	{cpeExtEnvColors, 1},
+	{cpeExtSelectionCuboid, 1},
+	{cpeExtBlockPermissions, 1},
+	{cpeExtChangeModel, 1},
+	{cpeExtEnvMapAppearance, 2},
+	{cpeExtEnvWeatherType, 1},
+	{cpeExtHackControl, 1},
+	{cpeExtEmoteFix, 1},
+	{cpeExtMessageTypes, 1},
+	{cpeExtLongerMessages, 1},
+	{cpeExtFullCP437, 1},
+	{cpeExtBlockDefinitions, 1},
+	{cpeExtBlockDefinitionsExt, 2},
+	{cpeExtTextColors, 1},
+	{cpeExtBulkBlockUpdate, 1},
+	{cpeExtEnvMapAspect, 2},
+	{cpeExtPlayerClick, 1},
+	{cpeExtEntityProperty, 1},
+	{cpeExtExtEntityPositions, 1},
+	{cpeExtTwoWayPingName, 1},
+	{cpeExtInventoryOrder, 1},
+	{cpeExtInstantMOTD, 1},
+	{cpeExtFastMapName, 1},
+	{cpeExtExtTextures, 1},
+	{cpeExtSetHotbar, 1},
+	{cpeExtSetSpawnpoint, 1},
+	{cpeExtVelocityControl, 1},
+	{cpeExtCustomParticles, 1},
+	{cpeExtCustomModels, 2},
+	{cpeExtPluginMessages, 1},
+	{cpeExtExtEntityTeleport, 1},
+	{cpeExtLightingMode, 1},
+	{cpeExtCinematicGui, 1},
+	{cpeExtNotifyAction, 1},
+	{cpeExtToggleBlockList, 1},
+}
 
-	if err := s.writePacket(encodeExtInfo(s.serverName, len(extensions))); err != nil {
+func (s *session) negotiateCPE() error {
+	if err := s.writePacket(encodeExtInfo(s.serverName, len(serverExtensions))); err != nil {
 		return fmt.Errorf("write ext info: %w", err)
 	}
-	for _, extension := range extensions {
-		if err := s.writePacket(encodeExtEntry(extension.name, extension.version)); err != nil {
-			return fmt.Errorf("write ext entry %s: %w", extension.name, err)
+	for _, ext := range serverExtensions {
+		if err := s.writePacket(encodeExtEntry(ext.name, ext.version)); err != nil {
+			return fmt.Errorf("write ext entry %s: %w", ext.name, err)
 		}
 	}
 
@@ -42,30 +113,15 @@ func (s *session) negotiateCPE() error {
 		return err
 	}
 
-	var supportsExtPlayerList bool
-	var supportsTwoWayPing bool
-	var supportsFastMap bool
+	cpeExts := make(map[string]uint32, extCount)
 	for i := 0; i < extCount; i++ {
 		name, version, err := s.readExtEntry()
 		if err != nil {
 			return err
 		}
-		switch name {
-		case cpeExtPlayerListName:
-			if version >= cpeExtPlayerListVersion {
-				supportsExtPlayerList = true
-			}
-		case cpeTwoWayPingName:
-			if version >= 1 {
-				supportsTwoWayPing = true
-			}
-		case cpeFastMapName:
-			if version >= 1 {
-				supportsFastMap = true
-			}
-		}
+		cpeExts[name] = version
 	}
-	s.setSupports(supportsExtPlayerList, supportsTwoWayPing, supportsFastMap)
+	s.setCPESupport(cpeExts)
 
 	return nil
 }
@@ -75,7 +131,7 @@ func (s *session) handleTwoWayPing() error {
 	if _, err := io.ReadFull(s.reader, payload); err != nil {
 		return fmt.Errorf("read two way ping payload: %w", err)
 	}
-	if !s.currentSupportsTwoWayPing() {
+	if !s.supportsExt(cpeExtTwoWayPingName) {
 		return nil
 	}
 	if payload[0] != 0 {

@@ -42,6 +42,10 @@ type Codec struct {
 	workers             *worker.Pool
 	readDeadline        time.Duration
 	writeDeadline       time.Duration
+	outboxSize          int
+	writeBatchSize      int
+	shutdownBatchSize   int
+	tcpNoDelay          bool
 	buildCommandContext func(SessionBackend) command.Context
 }
 
@@ -66,16 +70,20 @@ func NewCodec(
 		commands = command.NewRegistry()
 	}
 	return &Codec{
-		serverName:    serverName,
-		motd:          motd,
-		worlds:        worlds,
-		players:       players,
-		entities:      entities,
-		commands:      commands,
-		room:          sess.NewRoom[*session](),
-		logger:        slog.Default(),
-		readDeadline:  defaultReadDeadline,
-		writeDeadline: defaultWriteDeadline,
+		serverName:        serverName,
+		motd:              motd,
+		worlds:            worlds,
+		players:           players,
+		entities:          entities,
+		commands:          commands,
+		room:              sess.NewRoom[*session](),
+		logger:            slog.Default(),
+		readDeadline:      defaultReadDeadline,
+		writeDeadline:     defaultWriteDeadline,
+		outboxSize:        256,
+		writeBatchSize:    32,
+		shutdownBatchSize: 256,
+		tcpNoDelay:        true,
 	}
 }
 
@@ -113,6 +121,30 @@ func (c *Codec) SetConnTimeouts(read, write time.Duration) {
 	c.writeDeadline = write
 }
 
+// SetOutboxSize configures the per-session outbound packet queue depth.
+// When the queue is full the client is disconnected.
+func (c *Codec) SetOutboxSize(n int) {
+	if n > 0 {
+		c.outboxSize = n
+	}
+}
+
+// SetWriteBatchSize configures how many packets are batched per flush
+// in the write loop and during shutdown drain.
+func (c *Codec) SetWriteBatchSize(batch, shutdown int) {
+	if batch > 0 {
+		c.writeBatchSize = batch
+	}
+	if shutdown > 0 {
+		c.shutdownBatchSize = shutdown
+	}
+}
+
+// SetTCPNoDelay controls whether TCP_NODELAY is set on accepted connections.
+func (c *Codec) SetTCPNoDelay(enable bool) {
+	c.tcpNoDelay = enable
+}
+
 // ServeConn handles a single client connection until it closes, sends bad
 // data, or ctx is canceled.
 func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
@@ -135,10 +167,19 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		workers:             c.workers,
 		readDeadline:        c.readDeadline,
 		writeDeadline:       c.writeDeadline,
-		outbox:              make(chan []byte, 256),
+		outboxSize:          c.outboxSize,
+		writeBatchSize:      c.writeBatchSize,
+		shutdownBatchSize:   c.shutdownBatchSize,
+		outbox:              make(chan []byte, c.outboxSize),
 		stop:                make(chan struct{}),
 		writerDone:          make(chan struct{}),
 		buildCommandContext: c.buildCommandContext,
+	}
+
+	if c.tcpNoDelay {
+		if tcpConn, ok := conn.(*net.TCPConn); ok {
+			_ = tcpConn.SetNoDelay(true)
+		}
 	}
 
 	// Close the connection when ctx is canceled, unblocking the read loop.
@@ -159,37 +200,38 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 }
 
 type session struct {
-	conn                  net.Conn
-	reader                *bufio.Reader
-	writer                *bufio.Writer
-	serverName            string
-	motd                  string
-	worlds                *world.Manager
-	players               *player.Registry
-	entities              *entity.Manager
-	commands              *command.Registry
-	room                  *sess.Room[*session]
-	logger                *slog.Logger
-	worldPath             string
-	policyPath            string
-	workers               *worker.Pool
-	readDeadline          time.Duration
-	writeDeadline         time.Duration
-	outbox                chan []byte
-	stop                  chan struct{}
-	writerDone            chan struct{}
-	stateMu               sync.RWMutex
-	stopOnce              sync.Once
-	connOnce              sync.Once
-	username              string
-	entityID              uint32
-	tracked               bool
-	loggedIn              bool
-	joined                bool
-	supportsExtPlayerList bool
-	supportsTwoWayPing    bool
-	supportsFastMap       bool
-	buildCommandContext   func(SessionBackend) command.Context
+	conn                net.Conn
+	reader              *bufio.Reader
+	writer              *bufio.Writer
+	serverName          string
+	motd                string
+	worlds              *world.Manager
+	players             *player.Registry
+	entities            *entity.Manager
+	commands            *command.Registry
+	room                *sess.Room[*session]
+	logger              *slog.Logger
+	worldPath           string
+	policyPath          string
+	workers             *worker.Pool
+	readDeadline        time.Duration
+	writeDeadline       time.Duration
+	outboxSize          int
+	writeBatchSize      int
+	shutdownBatchSize   int
+	outbox              chan []byte
+	stop                chan struct{}
+	writerDone          chan struct{}
+	stateMu             sync.RWMutex
+	stopOnce            sync.Once
+	connOnce            sync.Once
+	username            string
+	entityID            uint32
+	tracked             bool
+	loggedIn            bool
+	joined              bool
+	cpeExts             map[string]uint32
+	buildCommandContext func(SessionBackend) command.Context
 }
 
 func (s *session) RoomEntityID() uint32 {
@@ -268,10 +310,11 @@ func (s *session) run() error {
 				return err
 			}
 		case opcodeTwoWayPing:
-			if !s.loggedIn {
-				continue
+			if err := s.handleLoggedInPacket(opcode, s.handleTwoWayPing); err != nil {
+				return err
 			}
-			if err := s.handleTwoWayPing(); err != nil {
+		case opcodePlayerClick, opcodePluginMessage, opcodeNotifyAction, opcodeNotifyPositionAction:
+			if err := s.handleCPEPacket(opcode); err != nil {
 				return err
 			}
 		default:
@@ -291,5 +334,32 @@ func (s *session) cleanup() {
 	}
 	if s.entities != nil && entityID != 0 {
 		s.entities.Remove(entityID)
+	}
+}
+
+type packetHandler func() error
+
+func (s *session) handleLoggedInPacket(_ byte, handler packetHandler) error {
+	if !s.loggedIn {
+		return nil
+	}
+	return handler()
+}
+
+func (s *session) handleCPEPacket(opcode byte) error {
+	if !s.loggedIn {
+		return nil
+	}
+	switch opcode {
+	case opcodePlayerClick:
+		return s.handlePlayerClick()
+	case opcodePluginMessage:
+		return s.handlePluginMessage()
+	case opcodeNotifyAction:
+		return s.handleNotifyAction()
+	case opcodeNotifyPositionAction:
+		return s.handleNotifyPositionAction()
+	default:
+		return nil
 	}
 }
