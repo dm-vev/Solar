@@ -109,11 +109,12 @@ type LevelStream struct {
 
 // Manager owns the current world snapshot.
 type Manager struct {
-	mu         sync.RWMutex
-	level      Level
-	ticks      atomic.Uint64
-	generation uint64
-	cache      levelCache
+	mu          sync.RWMutex
+	level       Level
+	ticks       atomic.Uint64
+	generation  uint64 // bumped on SetCurrent/SetSpawn (full-world changes)
+	blocksDirty bool   // set on SetBlock, cleared on next LevelStream re-compress
+	cache       levelCache
 }
 
 type levelCache struct {
@@ -180,7 +181,7 @@ func (m *Manager) SetBlock(x, y, z int, block byte) bool {
 	}
 
 	m.level.Blocks[packIndex(m.level, x, y, z)] = block
-	m.generation++
+	m.blocksDirty = true
 	return true
 }
 
@@ -199,8 +200,9 @@ func (m *Manager) LevelStream(fastMap bool) (LevelStream, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.cache.generation != m.generation {
+	if m.cache.generation != m.generation || m.blocksDirty {
 		m.cache.generation = m.generation
+		m.blocksDirty = false
 		m.cache.gzipData = nil
 		m.cache.flateData = nil
 	}

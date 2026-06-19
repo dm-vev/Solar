@@ -91,3 +91,15 @@ func (r *Room[T]) FindByName(name string) (T, bool) {
 	var zero T
 	return zero, false
 }
+
+// Snapshot returns a slice of all current participants. The caller may
+// iterate it without holding the room lock.
+func (r *Room[T]) Snapshot() []T {
+	r.mu.RLock()
+	peers := make([]T, 0, len(r.sessions))
+	for _, peer := range r.sessions {
+		peers = append(peers, peer)
+	}
+	r.mu.RUnlock()
+	return peers
+}

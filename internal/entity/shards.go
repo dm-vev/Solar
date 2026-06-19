@@ -7,7 +7,7 @@ const entityShardCount = 16
 
 type entityShard struct {
 	mu       sync.RWMutex
-	entities map[uint32]Entity
+	entities map[uint32]*Entity
 }
 
 func (m *Manager) shardIndex(id uint32) int {

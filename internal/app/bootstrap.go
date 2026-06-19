@@ -45,6 +45,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	codec.SetOutboxSize(cfg.Network.SessionOutbox)
 	codec.SetWriteBatchSize(cfg.Network.WriteBatchSize, cfg.Network.SessionOutbox)
 	codec.SetTCPNoDelay(cfg.Network.TCPNoDelay)
+	codec.SetSendTimeout(cfg.Network.SendTimeoutMode, cfg.Network.SendTimeout)
 
 	srv := server.New(
 		cfg,

@@ -231,6 +231,7 @@ func (s *Server) runTicks(ctx context.Context) {
 			if s.entities != nil {
 				s.entities.Tick()
 			}
+			s.codec.BroadcastEntityUpdates()
 		}
 	}
 }

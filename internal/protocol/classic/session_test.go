@@ -286,8 +286,8 @@ func TestServeConnUsesWorldSnapshot(t *testing.T) {
 		t.Fatalf("entity not tracked after login")
 	} else if entity.Name != "tester" {
 		t.Fatalf("entity name = %q, want tester", entity.Name)
-	} else if entity.Pos.X != 64 || entity.Pos.Y != 96 || entity.Pos.Z != 128 {
-		t.Fatalf("entity pos = %+v, want 64,96,128", entity.Pos)
+	} else if entity.Pos.X != 2048 || entity.Pos.Y != 3072 || entity.Pos.Z != 4096 {
+		t.Fatalf("entity pos = %+v, want 2048,3072,4096 (wire units)", entity.Pos)
 	}
 
 	if err := client.Close(); err != nil {
@@ -415,11 +415,11 @@ func TestServeConnUpdatesSelfEntityPosition(t *testing.T) {
 
 	loginAndDrain(t, client, 5, "tester", opcodePing)
 
-	if _, err := client.Write(encodeClientEntityTeleport(selfID, entity.Position{X: 20, Y: 12, Z: 18}, 33, 44)); err != nil {
+	if _, err := client.Write(encodeClientEntityTeleport(selfID, entity.Position{X: 640, Y: 384, Z: 576}, 33, 44)); err != nil {
 		t.Fatalf("write entity teleport: %v", err)
 	}
 
-	waitForEntity(t, entities, 1, entity.Position{X: 20, Y: 12, Z: 18}, 33, 44)
+	waitForEntity(t, entities, 1, entity.Position{X: 640, Y: 384, Z: 576}, 33, 44)
 
 	if err := client.Close(); err != nil {
 		t.Fatalf("close client: %v", err)
@@ -648,7 +648,7 @@ func TestServeConnExecutesTeleportAndSetSpawnCommands(t *testing.T) {
 		if teleport[0] != 1 {
 			t.Fatalf("teleport packet id = %d, want 1", teleport[0])
 		}
-		waitForEntity(t, entities, 1, entity.Position{X: 24, Y: 32, Z: 40}, 11, 22)
+		waitForEntity(t, entities, 1, entity.Position{X: 768, Y: 1024, Z: 1280}, 11, 22)
 
 		reply = make([]byte, 66)
 		if _, err := io.ReadFull(client, reply); err != nil {
@@ -680,7 +680,7 @@ func TestServeConnExecutesTeleportAndSetSpawnCommands(t *testing.T) {
 		if teleport[1] != 1 {
 			t.Fatalf("teleport packet id = %d, want 1", teleport[1])
 		}
-		waitForEntity(t, entities, 1, entity.Position{X: 24, Y: 32, Z: 40}, 11, 22)
+		waitForEntity(t, entities, 1, entity.Position{X: 768, Y: 1024, Z: 1280}, 11, 22)
 	default:
 		t.Fatalf("first tp packet opcode = %d, want teleport or message", first[0])
 	}
@@ -832,9 +832,9 @@ func encodeClientEntityTeleport(entityID byte, pos entity.Position, yaw, pitch b
 	packet := make([]byte, 10)
 	packet[0] = opcodeEntityTeleport
 	packet[1] = entityID
-	binary.BigEndian.PutUint16(packet[2:4], uint16(pos.X*32))
-	binary.BigEndian.PutUint16(packet[4:6], uint16(pos.Y*32+51))
-	binary.BigEndian.PutUint16(packet[6:8], uint16(pos.Z*32))
+	binary.BigEndian.PutUint16(packet[2:4], uint16(pos.X))
+	binary.BigEndian.PutUint16(packet[4:6], uint16(pos.Y+51))
+	binary.BigEndian.PutUint16(packet[6:8], uint16(pos.Z))
 	packet[8] = yaw
 	packet[9] = pitch
 	return packet

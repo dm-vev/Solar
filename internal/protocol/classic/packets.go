@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"math"
 	"strings"
 	"sync"
 	"time"
@@ -67,7 +66,9 @@ func (s *session) handleEntityTeleport() error {
 		return fmt.Errorf("read entity teleport payload: %w", err)
 	}
 
-	targetID := s.resolveEntityID(payload[0])
+	// Client always sends its own position. The ID byte is either
+	// selfID (255) or a held block ID (HeldBlock CPE extension).
+	targetID := s.currentEntityID()
 	position := decodeClassicPosition(payload[1:7])
 	yaw := payload[7]
 	pitch := payload[8]
@@ -75,7 +76,6 @@ func (s *session) handleEntityTeleport() error {
 	if s.entities != nil {
 		s.entities.SetLocation(targetID, position, yaw, pitch)
 	}
-	s.broadcastToPeers(encodeEntityTeleport(byte(targetID), position, yaw, pitch))
 	return nil
 }
 
@@ -130,26 +130,9 @@ func (s *session) applyRelativeUpdate(targetID uint32, dx, dy, dz, yaw, pitch by
 		return nil
 	}
 
-	entitySnapshot, ok := s.entities.Get(targetID)
-	if !ok {
-		return nil
-	}
-
-	position := entitySnapshot.Pos
-	if dx != 0 || dy != 0 || dz != 0 {
-		position.X += decodeClassicDelta(dx)
-		position.Y += decodeClassicDelta(dy)
-		position.Z += decodeClassicDelta(dz)
-	}
-
-	newYaw := entitySnapshot.Yaw
-	newPitch := entitySnapshot.Pitch
-	if yaw != 0 || pitch != 0 {
-		newYaw = yaw
-		newPitch = pitch
-	}
-	s.entities.SetLocation(targetID, position, newYaw, newPitch)
-	s.broadcastToPeers(encodeEntityTeleport(byte(targetID), position, newYaw, newPitch))
+	s.entities.ApplyDelta(targetID,
+		decodeClassicDelta(dx), decodeClassicDelta(dy), decodeClassicDelta(dz),
+		yaw, pitch)
 	return nil
 }
 
@@ -225,20 +208,19 @@ func (s *session) resolveEntityID(packetID byte) uint32 {
 	return uint32(packetID)
 }
 
+// decodeClassicPosition extracts a wire-coordinate position from a 6-byte
+// payload. Coordinates are stored as-is in wire units (1/32 block).
 func decodeClassicPosition(payload []byte) entity.Position {
 	return entity.Position{
-		X: decodeClassicCoord(int(binary.BigEndian.Uint16(payload[0:2]))),
-		Y: decodeClassicCoord(int(binary.BigEndian.Uint16(payload[2:4])) - eyeHeight),
-		Z: decodeClassicCoord(int(binary.BigEndian.Uint16(payload[4:6]))),
+		X: int(int16(binary.BigEndian.Uint16(payload[0:2]))),
+		Y: int(int16(binary.BigEndian.Uint16(payload[2:4]))) - eyeHeight,
+		Z: int(int16(binary.BigEndian.Uint16(payload[4:6]))),
 	}
 }
 
-func decodeClassicCoord(raw int) int {
-	return int(math.Round(float64(raw) / float64(coordScale)))
-}
-
+// decodeClassicDelta extracts a signed wire-unit delta from a byte.
 func decodeClassicDelta(raw byte) int {
-	return int(math.Round(float64(int8(raw)) / float64(coordScale)))
+	return int(int8(raw))
 }
 
 func (s *session) writeKick(message string) error {
@@ -247,6 +229,7 @@ func (s *session) writeKick(message string) error {
 
 // writePacket queues a packet for asynchronous writing. The packet slice
 // is copied because the caller may reuse the underlying buffer.
+// Blocks up to sendTimeout if the outbox is full, then disconnects.
 func (s *session) writePacket(packet []byte) error {
 	packetCopy := append([]byte(nil), packet...)
 	select {
@@ -255,14 +238,28 @@ func (s *session) writePacket(packet []byte) error {
 	case <-s.stop:
 		return io.ErrClosedPipe
 	default:
+	}
+	timeout := time.Duration(s.sendTimeoutVal.Load())
+	if timeout <= 0 {
+		s.fail()
+		return io.ErrShortWrite
+	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case s.outbox <- packetCopy:
+		return nil
+	case <-s.stop:
+		return io.ErrClosedPipe
+	case <-timer.C:
 		s.fail()
 		return io.ErrShortWrite
 	}
 }
 
-// writePacketNoCopy queues a packet without copying. The caller must
+// writePacketNoCopy queues a broadcast packet without copying. The caller must
 // guarantee that the packet slice will not be modified after this call.
-// Use this for broadcast packets that are shared between peers.
+// Drops the packet if the outbox is full — broadcast packets are best-effort.
 func (s *session) writePacketNoCopy(packet []byte) error {
 	select {
 	case s.outbox <- packet:
@@ -270,8 +267,7 @@ func (s *session) writePacketNoCopy(packet []byte) error {
 	case <-s.stop:
 		return io.ErrClosedPipe
 	default:
-		s.fail()
-		return io.ErrShortWrite
+		return nil
 	}
 }
 
@@ -378,9 +374,9 @@ func encodeAddEntity(id byte, name string, pos entity.Position, yaw, pitch byte)
 	packet[0] = opcodeAddEntity
 	packet[1] = id
 	writeFixedString(packet[2:66], name)
-	binary.BigEndian.PutUint16(packet[66:68], uint16(pos.X*coordScale))
-	binary.BigEndian.PutUint16(packet[68:70], uint16(pos.Y*coordScale+eyeHeight))
-	binary.BigEndian.PutUint16(packet[70:72], uint16(pos.Z*coordScale))
+	binary.BigEndian.PutUint16(packet[66:68], uint16(pos.X))
+	binary.BigEndian.PutUint16(packet[68:70], uint16(pos.Y+eyeHeight))
+	binary.BigEndian.PutUint16(packet[70:72], uint16(pos.Z))
 	packet[72] = yaw
 	packet[73] = pitch
 	return packet
@@ -394,12 +390,43 @@ func encodeEntityTeleport(id byte, pos entity.Position, yaw, pitch byte) []byte 
 	packet := make([]byte, 10)
 	packet[0] = opcodeEntityTeleport
 	packet[1] = id
-	binary.BigEndian.PutUint16(packet[2:4], uint16(pos.X*coordScale))
-	binary.BigEndian.PutUint16(packet[4:6], uint16(pos.Y*coordScale+eyeHeight))
-	binary.BigEndian.PutUint16(packet[6:8], uint16(pos.Z*coordScale))
+	binary.BigEndian.PutUint16(packet[2:4], uint16(pos.X))
+	binary.BigEndian.PutUint16(packet[4:6], uint16(pos.Y+eyeHeight))
+	binary.BigEndian.PutUint16(packet[6:8], uint16(pos.Z))
 	packet[8] = yaw
 	packet[9] = pitch
 	return packet
+}
+
+func encodeRelPosAndOrient(id byte, dx, dy, dz int, yaw, pitch byte) []byte {
+	packet := make([]byte, 7)
+	packet[0] = opcodeRelPosAndOrientation
+	packet[1] = id
+	packet[2] = byte(int8(dx))
+	packet[3] = byte(int8(dy))
+	packet[4] = byte(int8(dz))
+	packet[5] = yaw
+	packet[6] = pitch
+	return packet
+}
+
+func encodeRelPos(id byte, dx, dy, dz int) []byte {
+	packet := make([]byte, 5)
+	packet[0] = opcodeRelPos
+	packet[1] = id
+	packet[2] = byte(int8(dx))
+	packet[3] = byte(int8(dy))
+	packet[4] = byte(int8(dz))
+	return packet
+}
+
+func encodeOrientation(id byte, yaw, pitch byte) []byte {
+	return []byte{opcodeOrientation, id, yaw, pitch}
+}
+
+// fitsRelDelta reports whether a wire-unit delta fits in a signed byte.
+func fitsRelDelta(d int) bool {
+	return d >= -128 && d <= 127
 }
 
 func encodeMessage(messageType byte, message string) []byte {

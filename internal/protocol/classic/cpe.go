@@ -79,7 +79,6 @@ var serverExtensions = []struct {
 	{cpeExtEnvMapAspect, 2},
 	{cpeExtPlayerClick, 1},
 	{cpeExtEntityProperty, 1},
-	{cpeExtExtEntityPositions, 1},
 	{cpeExtTwoWayPingName, 1},
 	{cpeExtInventoryOrder, 1},
 	{cpeExtInstantMOTD, 1},

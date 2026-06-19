@@ -1,5 +1,7 @@
 package classic
 
+import "github.com/solar-mc/solar/internal/entity"
+
 func (s *session) setIdentity(username string, entityID uint32, tracked bool) {
 	s.stateMu.Lock()
 	s.username = username
@@ -71,4 +73,21 @@ func (s *session) currentSupportsFastMap() bool {
 
 func (s *session) currentSupportsExtPlayerList() bool {
 	return s.supportsExt(cpeExtPlayerListName)
+}
+
+func (s *session) lastBroadcast() (entity.Position, byte, byte) {
+	s.stateMu.RLock()
+	pos := s.lastPos
+	yaw := s.lastYaw
+	pitch := s.lastPitch
+	s.stateMu.RUnlock()
+	return pos, yaw, pitch
+}
+
+func (s *session) setLastBroadcast(pos entity.Position, yaw, pitch byte) {
+	s.stateMu.Lock()
+	s.lastPos = pos
+	s.lastYaw = yaw
+	s.lastPitch = pitch
+	s.stateMu.Unlock()
 }

@@ -38,11 +38,13 @@ type Config struct {
 
 // NetworkConfig controls per-session TCP I/O tuning.
 type NetworkConfig struct {
-	ReadTimeout    time.Duration `toml:"read_timeout"`
-	WriteTimeout   time.Duration `toml:"write_timeout"`
-	TCPNoDelay     bool          `toml:"tcp_nodelay"`
-	SessionOutbox  int           `toml:"session_outbox_size"`
-	WriteBatchSize int           `toml:"write_batch_size"`
+	ReadTimeout     time.Duration `toml:"read_timeout"`
+	WriteTimeout    time.Duration `toml:"write_timeout"`
+	TCPNoDelay      bool          `toml:"tcp_nodelay"`
+	SessionOutbox   int           `toml:"session_outbox_size"`
+	WriteBatchSize  int           `toml:"write_batch_size"`
+	SendTimeout     time.Duration `toml:"send_timeout"`
+	SendTimeoutMode string        `toml:"send_timeout_mode"`
 }
 
 // SimConfig controls the world/entity simulation loop.
@@ -113,11 +115,13 @@ func Load(path string) (Config, error) {
 		MOTD:             "CLI-only classic server",
 		Operators:        parseOperatorsEnv(),
 		Network: NetworkConfig{
-			ReadTimeout:    30 * time.Second,
-			WriteTimeout:   10 * time.Second,
-			TCPNoDelay:     true,
-			SessionOutbox:  256,
-			WriteBatchSize: 32,
+			ReadTimeout:     30 * time.Second,
+			WriteTimeout:    10 * time.Second,
+			TCPNoDelay:      true,
+			SessionOutbox:   256,
+			WriteBatchSize:  32,
+			SendTimeout:     50 * time.Millisecond,
+			SendTimeoutMode: "fixed",
 		},
 		Simulation: SimConfig{
 			TickInterval: 50 * time.Millisecond,
@@ -221,6 +225,14 @@ func (c Config) Validate() error {
 	if c.Network.WriteBatchSize < 1 {
 		return fmt.Errorf("network.write_batch_size must be at least 1")
 	}
+	if c.Network.SendTimeout < 0 {
+		return fmt.Errorf("network.send_timeout cannot be negative")
+	}
+	switch c.Network.SendTimeoutMode {
+	case "fixed", "adaptive", "":
+	default:
+		return fmt.Errorf("network.send_timeout_mode %q is not one of fixed|adaptive", c.Network.SendTimeoutMode)
+	}
 	if c.Simulation.TickInterval < 0 {
 		return fmt.Errorf("simulation.tick_interval cannot be negative")
 	}
@@ -308,6 +320,8 @@ write_timeout = "%s"
 tcp_nodelay = %v
 session_outbox_size = %d
 write_batch_size = %d
+send_timeout = "%s"
+send_timeout_mode = "%s"
 
 [simulation]
 tick_interval = "%s"
@@ -350,6 +364,7 @@ format = "%s"
 		cfg.Name, cfg.MOTD,
 		cfg.Network.ReadTimeout.String(), cfg.Network.WriteTimeout.String(),
 		cfg.Network.TCPNoDelay, cfg.Network.SessionOutbox, cfg.Network.WriteBatchSize,
+		cfg.Network.SendTimeout.String(), cfg.Network.SendTimeoutMode,
 		cfg.Simulation.TickInterval.String(),
 		cfg.World.DefaultWidth, cfg.World.DefaultHeight, cfg.World.DefaultLength, cfg.World.MaxBlocks,
 		cfg.Storage.Backend, cfg.Storage.WorldsDir, cfg.Storage.PlayersDir,

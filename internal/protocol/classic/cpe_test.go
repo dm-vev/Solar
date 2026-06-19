@@ -8,6 +8,8 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"github.com/solar-mc/solar/internal/entity"
 )
 
 func TestServeConnBroadcastsExtPlayerListJoinAndLeave(t *testing.T) {
@@ -188,6 +190,107 @@ func TestServeConnNegotiatesAllCPEExtensions(t *testing.T) {
 		t.Fatalf("read motd: %v", err)
 	}
 
+	if err := client.Close(); err != nil {
+		t.Fatalf("close client: %v", err)
+	}
+	<-done
+}
+
+// classiCubeExtensions lists all extensions ClassiCube client sends.
+var classiCubeExtensions = []struct {
+	name    string
+	version uint32
+}{
+	{"ClickDistance", 1}, {"CustomBlocks", 1}, {"HeldBlock", 1}, {"EmoteFix", 1},
+	{"TextHotKey", 1}, {"ExtPlayerList", 2}, {"EnvColors", 1}, {"SelectionCuboid", 1},
+	{"BlockPermissions", 1}, {"ChangeModel", 1}, {"EnvMapAppearance", 2}, {"EnvWeatherType", 1},
+	{"MessageTypes", 1}, {"HackControl", 1}, {"PlayerClick", 1}, {"FullCP437", 1},
+	{"LongerMessages", 1}, {"BlockDefinitions", 1}, {"BlockDefinitionsExt", 2}, {"BulkBlockUpdate", 1},
+	{"TextColors", 1}, {"EnvMapAspect", 2}, {"EntityProperty", 1}, {"ExtEntityPositions", 1},
+	{"TwoWayPing", 1}, {"InventoryOrder", 1}, {"InstantMOTD", 1}, {"FastMap", 1},
+	{"SetHotbar", 1}, {"SetSpawnpoint", 1}, {"VelocityControl", 1}, {"CustomParticles", 1},
+	{"PluginMessages", 1}, {"ExtEntityTeleport", 1}, {"LightingMode", 1}, {"CinematicGui", 1},
+	{"NotifyAction", 1}, {"ToggleBlockList", 1},
+}
+
+func TestServeConnClassiCubeFullFlow(t *testing.T) {
+	t.Parallel()
+
+	codec := newTestCodec()
+	server, client := net.Pipe()
+	done := make(chan struct{})
+
+	go func() {
+		codec.ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	// Send CPE handshake like ClassiCube
+	if _, err := client.Write(encodeClientHandshake(7, "tester", 0x42)); err != nil {
+		t.Fatalf("write handshake: %v", err)
+	}
+
+	// Read server ExtInfo
+	serverExtInfo := make([]byte, 67)
+	if _, err := io.ReadFull(client, serverExtInfo); err != nil {
+		t.Fatalf("read server ext info: %v", err)
+	}
+	serverExtCount := int(binary.BigEndian.Uint16(serverExtInfo[65:67]))
+
+	// Read all server ExtEntry packets
+	for i := 0; i < serverExtCount; i++ {
+		entry := make([]byte, 69)
+		if _, err := io.ReadFull(client, entry); err != nil {
+			t.Fatalf("read server ext entry %d: %v", i, err)
+		}
+		// Verify server does NOT advertise ExtEntityPositions
+		name := bytes.TrimRight(entry[1:65], " \x00")
+		if string(name) == "ExtEntityPositions" {
+			t.Fatalf("server must not advertise ExtEntityPositions")
+		}
+	}
+
+	// Client sends all its extensions (including ExtEntityPositions)
+	if _, err := client.Write(encodeClientExtInfo("ClassiCube", len(classiCubeExtensions))); err != nil {
+		t.Fatalf("write client ext info: %v", err)
+	}
+	for _, ext := range classiCubeExtensions {
+		if _, err := client.Write(encodeClientExtEntry(ext.name, ext.version)); err != nil {
+			t.Fatalf("write client ext entry %s: %v", ext.name, err)
+		}
+	}
+
+	// Read MOTD
+	if _, err := io.ReadFull(client, make([]byte, 131)); err != nil {
+		t.Fatalf("read motd: %v", err)
+	}
+
+	// Read level stream (FastMap since client supports it)
+	stream := readLevelStream(t, client, true)
+	if stream.Teleport[0] != opcodeEntityTeleport {
+		t.Fatalf("initial teleport opcode = %d, want %d", stream.Teleport[0], opcodeEntityTeleport)
+	}
+
+	// Send position update with selfID=255 (standard)
+	if _, err := client.Write(encodeClientEntityTeleport(255, entity.Position{X: 320, Y: 640, Z: 960}, 0, 0)); err != nil {
+		t.Fatalf("write teleport self: %v", err)
+	}
+
+	// Send position update with a block ID (HeldBlock extension)
+	// Client sends held block ID instead of 255 — server must treat as self
+	if _, err := client.Write(encodeClientEntityTeleport(3, entity.Position{X: 352, Y: 640, Z: 960}, 0, 0)); err != nil {
+		t.Fatalf("write teleport heldblock: %v", err)
+	}
+
+	// Wait for entity update to process
+	time.Sleep(50 * time.Millisecond)
+
+	// Connection should still be alive — send a ping
+	if _, err := client.Write([]byte{opcodePing}); err != nil {
+		t.Fatalf("write ping after teleport: %v", err)
+	}
+
+	// If connection is dead, close will fail or done will not fire
 	if err := client.Close(); err != nil {
 		t.Fatalf("close client: %v", err)
 	}

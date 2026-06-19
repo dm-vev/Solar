@@ -154,9 +154,9 @@ func (s *session) currentLocation() (world.Spawn, byte, byte) {
 	if s.entities != nil && entityID != 0 {
 		if entitySnapshot, ok := s.entities.Get(entityID); ok {
 			return world.Spawn{
-				X:     entitySnapshot.Pos.X,
-				Y:     entitySnapshot.Pos.Y,
-				Z:     entitySnapshot.Pos.Z,
+				X:     entitySnapshot.Pos.X / coordScale,
+				Y:     entitySnapshot.Pos.Y / coordScale,
+				Z:     entitySnapshot.Pos.Z / coordScale,
 				Yaw:   entitySnapshot.Yaw,
 				Pitch: entitySnapshot.Pitch,
 			}, entitySnapshot.Yaw, entitySnapshot.Pitch
@@ -181,11 +181,7 @@ func (s *session) teleportSelf(x, y, z int, yaw, pitch byte) bool {
 	}
 
 	packet := encodeEntityTeleport(byte(entityID), position, yaw, pitch)
-	if err := s.writePacket(packet); err != nil {
-		return false
-	}
-	s.broadcastToPeers(packet)
-	return true
+	return s.writePacket(packet) == nil
 }
 
 func (s *session) saveState() bool {
@@ -329,5 +325,5 @@ func (s *session) generateWorld(name, theme string, width, height, length int, s
 }
 
 func entityPosition(x, y, z int) entity.Position {
-	return entity.Position{X: x, Y: y, Z: z}
+	return entity.Position{X: x * coordScale, Y: y * coordScale, Z: z * coordScale}
 }

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/solar-mc/solar/internal/command"
@@ -25,6 +26,11 @@ import (
 const (
 	defaultReadDeadline  = 30 * time.Second
 	defaultWriteDeadline = 10 * time.Second
+	defaultSendTimeout   = 50 * time.Millisecond
+
+	adaptiveBase      = 20 * time.Millisecond
+	adaptivePerPlayer = 300 * time.Microsecond
+	adaptiveMax       = 150 * time.Millisecond
 )
 
 // Codec owns the Classic/ClassiCube wire format.
@@ -42,6 +48,8 @@ type Codec struct {
 	workers             *worker.Pool
 	readDeadline        time.Duration
 	writeDeadline       time.Duration
+	sendTimeoutMode     string
+	sendTimeoutVal      atomic.Int64
 	outboxSize          int
 	writeBatchSize      int
 	shutdownBatchSize   int
@@ -69,7 +77,7 @@ func NewCodec(
 	if commands == nil {
 		commands = command.NewRegistry()
 	}
-	return &Codec{
+	c := &Codec{
 		serverName:        serverName,
 		motd:              motd,
 		worlds:            worlds,
@@ -80,11 +88,14 @@ func NewCodec(
 		logger:            slog.Default(),
 		readDeadline:      defaultReadDeadline,
 		writeDeadline:     defaultWriteDeadline,
+		sendTimeoutMode:   "fixed",
 		outboxSize:        256,
 		writeBatchSize:    32,
 		shutdownBatchSize: 256,
 		tcpNoDelay:        true,
 	}
+	c.sendTimeoutVal.Store(int64(defaultSendTimeout))
+	return c
 }
 
 // SetLogger configures protocol/session logging.
@@ -145,6 +156,20 @@ func (c *Codec) SetTCPNoDelay(enable bool) {
 	c.tcpNoDelay = enable
 }
 
+// SetSendTimeout configures the send timeout mode and base duration.
+// mode is "fixed" (constant timeout) or "adaptive" (scales with player count).
+// In adaptive mode, timeout = min(base + players*0.3ms, 150ms).
+func (c *Codec) SetSendTimeout(mode string, base time.Duration) {
+	if mode == "adaptive" {
+		c.sendTimeoutMode = "adaptive"
+	} else {
+		c.sendTimeoutMode = "fixed"
+	}
+	if base > 0 {
+		c.sendTimeoutVal.Store(int64(base))
+	}
+}
+
 // ServeConn handles a single client connection until it closes, sends bad
 // data, or ctx is canceled.
 func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
@@ -167,6 +192,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		workers:             c.workers,
 		readDeadline:        c.readDeadline,
 		writeDeadline:       c.writeDeadline,
+		sendTimeoutVal:      &c.sendTimeoutVal,
 		outboxSize:          c.outboxSize,
 		writeBatchSize:      c.writeBatchSize,
 		shutdownBatchSize:   c.shutdownBatchSize,
@@ -216,6 +242,7 @@ type session struct {
 	workers             *worker.Pool
 	readDeadline        time.Duration
 	writeDeadline       time.Duration
+	sendTimeoutVal      *atomic.Int64
 	outboxSize          int
 	writeBatchSize      int
 	shutdownBatchSize   int
@@ -230,6 +257,9 @@ type session struct {
 	tracked             bool
 	loggedIn            bool
 	joined              bool
+	lastPos             entity.Position
+	lastYaw             byte
+	lastPitch           byte
 	cpeExts             map[string]uint32
 	buildCommandContext func(SessionBackend) command.Context
 }
@@ -334,6 +364,100 @@ func (s *session) cleanup() {
 	}
 	if s.entities != nil && entityID != 0 {
 		s.entities.Remove(entityID)
+	}
+}
+
+// BroadcastEntityUpdates runs the per-tick entity position broadcast.
+// It snapshots all sessions, finds entities whose position/rotation changed
+// since the last tick, and sends each recipient a single concatenated buffer.
+// Uses delta encoding: small movements go as RelPos/RelPosAndOrient packets
+// (which the client interpolates smoothly); large jumps use EntityTeleport.
+// Modeled on MCGalaxy's BroadcastEntityPositions.
+func (c *Codec) BroadcastEntityUpdates() {
+	peers := c.room.Snapshot()
+
+	if c.sendTimeoutMode == "adaptive" {
+		n := len(peers)
+		t := adaptiveBase + time.Duration(n)*adaptivePerPlayer
+		if t > adaptiveMax {
+			t = adaptiveMax
+		}
+		c.sendTimeoutVal.Store(int64(t))
+	}
+
+	if len(peers) < 2 {
+		return
+	}
+
+	type change struct {
+		sess  *session
+		pkt   []byte
+		pos   entity.Position
+		yaw   byte
+		pitch byte
+	}
+
+	changes := make([]change, 0, len(peers))
+	for _, s := range peers {
+		eid := s.currentEntityID()
+		if eid == 0 {
+			continue
+		}
+		snap, ok := s.entitySnapshot()
+		if !ok {
+			continue
+		}
+
+		lastPos, lastYaw, lastPitch := s.lastBroadcast()
+		posChanged := snap.Pos != lastPos
+		oriChanged := snap.Yaw != lastYaw || snap.Pitch != lastPitch
+		if !posChanged && !oriChanged {
+			continue
+		}
+
+		var pkt []byte
+		id := byte(eid)
+		dx, dy, dz := snap.Pos.X-lastPos.X, snap.Pos.Y-lastPos.Y, snap.Pos.Z-lastPos.Z
+
+		switch {
+		case posChanged && fitsRelDelta(dx) && fitsRelDelta(dy) && fitsRelDelta(dz) && oriChanged:
+			pkt = encodeRelPosAndOrient(id, dx, dy, dz, snap.Yaw, snap.Pitch)
+		case posChanged && fitsRelDelta(dx) && fitsRelDelta(dy) && fitsRelDelta(dz):
+			pkt = encodeRelPos(id, dx, dy, dz)
+		case !posChanged && oriChanged:
+			pkt = encodeOrientation(id, snap.Yaw, snap.Pitch)
+		default:
+			pkt = encodeEntityTeleport(id, snap.Pos, snap.Yaw, snap.Pitch)
+		}
+
+		changes = append(changes, change{
+			sess:  s,
+			pkt:   pkt,
+			pos:   snap.Pos,
+			yaw:   snap.Yaw,
+			pitch: snap.Pitch,
+		})
+	}
+
+	if len(changes) == 0 {
+		return
+	}
+
+	for _, dst := range peers {
+		var buf []byte
+		for _, ch := range changes {
+			if ch.sess == dst {
+				continue
+			}
+			buf = append(buf, ch.pkt...)
+		}
+		if len(buf) > 0 {
+			_ = dst.writePacketNoCopy(buf)
+		}
+	}
+
+	for _, ch := range changes {
+		ch.sess.setLastBroadcast(ch.pos, ch.yaw, ch.pitch)
 	}
 }
 

@@ -3,7 +3,6 @@ package loadtest
 import (
 	"testing"
 
-	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/protocol/wire"
 )
 
@@ -22,7 +21,7 @@ func TestEncodeLoadtestSetBlock(t *testing.T) {
 func TestEncodeLoadtestTeleport(t *testing.T) {
 	t.Parallel()
 
-	packet := encodeLoadtestTeleport(entity.Position{X: 4, Y: 5, Z: 6}, 11, 22)
+	packet := encodeLoadtestTeleport(128, 160, 192, 11, 22)
 	if packet[0] != wire.OpcodeEntityTeleport {
 		t.Fatalf("opcode = %d, want %d", packet[0], wire.OpcodeEntityTeleport)
 	}

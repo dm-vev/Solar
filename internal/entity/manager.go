@@ -13,7 +13,7 @@ type Manager struct {
 func NewManager() *Manager {
 	m := &Manager{}
 	for i := range m.shards {
-		m.shards[i].entities = make(map[uint32]Entity)
+		m.shards[i].entities = make(map[uint32]*Entity)
 	}
 	return m
 }
@@ -27,7 +27,7 @@ func (m *Manager) Add(name string, pos Position) (uint32, bool) {
 	id := m.nextID.Add(1)
 	shard := &m.shards[m.shardIndex(id)]
 	shard.mu.Lock()
-	shard.entities[id] = Entity{Name: name, Pos: pos}
+	shard.entities[id] = &Entity{Name: name, Pos: pos}
 	shard.mu.Unlock()
 	return id, true
 }
@@ -44,9 +44,8 @@ func (m *Manager) Remove(id uint32) {
 func (m *Manager) SetVelocity(id uint32, vel Velocity) {
 	shard := &m.shards[m.shardIndex(id)]
 	shard.mu.Lock()
-	if entity, ok := shard.entities[id]; ok {
-		entity.Vel = vel
-		shard.entities[id] = entity
+	if e, ok := shard.entities[id]; ok {
+		e.Vel = vel
 	}
 	shard.mu.Unlock()
 }
@@ -57,15 +56,35 @@ func (m *Manager) SetLocation(id uint32, pos Position, yaw, pitch byte) bool {
 	shard.mu.Lock()
 	defer shard.mu.Unlock()
 
-	entity, ok := shard.entities[id]
+	e, ok := shard.entities[id]
 	if !ok {
 		return false
 	}
-	entity.Pos = pos
-	entity.Yaw = yaw
-	entity.Pitch = pitch
-	shard.entities[id] = entity
+	e.Pos = pos
+	e.Yaw = yaw
+	e.Pitch = pitch
 	return true
+}
+
+// ApplyDelta atomically applies a position delta and optional rotation
+// update under a single shard lock, returning the resulting state.
+func (m *Manager) ApplyDelta(id uint32, dx, dy, dz int, yaw, pitch byte) (Position, byte, byte, bool) {
+	shard := &m.shards[m.shardIndex(id)]
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+
+	e, ok := shard.entities[id]
+	if !ok {
+		return Position{}, 0, 0, false
+	}
+	e.Pos.X += dx
+	e.Pos.Y += dy
+	e.Pos.Z += dz
+	if yaw != 0 || pitch != 0 {
+		e.Yaw = yaw
+		e.Pitch = pitch
+	}
+	return e.Pos, e.Yaw, e.Pitch, true
 }
 
 // Get returns an entity snapshot by ID.
@@ -74,8 +93,11 @@ func (m *Manager) Get(id uint32) (Entity, bool) {
 	shard.mu.RLock()
 	defer shard.mu.RUnlock()
 
-	entity, ok := shard.entities[id]
-	return entity, ok
+	e, ok := shard.entities[id]
+	if !ok {
+		return Entity{}, false
+	}
+	return *e, true
 }
 
 // Count returns the current number of active entities.
@@ -95,11 +117,10 @@ func (m *Manager) Tick() {
 	for i := range m.shards {
 		shard := &m.shards[i]
 		shard.mu.Lock()
-		for id, entity := range shard.entities {
-			entity.Pos.X += entity.Vel.X
-			entity.Pos.Y += entity.Vel.Y
-			entity.Pos.Z += entity.Vel.Z
-			shard.entities[id] = entity
+		for _, e := range shard.entities {
+			e.Pos.X += e.Vel.X
+			e.Pos.Y += e.Vel.Y
+			e.Pos.Z += e.Vel.Z
 		}
 		shard.mu.Unlock()
 	}

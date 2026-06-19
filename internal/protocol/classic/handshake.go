@@ -46,9 +46,9 @@ func (s *session) handleHandshake() error {
 	tracked := false
 	if s.entities != nil {
 		id, ok := s.entities.Add(username, entity.Position{
-			X: spawn.X,
-			Y: spawn.Y,
-			Z: spawn.Z,
+			X: spawn.X * coordScale,
+			Y: spawn.Y * coordScale,
+			Z: spawn.Z * coordScale,
 		})
 		if ok {
 			entityID = id

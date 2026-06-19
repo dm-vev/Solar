@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/protocol/wire"
 )
 
@@ -66,12 +65,10 @@ func runMoveScenario(ctx context.Context, conn net.Conn, index int) error {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			position := entity.Position{
-				X: 16 + index*2 + step,
-				Y: 10,
-				Z: 16 + step,
-			}
-			if err := sendClientPacket(conn, encodeLoadtestTeleport(position, byte((index+step)%256), byte((index+step*2)%256))); err != nil {
+			x := (16 + index*2 + step) * wire.CoordScale
+			y := 10 * wire.CoordScale
+			z := (16 + step) * wire.CoordScale
+			if err := sendClientPacket(conn, encodeLoadtestTeleport(x, y, z, byte((index+step)%256), byte((index+step*2)%256))); err != nil {
 				return err
 			}
 			step++
@@ -114,12 +111,10 @@ func runMixedScenario(ctx context.Context, conn net.Conn, username string, index
 					return err
 				}
 			case 1:
-				position := entity.Position{
-					X: 16 + index + step,
-					Y: 10,
-					Z: 16 + step,
-				}
-				if err := sendClientPacket(conn, encodeLoadtestTeleport(position, 255, 0)); err != nil {
+				x := (16 + index + step) * wire.CoordScale
+				y := 10 * wire.CoordScale
+				z := (16 + step) * wire.CoordScale
+				if err := sendClientPacket(conn, encodeLoadtestTeleport(x, y, z, 255, 0)); err != nil {
 					return err
 				}
 			default:
@@ -149,13 +144,13 @@ func encodeLoadtestMessage(username string, index, step int) []byte {
 	return packet
 }
 
-func encodeLoadtestTeleport(pos entity.Position, yaw, pitch byte) []byte {
+func encodeLoadtestTeleport(x, y, z int, yaw, pitch byte) []byte {
 	packet := make([]byte, 10)
 	packet[0] = wire.OpcodeEntityTeleport
 	packet[1] = 255
-	binary.BigEndian.PutUint16(packet[2:4], uint16(pos.X*wire.CoordScale))
-	binary.BigEndian.PutUint16(packet[4:6], uint16(pos.Y*wire.CoordScale+wire.EyeHeight))
-	binary.BigEndian.PutUint16(packet[6:8], uint16(pos.Z*wire.CoordScale))
+	binary.BigEndian.PutUint16(packet[2:4], uint16(x))
+	binary.BigEndian.PutUint16(packet[4:6], uint16(y+wire.EyeHeight))
+	binary.BigEndian.PutUint16(packet[6:8], uint16(z))
 	packet[8] = yaw
 	packet[9] = pitch
 	return packet
