@@ -248,3 +248,41 @@ func TestManagerConcurrentBlockAccess(t *testing.T) {
 		t.Fatalf("TickCount = %d, want 1000", got)
 	}
 }
+
+func TestManagerSpawn(t *testing.T) {
+	t.Parallel()
+
+	mgr := NewManager()
+	want := Spawn{X: 11, Y: 22, Z: 33, Yaw: 44, Pitch: 55}
+	mgr.SetSpawn(want)
+
+	got := mgr.Spawn()
+	if got != want {
+		t.Fatalf("Spawn() = %+v, want %+v", got, want)
+	}
+}
+
+func TestManagerConcurrentSpawnAndSetCurrent(t *testing.T) {
+	t.Parallel()
+
+	mgr := NewManager()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			mgr.SetSpawn(Spawn{X: i, Y: i, Z: i})
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1000; i++ {
+			_ = mgr.Spawn()
+		}
+	}()
+
+	wg.Wait()
+}

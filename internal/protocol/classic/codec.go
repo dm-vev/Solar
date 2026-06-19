@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
@@ -15,6 +16,15 @@ import (
 	sess "github.com/solar-mc/solar/internal/session"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
+)
+
+// Default deadlines for TCP session I/O. A read deadline protects against
+// slowloris-style attacks where a client connects but never sends data; a
+// write deadline protects against stuck clients that stop reading server
+// output. Both can be overridden per-codec via SetConnTimeouts.
+const (
+	defaultReadDeadline  = 30 * time.Second
+	defaultWriteDeadline = 10 * time.Second
 )
 
 // Codec owns the Classic/ClassiCube wire format.
@@ -30,6 +40,8 @@ type Codec struct {
 	worldPath           string
 	policyPath          string
 	workers             *worker.Pool
+	readDeadline        time.Duration
+	writeDeadline       time.Duration
 	buildCommandContext func(SessionBackend) command.Context
 }
 
@@ -54,14 +66,16 @@ func NewCodec(
 		commands = command.NewRegistry()
 	}
 	return &Codec{
-		serverName: serverName,
-		motd:       motd,
-		worlds:     worlds,
-		players:    players,
-		entities:   entities,
-		commands:   commands,
-		room:       sess.NewRoom[*session](),
-		logger:     slog.Default(),
+		serverName:    serverName,
+		motd:          motd,
+		worlds:        worlds,
+		players:       players,
+		entities:      entities,
+		commands:      commands,
+		room:          sess.NewRoom[*session](),
+		logger:        slog.Default(),
+		readDeadline:  defaultReadDeadline,
+		writeDeadline: defaultWriteDeadline,
 	}
 }
 
@@ -91,6 +105,14 @@ func (c *Codec) SetWorkerPool(pool *worker.Pool) {
 	c.workers = pool
 }
 
+// SetConnTimeouts configures per-session TCP read and write deadlines.
+// A value of 0 disables the corresponding deadline. By default the codec
+// uses defaultReadDeadline and defaultWriteDeadline.
+func (c *Codec) SetConnTimeouts(read, write time.Duration) {
+	c.readDeadline = read
+	c.writeDeadline = write
+}
+
 // ServeConn handles a single client connection until it closes, sends bad
 // data, or ctx is canceled.
 func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
@@ -111,6 +133,8 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		worldPath:           c.worldPath,
 		policyPath:          c.policyPath,
 		workers:             c.workers,
+		readDeadline:        c.readDeadline,
+		writeDeadline:       c.writeDeadline,
 		outbox:              make(chan []byte, 64),
 		stop:                make(chan struct{}),
 		writerDone:          make(chan struct{}),
@@ -149,6 +173,8 @@ type session struct {
 	worldPath             string
 	policyPath            string
 	workers               *worker.Pool
+	readDeadline          time.Duration
+	writeDeadline         time.Duration
 	outbox                chan []byte
 	stop                  chan struct{}
 	writerDone            chan struct{}
@@ -178,6 +204,12 @@ func (s *session) run() error {
 	defer s.cleanup()
 
 	for {
+		if s.readDeadline > 0 {
+			if err := s.conn.SetReadDeadline(time.Now().Add(s.readDeadline)); err != nil {
+				return fmt.Errorf("set read deadline: %w", err)
+			}
+		}
+
 		opcode, err := s.reader.ReadByte()
 		if err != nil {
 			if err == io.EOF {

@@ -224,6 +224,15 @@ func TestSaveCommand(t *testing.T) {
 			t.Fatalf("got %q", got)
 		}
 	})
+
+	t.Run("save failed", func(t *testing.T) {
+		t.Parallel()
+		ctx := Context{Persistence: failingPersistence{}}
+		got, _ := saveCommand(ctx, nil)
+		if got != "save failed" {
+			t.Fatalf("got %q, want 'save failed'", got)
+		}
+	})
 }
 
 func TestRegistryUnknownCommand(t *testing.T) {
@@ -290,6 +299,10 @@ func (d stubDirectory) ListWhitelisted() []string { return d.whitelisted }
 type stubPersistence struct{}
 
 func (stubPersistence) SaveState() bool { return true }
+
+type failingPersistence struct{}
+
+func (failingPersistence) SaveState() bool { return false }
 
 func containsStr(s, sub string) bool {
 	for i := 0; i+len(sub) <= len(s); i++ {

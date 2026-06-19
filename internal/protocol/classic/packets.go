@@ -7,6 +7,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
@@ -304,6 +305,11 @@ func (s *session) writeLoop() {
 func (s *session) writeOnePacket(packet []byte) bool {
 	if packet == nil {
 		return false
+	}
+	if s.writeDeadline > 0 {
+		if err := s.conn.SetWriteDeadline(time.Now().Add(s.writeDeadline)); err != nil {
+			return false
+		}
 	}
 	if _, err := s.writer.Write(packet); err != nil {
 		return false

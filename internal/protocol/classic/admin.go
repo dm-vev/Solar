@@ -105,7 +105,9 @@ func (s *session) WhitelistAdd(name string) bool {
 		return false
 	}
 	changed := s.players.WhitelistAdd(name)
-	s.persistPlayerPolicy()
+	if !s.persistPlayerPolicy() {
+		return false
+	}
 	return changed
 }
 
@@ -114,7 +116,9 @@ func (s *session) WhitelistRemove(name string) bool {
 		return false
 	}
 	changed := s.players.WhitelistRemove(name)
-	s.persistPlayerPolicy()
+	if !s.persistPlayerPolicy() {
+		return false
+	}
 	return changed
 }
 
@@ -123,7 +127,9 @@ func (s *session) SetWhitelistEnabled(enabled bool) bool {
 		return false
 	}
 	changed := s.players.SetWhitelistEnabled(enabled)
-	s.persistPlayerPolicy()
+	if !s.persistPlayerPolicy() {
+		return false
+	}
 	return changed
 }
 
@@ -157,8 +163,8 @@ func (s *session) currentLocation() (world.Spawn, byte, byte) {
 		}
 	}
 	if s.worlds != nil {
-		level := s.worlds.CurrentRef()
-		return level.Spawn, level.Spawn.Yaw, level.Spawn.Pitch
+		spawn := s.worlds.Spawn()
+		return spawn, spawn.Yaw, spawn.Pitch
 	}
 	return world.Spawn{}, 0, 0
 }
@@ -206,9 +212,11 @@ func (s *session) saveState() bool {
 		}
 	}
 
-	// Run synchronously if no worker pool, otherwise dispatch in background.
 	if s.workers != nil {
-		s.workers.Submit(save)
+		if !s.workers.Submit(save) {
+			logger.Error("failed to queue save", "world_path", worldPath, "policy_path", policyPath)
+			return false
+		}
 	} else {
 		go save()
 	}
@@ -217,7 +225,7 @@ func (s *session) saveState() bool {
 
 func (s *session) persistPlayerPolicy() bool {
 	if s.players == nil || s.policyPath == "" {
-		return false
+		return true
 	}
 	policyPath := s.policyPath
 	players := s.players
@@ -230,7 +238,10 @@ func (s *session) persistPlayerPolicy() bool {
 	}
 
 	if s.workers != nil {
-		s.workers.Submit(save)
+		if !s.workers.Submit(save) {
+			logger.Error("failed to queue player policy save", "path", policyPath)
+			return false
+		}
 	} else {
 		go save()
 	}
@@ -262,11 +273,14 @@ func (s *session) banPlayer(name, reason string) bool {
 		reason = fmt.Sprintf("banned by %s", s.currentUsername())
 	}
 	changed := s.players.Ban(name, reason)
-	s.persistPlayerPolicy()
+	persisted := s.persistPlayerPolicy()
 	if s.room != nil {
 		if target, ok := s.room.FindByName(name); ok {
 			target.disconnect(reason)
 		}
+	}
+	if !persisted {
+		return false
 	}
 	return changed
 }
@@ -276,7 +290,9 @@ func (s *session) unbanPlayer(name string) bool {
 		return false
 	}
 	changed := s.players.Unban(name)
-	s.persistPlayerPolicy()
+	if !s.persistPlayerPolicy() {
+		return false
+	}
 	return changed
 }
 

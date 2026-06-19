@@ -80,13 +80,13 @@ func (m *Manager) Current() Level {
 	return cloneLevel(m.level)
 }
 
-// CurrentRef returns a read-only pointer to the active world. The caller
-// must not modify the Blocks slice. Use this in hot paths where cloning
-// the entire block array is wasteful (e.g. handshake level streaming).
-func (m *Manager) CurrentRef() *Level {
+// Spawn returns the spawn point of the active world snapshot. This is a
+// safe accessor for callers that only need the spawn (e.g. computing a
+// fallback position) without cloning the entire block array.
+func (m *Manager) Spawn() Spawn {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return &m.level
+	return m.level.Spawn
 }
 
 // SetCurrent replaces the active world snapshot.

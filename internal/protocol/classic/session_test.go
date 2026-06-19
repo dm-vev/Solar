@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/player"
+	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
 )
 
@@ -30,7 +33,6 @@ func TestServeConnMatchesClassiCubeFlow(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -130,8 +132,11 @@ func TestServeConnIgnoresClientPingAfterLogin(t *testing.T) {
 	var buf [1]byte
 	if n, err := client.Read(buf[:]); err == nil {
 		t.Fatalf("read after login ping returned %d bytes, want timeout", n)
-	} else if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
-		t.Fatalf("read after login ping error = %v, want timeout", err)
+	} else {
+		var ne net.Error
+		if !errors.As(err, &ne) || !ne.Timeout() {
+			t.Fatalf("read after login ping error = %v, want timeout", err)
+		}
 	}
 
 	if err := client.Close(); err != nil {
@@ -879,4 +884,164 @@ func waitForEntity(
 		t.Fatal("entity not found after movement update")
 	}
 	t.Fatalf("entity state = %+v, want pos=%+v yaw=%d pitch=%d", got, wantPos, wantYaw, wantPitch)
+}
+
+func TestServeConnDropsIdleClientOnReadDeadline(t *testing.T) {
+	t.Parallel()
+
+	codec := newTestCodec()
+	codec.SetConnTimeouts(50*time.Millisecond, 0)
+
+	server, client := net.Pipe()
+	done := make(chan struct{})
+	go func() {
+		codec.ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	if err := client.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
+	buf := make([]byte, 1)
+	if _, err := client.Read(buf); err == nil {
+		t.Fatal("expected read error from closed connection, got nil")
+	}
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ServeConn did not return after read deadline expiry")
+	}
+
+	_ = client.Close()
+}
+
+func TestServeConnDropsClientOnWriteDeadline(t *testing.T) {
+	t.Parallel()
+
+	codec := newTestCodec()
+	codec.SetConnTimeouts(0, 50*time.Millisecond)
+
+	server, client := net.Pipe()
+	done := make(chan struct{})
+	go func() {
+		codec.ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	if _, err := client.Write(encodeClientHandshake(7, "tester", 0)); err != nil {
+		t.Fatalf("write handshake: %v", err)
+	}
+
+	// Read the motd but then stop reading — the server's subsequent level
+	// stream writes will block and hit the write deadline.
+	motd := make([]byte, 131)
+	if _, err := io.ReadFull(client, motd); err != nil {
+		t.Fatalf("read motd: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ServeConn did not return after write deadline expiry")
+	}
+
+	_ = client.Close()
+}
+
+func TestCodecDefaultConnTimeouts(t *testing.T) {
+	t.Parallel()
+
+	codec := newTestCodec()
+	if codec.readDeadline != defaultReadDeadline {
+		t.Fatalf("readDeadline = %v, want %v", codec.readDeadline, defaultReadDeadline)
+	}
+	if codec.writeDeadline != defaultWriteDeadline {
+		t.Fatalf("writeDeadline = %v, want %v", codec.writeDeadline, defaultWriteDeadline)
+	}
+
+	codec.SetConnTimeouts(5*time.Second, 3*time.Second)
+	if codec.readDeadline != 5*time.Second {
+		t.Fatalf("readDeadline = %v, want 5s", codec.readDeadline)
+	}
+	if codec.writeDeadline != 3*time.Second {
+		t.Fatalf("writeDeadline = %v, want 3s", codec.writeDeadline)
+	}
+}
+
+func TestServeConnSaveFailsWithClosedWorkerPool(t *testing.T) {
+	t.Parallel()
+
+	codec := newTestCodecWithOperators("tester")
+	pool := worker.NewPool(context.Background(), 1)
+	pool.Close()
+	codec.SetWorkerPool(pool)
+	codec.SetPersistencePaths(
+		filepath.Join(t.TempDir(), "world.swld"),
+		filepath.Join(t.TempDir(), "policy.json"),
+	)
+
+	server, client := net.Pipe()
+	done := make(chan struct{})
+	go func() {
+		codec.ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	loginAndDrain(t, client, 5, "tester", opcodePing)
+
+	if _, err := client.Write(encodeClientMessage("/save")); err != nil {
+		t.Fatalf("write save command: %v", err)
+	}
+
+	reply := make([]byte, 66)
+	if _, err := io.ReadFull(client, reply); err != nil {
+		t.Fatalf("read save reply: %v", err)
+	}
+	text := bytes.TrimRight(reply[2:66], " \x00")
+	if !strings.Contains(string(text), "save failed") {
+		t.Fatalf("save reply = %q, want 'save failed'", text)
+	}
+
+	if err := client.Close(); err != nil {
+		t.Fatalf("close client: %v", err)
+	}
+	<-done
+}
+
+func TestServeConnBanFailsWithClosedWorkerPool(t *testing.T) {
+	t.Parallel()
+
+	codec := newTestCodecWithOperators("alice")
+	pool := worker.NewPool(context.Background(), 1)
+	pool.Close()
+	codec.SetWorkerPool(pool)
+	codec.SetPersistencePaths("", filepath.Join(t.TempDir(), "policy.json"))
+
+	server, client := net.Pipe()
+	done := make(chan struct{})
+	go func() {
+		codec.ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	loginAndDrain(t, client, 5, "alice", opcodePing)
+
+	if _, err := client.Write(encodeClientMessage("/ban griefer")); err != nil {
+		t.Fatalf("write ban command: %v", err)
+	}
+
+	reply := make([]byte, 66)
+	if _, err := io.ReadFull(client, reply); err != nil {
+		t.Fatalf("read ban reply: %v", err)
+	}
+	text := bytes.TrimRight(reply[2:66], " \x00")
+	if !strings.Contains(string(text), "ban failed") {
+		t.Fatalf("ban reply = %q, want 'ban failed'", text)
+	}
+
+	if err := client.Close(); err != nil {
+		t.Fatalf("close client: %v", err)
+	}
+	<-done
 }
