@@ -282,27 +282,31 @@ func (s *session) writeLoop() {
 	for {
 		select {
 		case packet := <-s.outbox:
-			if !s.writeOnePacket(packet) {
+			if !s.writePacketBuffer(packet) {
+				return
+			}
+			// Batch any additional packets already queued so that small
+			// broadcasts do not trigger a syscall per packet.
+			if !s.drainOutbox(32) {
+				return
+			}
+			if !s.flushWriter() {
 				return
 			}
 		case <-s.stop:
-			for {
-				select {
-				case packet := <-s.outbox:
-					if !s.writeOnePacket(packet) {
-						return
-					}
-				default:
-					return
-				}
+			if !s.drainOutbox(256) {
+				return
 			}
+			if !s.flushWriter() {
+				return
+			}
+			return
 		}
 	}
 }
 
-// writeOnePacket writes a single packet to the buffered writer and flushes.
-// Returns false if the write failed and the loop should stop.
-func (s *session) writeOnePacket(packet []byte) bool {
+// writePacketBuffer writes a packet to the buffered writer without flushing.
+func (s *session) writePacketBuffer(packet []byte) bool {
 	if packet == nil {
 		return false
 	}
@@ -311,13 +315,29 @@ func (s *session) writeOnePacket(packet []byte) bool {
 			return false
 		}
 	}
-	if _, err := s.writer.Write(packet); err != nil {
-		return false
-	}
-	if err := s.writer.Flush(); err != nil {
-		return false
+	_, err := s.writer.Write(packet)
+	return err == nil
+}
+
+// drainOutbox pulls up to max packets from the outbox and writes them without
+// flushing. Returns false if a write failed and the loop should stop.
+func (s *session) drainOutbox(max int) bool {
+	for i := 0; i < max; i++ {
+		select {
+		case packet := <-s.outbox:
+			if !s.writePacketBuffer(packet) {
+				return false
+			}
+		default:
+			return true
+		}
 	}
 	return true
+}
+
+// flushWriter flushes the buffered writer. Returns false on error.
+func (s *session) flushWriter() bool {
+	return s.writer.Flush() == nil
 }
 
 func (s *session) fail() {

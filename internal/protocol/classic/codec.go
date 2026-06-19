@@ -135,7 +135,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		workers:             c.workers,
 		readDeadline:        c.readDeadline,
 		writeDeadline:       c.writeDeadline,
-		outbox:              make(chan []byte, 64),
+		outbox:              make(chan []byte, 256),
 		stop:                make(chan struct{}),
 		writerDone:          make(chan struct{}),
 		buildCommandContext: c.buildCommandContext,
