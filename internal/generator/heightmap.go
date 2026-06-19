@@ -15,6 +15,19 @@ import (
 	"time"
 )
 
+// HeightmapModule exposes image-based terrain generation.
+var HeightmapModule = Module{
+	Name: "heightmap",
+	Generators: func() []Generator {
+		return []Generator{{
+			Name: "Heightmap",
+			Type: GenTypeAdvanced,
+			Desc: "Seed specifies the URL of a heightmap image",
+			Func: genHeightmap,
+		}}
+	},
+}
+
 func genHeightmap(args *Args, lvl *Level) error {
 	fields := strings.Fields(args.Raw)
 	var source string

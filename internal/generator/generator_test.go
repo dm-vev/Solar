@@ -212,6 +212,46 @@ func TestRegistryContainsGenerators(t *testing.T) {
 	}
 }
 
+func TestRegistryRegisterModule(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry()
+	registry.RegisterModule(Module{
+		Name: "test",
+		Generators: func() []Generator {
+			return []Generator{
+				{Name: "One", Type: GenTypeSimple, Func: genEmpty},
+				{Name: "Two", Type: GenTypeAdvanced, Func: genEmpty},
+			}
+		},
+	})
+
+	if _, ok := registry.Find("one"); !ok {
+		t.Fatal("module generator One was not registered")
+	}
+	if _, ok := registry.Find("TWO"); !ok {
+		t.Fatal("module generator Two was not registered")
+	}
+	if got := len(registry.All()); got != 2 {
+		t.Fatalf("registered generators = %d, want 2", got)
+	}
+}
+
+func TestBuiltinModulesRegisterExpectedGenerators(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry()
+	for _, module := range BuiltinModules() {
+		registry.RegisterModule(module)
+	}
+
+	for _, name := range []string{"Flat", "Empty", "Classic", "Hills", "Heightmap"} {
+		if _, ok := registry.Find(name); !ok {
+			t.Fatalf("%s generator not registered by built-in modules", name)
+		}
+	}
+}
+
 func TestTreeGenerator(t *testing.T) {
 	tree := NewClassicTree()
 	rng := newRandom(0)

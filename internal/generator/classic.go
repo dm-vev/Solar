@@ -5,6 +5,9 @@ import (
 	"math/rand"
 )
 
+// ClassicModule exposes the MCGalaxy Classic generator.
+var ClassicModule = Module{Name: "classic", Generators: ClassicGenerators}
+
 // ClassicGenerators returns the MCGalaxy Classic generator.
 func ClassicGenerators() []Generator {
 	return []Generator{{

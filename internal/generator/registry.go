@@ -26,6 +26,14 @@ type Generator struct {
 	Func func(args *Args, lvl *Level) error
 }
 
+// Module is a cohesive generator family that can register one or more named
+// generators. New generator families should expose a Module instead of adding
+// ad-hoc registration logic to the default registry.
+type Module struct {
+	Name       string
+	Generators func() []Generator
+}
+
 // Args holds generator parameters and is parsed from command input.
 type Args struct {
 	Raw          string
@@ -73,9 +81,22 @@ func NewRegistry() *Registry {
 
 // Register adds a generator to the registry.
 func (r *Registry) Register(gen Generator) {
+	if gen.Name == "" || gen.Func == nil {
+		return
+	}
 	r.mu.Lock()
 	r.generators[gen.Name] = gen
 	r.mu.Unlock()
+}
+
+// RegisterModule adds all generators exposed by a module.
+func (r *Registry) RegisterModule(module Module) {
+	if module.Generators == nil {
+		return
+	}
+	for _, gen := range module.Generators() {
+		r.Register(gen)
+	}
 }
 
 // Find looks up a generator by case-insensitive name.
@@ -127,24 +148,22 @@ func Generate(gen Generator, name string, width, height, length int, args Args) 
 // defaultRegistry is the package-level registry initialised by RegisterDefaults.
 var defaultRegistry = NewRegistry()
 
-// RegisterDefaults populates the default registry with all built-in
-// generators. It is safe to call multiple times.
+// RegisterDefaults populates the default registry with all built-in generator
+// modules. It is safe to call multiple times.
 func RegisterDefaults() {
-	for _, gen := range SimpleGenerators() {
-		defaultRegistry.Register(gen)
+	for _, module := range BuiltinModules() {
+		defaultRegistry.RegisterModule(module)
 	}
-	for _, gen := range ClassicGenerators() {
-		defaultRegistry.Register(gen)
+}
+
+// BuiltinModules returns the built-in generator families.
+func BuiltinModules() []Module {
+	return []Module{
+		SimpleModule,
+		ClassicModule,
+		FCraftModule,
+		HeightmapModule,
 	}
-	for _, gen := range FCraftGenerators() {
-		defaultRegistry.Register(gen)
-	}
-	defaultRegistry.Register(Generator{
-		Name: "Heightmap",
-		Type: GenTypeAdvanced,
-		Desc: "Seed specifies the URL of a heightmap image",
-		Func: genHeightmap,
-	})
 }
 
 // DefaultRegistry returns the package-level registry.

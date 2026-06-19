@@ -5,6 +5,9 @@ import (
 	"math/rand"
 )
 
+// FCraftModule exposes fCraft-style terrain template generators.
+var FCraftModule = Module{Name: "fcraft", Generators: FCraftGenerators}
+
 // fCraftTemplates lists the named fCraft generator templates.
 var fCraftTemplates = []string{
 	"Archipelago", "Atoll", "Bay", "Dunes", "Hills", "Ice", "Island2",

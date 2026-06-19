@@ -2,6 +2,9 @@ package generator
 
 import "math/rand"
 
+// SimpleModule groups lightweight built-in generators.
+var SimpleModule = Module{Name: "simple", Generators: SimpleGenerators}
+
 // SimpleGenerators returns the list of simple generators.
 func SimpleGenerators() []Generator {
 	return []Generator{
