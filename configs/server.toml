@@ -1,0 +1,9 @@
+listen = ":25565"
+data_dir = "data"
+workers = 8
+max_players = 128
+connect_rate = 32
+autosave_interval = "60s"
+server_name = "Solar"
+motd = "CLI-only classic server"
+# SOLAR_OPERATORS="alice,bob" seeds admin usernames.

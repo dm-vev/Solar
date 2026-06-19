@@ -1,0 +1,161 @@
+package classic
+
+import (
+	"fmt"
+	"io"
+
+	"github.com/solar-mc/solar/internal/entity"
+	"github.com/solar-mc/solar/internal/world"
+)
+
+func (s *session) handleHandshake() error {
+	payload := make([]byte, 129)
+	if _, err := io.ReadFull(s.reader, payload); err != nil {
+		return fmt.Errorf("read handshake payload: %w", err)
+	}
+
+	version := payload[0]
+	username := readFixedString(payload[1:65])
+	cpeRequested := false
+
+	if version >= 6 {
+		userType, err := s.reader.ReadByte()
+		if err != nil {
+			return fmt.Errorf("read handshake usertype: %w", err)
+		}
+		cpeRequested = userType == 0x42
+	}
+
+	if username == "" {
+		return s.writeKick("invalid username")
+	}
+	if !validUsername(username) {
+		return s.writeKick("invalid username")
+	}
+	if s.players != nil {
+		if allowed, reason := s.players.CanJoin(username); !allowed {
+			return s.writeKick(reason)
+		}
+	}
+	if s.room != nil {
+		if old, ok := s.room.FindByName(username); ok {
+			old.disconnect("reconnected from another client")
+		}
+	}
+	level := s.worlds.Current()
+	entityID := uint32(0)
+	tracked := false
+	if s.entities != nil {
+		id, ok := s.entities.Add(username, entity.Position{
+			X: level.Spawn.X,
+			Y: level.Spawn.Y,
+			Z: level.Spawn.Z,
+		})
+		if ok {
+			entityID = id
+		}
+	}
+	if s.players != nil {
+		tracked = s.players.Add(username, entityID)
+	}
+	s.setIdentity(username, entityID, tracked)
+
+	if cpeRequested {
+		if err := s.negotiateCPE(); err != nil {
+			return fmt.Errorf("negotiate cpe: %w", err)
+		}
+	}
+
+	if err := s.writePacket(encodeMotd(version, s.serverName, s.motd)); err != nil {
+		return err
+	}
+	if err := s.sendLevel(level); err != nil {
+		return err
+	}
+	s.markLoggedIn()
+	s.joinRoom()
+	return nil
+}
+
+func validUsername(username string) bool {
+	if len(username) < 1 || len(username) > 32 {
+		return false
+	}
+	for _, r := range username {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func encodeMotd(version byte, serverName, motd string) []byte {
+	size := 130
+	if version >= 6 {
+		size = 131
+	}
+
+	packet := make([]byte, size)
+	packet[0] = opcodeHandshake
+	packet[1] = version
+	writeFixedString(packet[2:66], serverName)
+	writeFixedString(packet[66:130], motd)
+	if version >= 6 {
+		packet[130] = 0
+	}
+	return packet
+}
+
+func (s *session) sendLevel(level world.Level) error {
+	if err := s.writePacket(encodeLevelBegin(level.Volume(), s.currentSupportsFastMap())); err != nil {
+		return err
+	}
+
+	chunks, err := encodeLevelDataPackets(level, s.currentSupportsFastMap())
+	if err != nil {
+		return err
+	}
+	for _, chunk := range chunks {
+		if err := s.writePacket(chunk); err != nil {
+			return err
+		}
+	}
+
+	if err := s.writePacket([]byte{
+		opcodeLevelFinalize,
+		byte(level.Width >> 8), byte(level.Width),
+		byte(level.Height >> 8), byte(level.Height),
+		byte(level.Length >> 8), byte(level.Length),
+	}); err != nil {
+		return err
+	}
+
+	if username := s.currentUsername(); s.players != nil && username != "" {
+		s.players.MarkSpawned(username)
+	}
+
+	return s.writePacket([]byte{
+		opcodeEntityTeleport,
+		selfID,
+		byte(level.Spawn.X * coordScale >> 8), byte(level.Spawn.X * coordScale),
+		byte((level.Spawn.Y*coordScale + eyeHeight) >> 8), byte(level.Spawn.Y*coordScale + eyeHeight),
+		byte(level.Spawn.Z * coordScale >> 8), byte(level.Spawn.Z * coordScale),
+		level.Spawn.Yaw,
+		level.Spawn.Pitch,
+	})
+}
+
+func encodeLevelBegin(volume int, fastMap bool) []byte {
+	if !fastMap {
+		return []byte{opcodeLevelInitialize}
+	}
+
+	packet := make([]byte, 5)
+	packet[0] = opcodeLevelInitialize
+	packet[1] = byte(volume >> 24)
+	packet[2] = byte(volume >> 16)
+	packet[3] = byte(volume >> 8)
+	packet[4] = byte(volume)
+	return packet
+}

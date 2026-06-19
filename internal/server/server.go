@@ -1,0 +1,189 @@
+package server
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"net"
+	"net/http"
+	_ "net/http/pprof"
+	"sync"
+	"time"
+
+	"github.com/solar-mc/solar/internal/config"
+	"github.com/solar-mc/solar/internal/entity"
+	"github.com/solar-mc/solar/internal/network"
+	"github.com/solar-mc/solar/internal/player"
+	"github.com/solar-mc/solar/internal/protocol/classic"
+	"github.com/solar-mc/solar/internal/storage"
+	"github.com/solar-mc/solar/internal/worker"
+	"github.com/solar-mc/solar/internal/world"
+)
+
+// Server wires the CLI, network, and core subsystems together.
+type Server struct {
+	cfg       config.Config
+	listener  *network.Listener
+	codec     *classic.Codec
+	worlds    *world.Manager
+	players   *player.Registry
+	entities  *entity.Manager
+	store     *storage.LocalStore
+	workers   *worker.Pool
+	logger    *slog.Logger
+	sema      chan struct{}
+	pprofAddr string
+}
+
+// New creates the bootstrap server.
+func New(
+	cfg config.Config,
+	listener *network.Listener,
+	codec *classic.Codec,
+	worlds *world.Manager,
+	players *player.Registry,
+	entities *entity.Manager,
+	store *storage.LocalStore,
+	workers *worker.Pool,
+) *Server {
+	if workers == nil {
+		workers = worker.NewPool(context.Background(), 0)
+	}
+	return &Server{
+		cfg:       cfg,
+		listener:  listener,
+		codec:     codec,
+		worlds:    worlds,
+		players:   players,
+		entities:  entities,
+		store:     store,
+		workers:   workers,
+		logger:    slog.Default(),
+		sema:      make(chan struct{}, cfg.MaxPlayers),
+		pprofAddr: "",
+	}
+}
+
+// SetLogger configures the server logger.
+func (s *Server) SetLogger(logger *slog.Logger) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	s.logger = logger
+}
+
+// SetPprofAddress configures the pprof/health HTTP server address.
+// Empty string disables the debug server.
+func (s *Server) SetPprofAddress(addr string) {
+	s.pprofAddr = addr
+}
+
+// Run starts the server and blocks until ctx is canceled or a fatal error
+// occurs. It guarantees graceful shutdown: background goroutines are stopped
+// and state is persisted before returning.
+func (s *Server) Run(ctx context.Context) error {
+	worldPath, policyPath, err := s.loadState()
+	if err != nil {
+		return err
+	}
+
+	s.logger.Info("starting server",
+		"listen", s.cfg.ListenAddress,
+		"workers", s.workers.Size,
+		"max_players", s.cfg.MaxPlayers,
+		"connect_rate", s.cfg.ConnectRate,
+		"autosave", s.cfg.Autosave.String(),
+	)
+
+	var debugWG sync.WaitGroup
+	if s.pprofAddr != "" {
+		debugWG.Add(1)
+		go func() {
+			defer debugWG.Done()
+			s.runDebugServer(ctx)
+		}()
+	}
+
+	tickCtx, stopTicks := context.WithCancel(ctx)
+
+	var tickWG sync.WaitGroup
+	tickWG.Add(2)
+	go func() {
+		defer tickWG.Done()
+		s.runTicks(tickCtx)
+	}()
+	go func() {
+		defer tickWG.Done()
+		s.autosaveLoop(tickCtx, worldPath, policyPath)
+	}()
+
+	serveErr := s.listener.Serve(ctx, func(conn net.Conn) {
+		select {
+		case s.sema <- struct{}{}:
+			go func() {
+				defer func() { <-s.sema }()
+				s.codec.ServeConn(ctx, conn)
+			}()
+		default:
+			s.logger.Warn("connection rejected", "remote", conn.RemoteAddr().String(), "reason", "server full")
+			_ = conn.Close()
+		}
+	})
+
+	// Graceful shutdown: stop background goroutines first, then save.
+	stopTicks()
+	tickWG.Wait()
+	debugWG.Wait()
+
+	s.saveState(worldPath, policyPath)
+	s.workers.Close()
+
+	return serveErr
+}
+
+func (s *Server) runDebugServer(ctx context.Context) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"status":"ok","players":%d,"entities":%d}`, s.players.Count(), s.entities.Count())
+	})
+	mux.HandleFunc("/debug/pprof/", http.DefaultServeMux.ServeHTTP)
+	mux.HandleFunc("/debug/pprof/cmdline", http.DefaultServeMux.ServeHTTP)
+	mux.HandleFunc("/debug/pprof/profile", http.DefaultServeMux.ServeHTTP)
+	mux.HandleFunc("/debug/pprof/symbol", http.DefaultServeMux.ServeHTTP)
+	mux.HandleFunc("/debug/pprof/trace", http.DefaultServeMux.ServeHTTP)
+
+	srv := &http.Server{
+		Addr:    s.pprofAddr,
+		Handler: mux,
+	}
+
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
+	}()
+
+	s.logger.Info("debug server listening", "addr", s.pprofAddr)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		s.logger.Error("debug server error", "error", err)
+	}
+}
+
+func (s *Server) runTicks(ctx context.Context) {
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.worlds.Tick()
+			if s.entities != nil {
+				s.entities.Tick()
+			}
+		}
+	}
+}
