@@ -3,6 +3,8 @@ data_dir = "data"
 workers = 8
 max_players = 128
 connect_rate = 32
+# autosave_interval controls how often the world and policy are saved to disk.
+# Set to 0 to disable automatic saves; negative values are rejected.
 autosave_interval = "60s"
 server_name = "Solar"
 motd = "CLI-only classic server"

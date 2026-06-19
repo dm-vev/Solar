@@ -44,8 +44,8 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 		entities,
 		store,
 		pool,
+		logger,
 	)
-	srv.SetLogger(logger)
 
 	generator.RegisterDefaults()
 	return srv

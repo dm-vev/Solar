@@ -98,3 +98,41 @@ func TestLoadRejectsUnknownConfigKey(t *testing.T) {
 		t.Fatal("Load returned nil error for unknown key")
 	}
 }
+
+func TestAutosaveIntervalZeroIsAllowed(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "server.toml")
+	contents := []byte("listen = \"127.0.0.1:25566\"\n" +
+		"data_dir = \"" + t.TempDir() + "\"\n" +
+		"autosave_interval = \"0s\"\n" +
+		"server_name = \"Solar\"\n" +
+		"motd = \"Test\"\n")
+	if err := os.WriteFile(path, contents, 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Autosave != 0 {
+		t.Fatalf("Autosave = %s, want 0", cfg.Autosave)
+	}
+}
+
+func TestAutosaveIntervalRejectsNegative(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "server.toml")
+	contents := []byte("listen = \"127.0.0.1:25566\"\n" +
+		"data_dir = \"" + t.TempDir() + "\"\n" +
+		"autosave_interval = \"-1s\"\n" +
+		"server_name = \"Solar\"\n" +
+		"motd = \"Test\"\n")
+	if err := os.WriteFile(path, contents, 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load returned nil error for negative autosave interval")
+	}
+}

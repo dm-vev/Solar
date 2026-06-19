@@ -95,7 +95,8 @@ func (s *Server) saveState(worldPath, policyPath string) {
 func (s *Server) autosaveLoop(ctx context.Context, worldPath, policyPath string) {
 	interval := s.cfg.Autosave
 	if interval <= 0 {
-		interval = 60 * time.Second
+		// Autosave is disabled; the caller normally skips this goroutine.
+		return
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()

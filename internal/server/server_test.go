@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"os"
 	"testing"
 
@@ -15,6 +17,8 @@ import (
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
 )
+
+var testLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 func TestMain(m *testing.M) {
 	generator.RegisterDefaults()
@@ -44,7 +48,7 @@ func TestLoadStateGeneratesDefaultWorld(t *testing.T) {
 	listener := network.NewListener(":25565")
 	codec := classic.NewCodec("Solar", "Test", worlds, players, entities, nil)
 
-	srv := New(cfg, listener, codec, worlds, players, entities, store, worker.NewPool(context.Background(), 1))
+	srv := New(cfg, listener, codec, worlds, players, entities, store, worker.NewPool(context.Background(), 1), testLogger)
 
 	worldPath, _, err := srv.loadState()
 	if err != nil {
@@ -110,7 +114,7 @@ func TestLoadStateUsesExistingWorld(t *testing.T) {
 	listener := network.NewListener(":25565")
 	codec := classic.NewCodec("Solar", "Test", worlds, players, entities, nil)
 
-	srv := New(cfg, listener, codec, worlds, players, entities, store, worker.NewPool(context.Background(), 1))
+	srv := New(cfg, listener, codec, worlds, players, entities, store, worker.NewPool(context.Background(), 1), testLogger)
 
 	loadedPath, _, err := srv.loadState()
 	if err != nil {
@@ -152,7 +156,7 @@ func TestLoadStateRejectsUnknownDefaultGenerator(t *testing.T) {
 	listener := network.NewListener(":25565")
 	codec := classic.NewCodec("Solar", "Test", worlds, players, entities, nil)
 
-	srv := New(cfg, listener, codec, worlds, players, entities, store, worker.NewPool(context.Background(), 1))
+	srv := New(cfg, listener, codec, worlds, players, entities, store, worker.NewPool(context.Background(), 1), testLogger)
 
 	_, _, err := srv.loadState()
 	if err == nil {

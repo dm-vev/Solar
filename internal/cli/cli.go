@@ -15,6 +15,7 @@ var ErrUsage = errors.New("usage")
 type Command struct {
 	Name           string
 	ConfigPath     string
+	PprofAddress   string
 	Address        string
 	Clients        int
 	Duration       time.Duration
@@ -34,10 +35,11 @@ func Parse(args []string) (Command, error) {
 		fs := flag.NewFlagSet("start", flag.ContinueOnError)
 		fs.SetOutput(io.Discard)
 		configPath := fs.String("config", "configs/server.toml", "config path")
+		pprofAddress := fs.String("pprof", "", "pprof/health HTTP address (default disabled)")
 		if err := fs.Parse(args[1:]); err != nil {
-			return Command{}, fmt.Errorf("%w: start [--config path]", ErrUsage)
+			return Command{}, fmt.Errorf("%w: start [--config path] [--pprof address]", ErrUsage)
 		}
-		return Command{Name: "start", ConfigPath: *configPath}, nil
+		return Command{Name: "start", ConfigPath: *configPath, PprofAddress: *pprofAddress}, nil
 	case "loadtest":
 		return parseLoadTest(args)
 	case "version":
@@ -51,5 +53,5 @@ func Parse(args []string) (Command, error) {
 
 // Help returns the CLI usage text.
 func Help() string {
-	return "usage:\n  solar start [--config path]\n  solar loadtest [--address host:port] [--clients n] [--duration 30s] [--prefix bot] [--scenario idle|chat|move|blocks|mixed] [--cpe]\n  solar version\n  solar help\n"
+	return "usage:\n  solar start [--config path] [--pprof host:port]\n  solar loadtest [--address host:port] [--clients n] [--duration 30s] [--prefix bot] [--scenario idle|chat|move|blocks|mixed] [--cpe]\n  solar version\n  solar help\n"
 }

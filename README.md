@@ -31,6 +31,8 @@ operators = ["alice", "bob"]
 autosave_interval = "60s"
 ```
 
+`autosave_interval` accepts a duration; use `0` to disable automatic saves. Negative values are rejected.
+
 Operators can also be seeded with `SOLAR_OPERATORS="alice,bob"` or the legacy `SOLAR_ADMIN` variable.
 
 ## Commands

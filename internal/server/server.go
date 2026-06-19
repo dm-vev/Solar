@@ -3,10 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,9 +47,13 @@ func New(
 	entities *entity.Manager,
 	store *storage.LocalStore,
 	workers *worker.Pool,
+	logger *slog.Logger,
 ) *Server {
 	if workers == nil {
 		workers = worker.NewPool(context.Background(), 0)
+	}
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	return &Server{
 		cfg:       cfg,
@@ -58,7 +64,7 @@ func New(
 		entities:  entities,
 		store:     store,
 		workers:   workers,
-		logger:    slog.Default(),
+		logger:    logger,
 		sema:      make(chan struct{}, cfg.MaxPlayers),
 		pprofAddr: "",
 	}
@@ -67,13 +73,14 @@ func New(
 // SetLogger configures the server logger.
 func (s *Server) SetLogger(logger *slog.Logger) {
 	if logger == nil {
-		logger = slog.Default()
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	s.logger = logger
 }
 
 // SetPprofAddress configures the pprof/health HTTP server address.
-// Empty string disables the debug server.
+// Empty string disables the debug server. Prefer a localhost address
+// (e.g. "127.0.0.1:6060") to avoid exposing pprof endpoints to the network.
 func (s *Server) SetPprofAddress(addr string) {
 	s.pprofAddr = addr
 }
@@ -87,12 +94,16 @@ func (s *Server) Run(ctx context.Context) error {
 		return err
 	}
 
+	autosaveMsg := s.cfg.Autosave.String()
+	if s.cfg.Autosave <= 0 {
+		autosaveMsg = "disabled"
+	}
 	s.logger.Info("starting server",
 		"listen", s.cfg.ListenAddress,
 		"workers", s.workers.Size,
 		"max_players", s.cfg.MaxPlayers,
 		"connect_rate", s.cfg.ConnectRate,
-		"autosave", s.cfg.Autosave.String(),
+		"autosave", autosaveMsg,
 	)
 
 	var debugWG sync.WaitGroup
@@ -107,15 +118,18 @@ func (s *Server) Run(ctx context.Context) error {
 	tickCtx, stopTicks := context.WithCancel(ctx)
 
 	var tickWG sync.WaitGroup
-	tickWG.Add(2)
+	tickWG.Add(1)
 	go func() {
 		defer tickWG.Done()
 		s.runTicks(tickCtx)
 	}()
-	go func() {
-		defer tickWG.Done()
-		s.autosaveLoop(tickCtx, worldPath, policyPath)
-	}()
+	if s.cfg.Autosave > 0 {
+		tickWG.Add(1)
+		go func() {
+			defer tickWG.Done()
+			s.autosaveLoop(tickCtx, worldPath, policyPath)
+		}()
+	}
 
 	serveErr := s.listener.Serve(ctx, func(conn net.Conn) {
 		select {
@@ -165,10 +179,35 @@ func (s *Server) runDebugServer(ctx context.Context) {
 		_ = srv.Shutdown(shutdownCtx)
 	}()
 
+	if isNonLocalAddress(s.pprofAddr) {
+		s.logger.Warn("debug server bound to a non-local address; pprof endpoints may be exposed to the network",
+			"addr", s.pprofAddr)
+	}
+
 	s.logger.Info("debug server listening", "addr", s.pprofAddr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		s.logger.Error("debug server error", "error", err)
 	}
+}
+
+// isNonLocalAddress reports whether addr is not a loopback address.
+// It treats an empty or unresolvable host as non-local.
+func isNonLocalAddress(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return true
+	}
+	if host == "" {
+		return true
+	}
+	if strings.EqualFold(host, "localhost") {
+		return false
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return true
+	}
+	return !ip.IsLoopback()
 }
 
 func (s *Server) runTicks(ctx context.Context) {

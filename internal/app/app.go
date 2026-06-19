@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/solar-mc/solar/internal/cli"
 	"github.com/solar-mc/solar/internal/config"
@@ -22,7 +23,11 @@ func Run(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		return buildServer(ctx, cfg).Run(ctx)
+		srv := buildServer(ctx, cfg)
+		if cmd.PprofAddress != "" {
+			srv.SetPprofAddress(cmd.PprofAddress)
+		}
+		return srv.Run(ctx)
 	case "loadtest":
 		return loadtest.Run(ctx, loadtest.Config{
 			Address:        cmd.Address,
@@ -33,10 +38,10 @@ func Run(ctx context.Context, args []string) error {
 			CPE:            cmd.CPE,
 		})
 	case "version":
-		fmt.Println("solar pre-alpha")
+		_, _ = fmt.Fprintln(os.Stdout, "solar pre-alpha")
 		return nil
 	case "help":
-		fmt.Print(cli.Help())
+		_, _ = fmt.Fprint(os.Stdout, cli.Help())
 		return nil
 	default:
 		return fmt.Errorf("unsupported command %q", cmd.Name)

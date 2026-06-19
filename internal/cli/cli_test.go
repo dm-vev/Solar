@@ -15,6 +15,16 @@ func TestParseStartConfig(t *testing.T) {
 	}
 }
 
+func TestParseStartPprof(t *testing.T) {
+	cmd, err := Parse([]string{"start", "--pprof", "127.0.0.1:6060"})
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if cmd.PprofAddress != "127.0.0.1:6060" {
+		t.Fatalf("PprofAddress = %q, want 127.0.0.1:6060", cmd.PprofAddress)
+	}
+}
+
 func TestParseLoadTest(t *testing.T) {
 	cmd, err := Parse([]string{
 		"loadtest",

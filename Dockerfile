@@ -9,8 +9,11 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /solar ./cmd/solar
 
 FROM gcr.io/distroless/static-debian12:nonroot
 
+# Run from the nonroot user's home directory so the default data_dir "data"
+# resolves to a writable path (/home/nonroot/data).
+WORKDIR /home/nonroot
 COPY --from=builder /solar /solar
-COPY configs/server.toml /configs/server.toml
+COPY --from=builder /src/configs/server.toml /configs/server.toml
 
 EXPOSE 25565
 USER nonroot:nonroot
