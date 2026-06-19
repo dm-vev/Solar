@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+
+	"github.com/solar-mc/solar/plugin"
 )
 
 func (s *session) handlePlayerClick() error {
@@ -14,15 +16,19 @@ func (s *session) handlePlayerClick() error {
 	if !s.supportsExt(cpeExtPlayerClick) {
 		return nil
 	}
-	_ = payload[0]                              // button
-	_ = payload[1]                              // action
-	_ = binary.BigEndian.Uint16(payload[2:4])   // yaw
-	_ = binary.BigEndian.Uint16(payload[4:6])   // pitch
-	_ = payload[6]                              // entityID
-	_ = binary.BigEndian.Uint16(payload[7:9])   // x
-	_ = binary.BigEndian.Uint16(payload[9:11])  // y
-	_ = binary.BigEndian.Uint16(payload[11:13]) // z
-	_ = payload[13]                             // face
+
+	if plugin.OnPlayerClick.HasHandlers() {
+		plugin.OnPlayerClick.Fire(plugin.PlayerClickData{
+			Player:   s,
+			Button:   payload[0],
+			Action:   payload[1],
+			EntityID: payload[6],
+			X:        int(binary.BigEndian.Uint16(payload[7:9])),
+			Y:        int(binary.BigEndian.Uint16(payload[9:11])),
+			Z:        int(binary.BigEndian.Uint16(payload[11:13])),
+			Face:     payload[13],
+		})
+	}
 	return nil
 }
 
@@ -34,8 +40,14 @@ func (s *session) handlePluginMessage() error {
 	if !s.supportsExt(cpeExtPluginMessages) {
 		return nil
 	}
-	_ = payload[0]  // channel
-	_ = payload[1:] // data
+
+	if plugin.OnPluginMessage.HasHandlers() {
+		plugin.OnPluginMessage.Fire(plugin.CpePluginMessageData{
+			Player:  s,
+			Channel: payload[0],
+			Data:    append([]byte(nil), payload[1:]...),
+		})
+	}
 	return nil
 }
 
@@ -47,9 +59,14 @@ func (s *session) handleNotifyAction() error {
 	if !s.supportsExt(cpeExtNotifyAction) {
 		return nil
 	}
-	_ = payload[0] // entityID
-	_ = payload[1] // action type
-	_ = int16(binary.BigEndian.Uint16(payload[2:4]))
+
+	if plugin.OnNotifyAction.HasHandlers() {
+		plugin.OnNotifyAction.Fire(plugin.NotifyActionData{
+			Player: s,
+			Action: payload[1],
+			Value:  int(int16(binary.BigEndian.Uint16(payload[2:4]))),
+		})
+	}
 	return nil
 }
 
@@ -61,10 +78,15 @@ func (s *session) handleNotifyPositionAction() error {
 	if !s.supportsExt(cpeExtNotifyAction) {
 		return nil
 	}
-	_ = payload[0]                            // entityID
-	_ = payload[1]                            // action type
-	_ = binary.BigEndian.Uint16(payload[2:4]) // x
-	_ = binary.BigEndian.Uint16(payload[4:6]) // y
-	_ = binary.BigEndian.Uint16(payload[6:8]) // z
+
+	if plugin.OnNotifyPositionAction.HasHandlers() {
+		plugin.OnNotifyPositionAction.Fire(plugin.NotifyPositionActionData{
+			Player: s,
+			Action: payload[1],
+			X:      int(binary.BigEndian.Uint16(payload[2:4])),
+			Y:      int(binary.BigEndian.Uint16(payload[4:6])),
+			Z:      int(binary.BigEndian.Uint16(payload[6:8])),
+		})
+	}
 	return nil
 }

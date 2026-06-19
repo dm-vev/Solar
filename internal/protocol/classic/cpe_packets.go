@@ -481,19 +481,28 @@ func encodeDefineBlock(
 	packet[66] = collideType
 	packet[67] = rawSpeed
 	off := 68
-	writeTex(packet[off:], topTex, extTex); off += texSize
-	writeTex(packet[off:], sideTex, extTex); off += texSize
-	writeTex(packet[off:], bottomTex, extTex); off += texSize
+	writeTex(packet[off:], topTex, extTex)
+	off += texSize
+	writeTex(packet[off:], sideTex, extTex)
+	off += texSize
+	writeTex(packet[off:], bottomTex, extTex)
+	off += texSize
 	if !blocksLight {
 		packet[off] = 1
 	}
 	off++
-	packet[off] = walkSound; off++
-	packet[off] = brightness; off++
-	packet[off] = blockDraw; off++
-	packet[off] = fogDensity; off++
-	packet[off] = fogR; off++
-	packet[off] = fogG; off++
+	packet[off] = walkSound
+	off++
+	packet[off] = brightness
+	off++
+	packet[off] = blockDraw
+	off++
+	packet[off] = fogDensity
+	off++
+	packet[off] = fogR
+	off++
+	packet[off] = fogG
+	off++
 	packet[off] = fogB
 	return packet
 }
@@ -521,28 +530,46 @@ func encodeDefineBlockExt(
 	packet[66] = collideType
 	packet[67] = rawSpeed
 	off := 68
-	writeTex(packet[off:], topTex, extTex); off += texSize
-	writeTex(packet[off:], leftTex, extTex); off += texSize
-	writeTex(packet[off:], rightTex, extTex); off += texSize
-	writeTex(packet[off:], frontTex, extTex); off += texSize
-	writeTex(packet[off:], backTex, extTex); off += texSize
-	writeTex(packet[off:], bottomTex, extTex); off += texSize
+	writeTex(packet[off:], topTex, extTex)
+	off += texSize
+	writeTex(packet[off:], leftTex, extTex)
+	off += texSize
+	writeTex(packet[off:], rightTex, extTex)
+	off += texSize
+	writeTex(packet[off:], frontTex, extTex)
+	off += texSize
+	writeTex(packet[off:], backTex, extTex)
+	off += texSize
+	writeTex(packet[off:], bottomTex, extTex)
+	off += texSize
 	if !blocksLight {
 		packet[off] = 1
 	}
 	off++
-	packet[off] = walkSound; off++
-	packet[off] = brightness; off++
-	packet[off] = blockDraw; off++
-	packet[off] = fogDensity; off++
-	packet[off] = fogR; off++
-	packet[off] = fogG; off++
-	packet[off] = fogB; off++
-	packet[off] = minX; off++
-	packet[off] = minZ; off++
-	packet[off] = minY; off++
-	packet[off] = maxX; off++
-	packet[off] = maxZ; off++
+	packet[off] = walkSound
+	off++
+	packet[off] = brightness
+	off++
+	packet[off] = blockDraw
+	off++
+	packet[off] = fogDensity
+	off++
+	packet[off] = fogR
+	off++
+	packet[off] = fogG
+	off++
+	packet[off] = fogB
+	off++
+	packet[off] = minX
+	off++
+	packet[off] = minZ
+	off++
+	packet[off] = minY
+	off++
+	packet[off] = maxX
+	off++
+	packet[off] = maxZ
+	off++
 	packet[off] = maxY
 	return packet
 }

@@ -18,6 +18,7 @@ import (
 	sess "github.com/solar-mc/solar/internal/session"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
+	"github.com/solar-mc/solar/plugin"
 )
 
 // Default deadlines for TCP session I/O. A read deadline protects against
@@ -177,6 +178,11 @@ func (c *Codec) SetSendTimeout(mode string, base time.Duration) {
 	}
 }
 
+// SetServerName updates the server name advertised to new connections.
+func (c *Codec) SetServerName(name string) {
+	c.serverName = name
+}
+
 // ServeConn handles a single client connection until it closes, sends bad
 // data, or ctx is canceled.
 func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
@@ -209,6 +215,9 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		stop:                make(chan struct{}),
 		writerDone:          make(chan struct{}),
 		buildCommandContext: c.buildCommandContext,
+		color:               "&e",
+		model:               "humanoid",
+		allowBuild:          true,
 	}
 
 	if c.tcpNoDelay {
@@ -273,6 +282,15 @@ type session struct {
 	lastPitch           byte
 	cpeExts             map[string]uint32
 	buildCommandContext func(SessionBackend) command.Context
+
+	// ponytail: plugin.Player stub state, guarded by stateMu
+	color      string
+	model      string
+	hidden     bool
+	muted      bool
+	frozen     bool
+	afk        bool
+	allowBuild bool
 }
 
 func (s *session) RoomEntityID() uint32 {
@@ -368,6 +386,12 @@ func (s *session) run() error {
 }
 
 func (s *session) cleanup() {
+	if plugin.OnPlayerDisconnect.HasHandlers() {
+		plugin.OnPlayerDisconnect.Fire(plugin.PlayerDisconnectData{
+			Player: s,
+			Reason: "disconnected",
+		})
+	}
 	s.leaveRoom()
 	username, entityID, tracked := s.sessionIdentity()
 	if s.players != nil && tracked && username != "" {
@@ -376,6 +400,133 @@ func (s *session) cleanup() {
 	if s.entities != nil && entityID != 0 {
 		s.entities.Remove(entityID)
 	}
+}
+
+// ─── plugin.Player implementation on *session ───
+
+func (s *session) Name() string { return s.currentUsername() }
+
+func (s *session) Message(msg string) {
+	_ = s.writePacket(encodeMessage(selfID, msg))
+}
+
+func (s *session) Teleport(x, y, z int, yaw, pitch byte) bool {
+	return s.teleportSelf(x, y, z, yaw, pitch)
+}
+
+func (s *session) Kick(reason string) { s.disconnect(reason) }
+
+func (s *session) Position() (int, int, int) {
+	eid := s.currentEntityID()
+	if s.entities != nil && eid != 0 {
+		e, ok := s.entities.Get(eid)
+		if ok {
+			return e.Pos.X, e.Pos.Y, e.Pos.Z
+		}
+	}
+	return 0, 0, 0
+}
+
+func (s *session) SetBlock(x, y, z int, block byte) bool {
+	return s.applyBlockChange(x, y, z, block, false) == nil
+}
+
+func (s *session) SupportsCPE(extName string) bool { return s.supportsExt(extName) }
+
+// ─── Codec broadcast helpers for plugin API ───
+
+// BroadcastMessage sends a chat message to all online players.
+func (c *Codec) BroadcastMessage(msg string) {
+	packet := encodeMessage(selfID, msg)
+	c.room.ForEachPeerExcept(0, func(peer *session) {
+		_ = peer.writePacket(packet)
+	})
+}
+
+// OnlinePlayers returns all currently connected sessions as plugin.Player.
+func (c *Codec) OnlinePlayers() []plugin.Player {
+	peers := c.room.Snapshot()
+	out := make([]plugin.Player, len(peers))
+	for i, p := range peers {
+		out[i] = p
+	}
+	return out
+}
+
+// FindPlayer returns the online session with the given name (case-insensitive).
+func (c *Codec) FindPlayer(name string) plugin.Player {
+	p, ok := c.room.FindByName(name)
+	if !ok {
+		return nil
+	}
+	return p
+}
+
+// BroadcastPacket sends a raw packet to all online players.
+func (c *Codec) BroadcastPacket(packet []byte) {
+	c.room.ForEachPeerExcept(0, func(peer *session) {
+		_ = peer.writePacket(packet)
+	})
+}
+
+// BroadcastAddEntity builds and broadcasts an add-entity packet to all players.
+func (c *Codec) BroadcastAddEntity(id byte, name string, x, y, z int, yaw, pitch byte) {
+	c.BroadcastPacket(encodeAddEntity(id, name, entity.Position{X: x, Y: y, Z: z}, yaw, pitch))
+}
+
+// BroadcastRemoveEntity builds and broadcasts a remove-entity packet to all players.
+func (c *Codec) BroadcastRemoveEntity(id byte) {
+	c.BroadcastPacket(encodeRemoveEntity(id))
+}
+
+// BroadcastEntityTeleport builds and broadcasts an entity-teleport packet to all players.
+func (c *Codec) BroadcastEntityTeleport(id byte, x, y, z int, yaw, pitch byte) {
+	c.BroadcastPacket(encodeEntityTeleport(id, entity.Position{X: x, Y: y, Z: z}, yaw, pitch))
+}
+
+// BroadcastChangeModel builds and broadcasts a change-model packet to all players.
+func (c *Codec) BroadcastChangeModel(entityID byte, model string) {
+	c.BroadcastPacket(encodeChangeModel(entityID, model))
+}
+
+// ChangeMap sends a different level to the player and switches their active
+// world Manager. The player must be online.
+func (c *Codec) ChangeMap(p plugin.Player, mgr *world.Manager) error {
+	s, ok := p.(*session)
+	if !ok {
+		return fmt.Errorf("player is not a classic session")
+	}
+	return s.changeMap(mgr)
+}
+
+// PlayersOnLevel returns all online sessions whose active world Manager
+// matches mgr (by pointer identity).
+func (c *Codec) PlayersOnLevel(mgr *world.Manager) []plugin.Player {
+	peers := c.room.Snapshot()
+	var out []plugin.Player
+	for _, s := range peers {
+		s.stateMu.RLock()
+		w := s.worlds
+		s.stateMu.RUnlock()
+		if w == mgr {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// BroadcastSetBlockToLevel sends a set-block packet to all players on the
+// level whose Manager matches mgr (by pointer identity).
+func (c *Codec) BroadcastSetBlockToLevel(mgr *world.Manager, x, y, z int, block byte) {
+	packet := encodeSetBlock(x, y, z, block)
+	c.room.ForEachPeerExcept(0, func(peer *session) {
+		peer.stateMu.RLock()
+		w := peer.worlds
+		peer.stateMu.RUnlock()
+		if w == mgr {
+			_ = peer.writePacket(packet)
+		}
+	})
 }
 
 // BroadcastEntityUpdates runs the per-tick entity position broadcast.

@@ -18,6 +18,7 @@ import (
 	"github.com/solar-mc/solar/internal/storage"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
+	"github.com/solar-mc/solar/plugin"
 )
 
 func buildServer(ctx context.Context, cfg config.Config) *server.Server {
@@ -73,5 +74,13 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	}
 
 	generator.RegisterDefaults()
+
+	// Load plugins: create the server API handle and enable all registered plugins.
+	pluginSrv := server.NewPluginServer(codec, worlds, commands, srv)
+	if err := plugin.LoadAll(pluginSrv, logger); err != nil {
+		logger.Error("plugin load failed", "error", err)
+	}
+	plugin.OnPluginsLoaded.Fire(plugin.PluginsLoadedData{})
+
 	return srv
 }

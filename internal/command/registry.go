@@ -131,6 +131,21 @@ func (r *Registry) Register(name string, handler Handler) {
 	r.mu.Unlock()
 }
 
+// Unregister removes a command handler. Returns false if not found.
+func (r *Registry) Unregister(name string) bool {
+	if name == "" {
+		return false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	key := strings.ToLower(name)
+	if _, ok := r.handlers[key]; !ok {
+		return false
+	}
+	delete(r.handlers, key)
+	return true
+}
+
 // Execute runs a command line and returns a response when handled.
 func (r *Registry) Execute(ctx Context, line string) (string, bool) {
 	line = strings.TrimSpace(line)

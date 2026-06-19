@@ -135,6 +135,11 @@ func (r *Registry) AddOperators(names ...string) bool {
 	return r.policy.AddOperators(names...)
 }
 
+// RemoveOperator removes an operator name from the policy.
+func (r *Registry) RemoveOperator(name string) bool {
+	return r.policy.RemoveOperator(name)
+}
+
 // IsOperator reports whether the named player is an operator.
 func (r *Registry) IsOperator(name string) bool {
 	return r.policy.IsOperator(name)

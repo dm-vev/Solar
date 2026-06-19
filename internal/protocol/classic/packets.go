@@ -11,6 +11,7 @@ import (
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/protocol/wire"
+	"github.com/solar-mc/solar/plugin"
 )
 
 // payloadPool reuses small read buffers used by packet handlers.
@@ -56,6 +57,15 @@ func (s *session) handleSetBlock() error {
 		blockID = 0
 	}
 
+	if !s.AllowBuild() {
+		if s.worlds != nil {
+			if block, ok := s.worlds.BlockAt(x, y, z); ok {
+				s.SendBlockChange(x, y, z, block)
+			}
+		}
+		return nil
+	}
+
 	return s.applyBlockChange(x, y, z, blockID, true)
 }
 
@@ -64,6 +74,10 @@ func (s *session) handleEntityTeleport() error {
 	defer releasePayload(payload)
 	if _, err := io.ReadFull(s.reader, payload); err != nil {
 		return fmt.Errorf("read entity teleport payload: %w", err)
+	}
+
+	if s.IsFrozen() {
+		return nil
 	}
 
 	// Client always sends its own position. The ID byte is either
@@ -75,6 +89,17 @@ func (s *session) handleEntityTeleport() error {
 
 	if s.entities != nil {
 		s.entities.SetLocation(targetID, position, yaw, pitch)
+	}
+
+	if plugin.OnPlayerMove.HasHandlers() {
+		plugin.OnPlayerMove.Fire(plugin.PlayerMoveData{
+			Player: s,
+			X:      position.X,
+			Y:      position.Y,
+			Z:      position.Z,
+			Yaw:    yaw,
+			Pitch:  pitch,
+		})
 	}
 	return nil
 }
@@ -99,6 +124,10 @@ func (s *session) handleRelativePositionAndOrientation() error {
 		return fmt.Errorf("read relative position+orientation payload: %w", err)
 	}
 
+	if s.IsFrozen() {
+		return nil
+	}
+
 	targetID := s.resolveEntityID(payload[0])
 	return s.applyRelativeUpdate(targetID, payload[1], payload[2], payload[3], payload[4], payload[5])
 }
@@ -108,6 +137,10 @@ func (s *session) handleRelativePositionOnly() error {
 	defer releasePayload(payload)
 	if _, err := io.ReadFull(s.reader, payload); err != nil {
 		return fmt.Errorf("read relative position payload: %w", err)
+	}
+
+	if s.IsFrozen() {
+		return nil
 	}
 
 	targetID := s.resolveEntityID(payload[0])
@@ -148,8 +181,25 @@ func (s *session) handleMessage() error {
 		return nil
 	}
 
+	if s.IsMuted() {
+		s.Message("&cYou are muted.")
+		return nil
+	}
+
 	if strings.HasPrefix(text, "/") {
 		return s.handleCommand(text)
+	}
+
+	if plugin.OnPlayerChat.HasHandlers() {
+		msg := text
+		ctx := plugin.OnPlayerChat.Fire(plugin.PlayerChatData{
+			Player:  s,
+			Message: &msg,
+		})
+		if ctx.Cancelled() {
+			return nil
+		}
+		text = msg
 	}
 
 	packet := encodeMessage(selfID, fmt.Sprintf("<%s> %s", s.currentUsername(), text))
@@ -163,6 +213,24 @@ func (s *session) handleMessage() error {
 func (s *session) handleCommand(line string) error {
 	if s.commands == nil {
 		return nil
+	}
+
+	if plugin.OnPlayerCommand.HasHandlers() {
+		cmdLine := strings.TrimPrefix(line, "/")
+		parts := strings.SplitN(cmdLine, " ", 2)
+		cmdName := parts[0]
+		cmdArgs := ""
+		if len(parts) > 1 {
+			cmdArgs = parts[1]
+		}
+		ctx := plugin.OnPlayerCommand.Fire(plugin.PlayerCommandData{
+			Player:  s,
+			Command: cmdName,
+			Args:    cmdArgs,
+		})
+		if ctx.Cancelled() {
+			return nil
+		}
 	}
 
 	ctx := s.buildCommandContextFn()
@@ -187,8 +255,35 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 	if s.worlds == nil {
 		return nil
 	}
+
+	placing := blockID != 0
+	if plugin.OnBlockChange.HasHandlers() {
+		ctx := plugin.OnBlockChange.Fire(plugin.BlockChangeData{
+			Player:  s,
+			X:       x,
+			Y:       y,
+			Z:       z,
+			Block:   blockID,
+			Placing: placing,
+		})
+		if ctx.Cancelled() {
+			return nil
+		}
+	}
+
 	if !s.worlds.SetBlock(x, y, z, blockID) {
 		return fmt.Errorf("block position out of bounds: %d %d %d", x, y, z)
+	}
+
+	if plugin.OnBlockChanged.HasHandlers() {
+		plugin.OnBlockChanged.Fire(plugin.BlockChangedData{
+			Player:  s,
+			X:       x,
+			Y:       y,
+			Z:       z,
+			Block:   blockID,
+			Placing: placing,
+		})
 	}
 
 	packet := encodeSetBlock(x, y, z, blockID)

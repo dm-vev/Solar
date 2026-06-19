@@ -67,18 +67,6 @@ func (s *session) supportsExt(name string) bool {
 	return ok
 }
 
-// extVersion returns the negotiated version of the given CPE extension,
-// or 0 if the client does not support it.
-func (s *session) extVersion(name string) uint32 {
-	s.stateMu.RLock()
-	v, ok := s.cpeExts[name]
-	s.stateMu.RUnlock()
-	if !ok {
-		return 0
-	}
-	return v
-}
-
 func (s *session) currentSupportsFastMap() bool {
 	return s.supportsExt(cpeExtFastMapName)
 }

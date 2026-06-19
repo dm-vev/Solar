@@ -85,6 +85,17 @@ func (s *Server) saveState(worldPath, policyPath string) {
 	}
 }
 
+// SaveStateNow persists world and player policy using the store's configured
+// paths. Safe to call at runtime; it re-derives the same paths as loadState.
+func (s *Server) SaveStateNow() {
+	s.saveState(s.store.WorldFile(s.cfg.Storage.MainWorldName), s.store.PlayerPolicyFile())
+}
+
+// worldSavePath returns the on-disk path of the main world snapshot.
+func (s *Server) worldSavePath() string {
+	return s.store.WorldFile(s.cfg.Storage.MainWorldName)
+}
+
 func (s *Server) autosaveLoop(ctx context.Context, worldPath, policyPath string) {
 	interval := s.cfg.Autosave
 	if interval <= 0 {

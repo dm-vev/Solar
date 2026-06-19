@@ -235,6 +235,25 @@ func (p *Policy) AddOperators(names ...string) bool {
 	return changed
 }
 
+// RemoveOperator removes an operator name from the policy.
+func (p *Policy) RemoveOperator(name string) bool {
+	if p == nil {
+		return false
+	}
+
+	key := normalizeName(name)
+	if key == "" {
+		return false
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	_, existed := p.operators[key]
+	delete(p.operators, key)
+	return existed
+}
+
 // IsOperator reports whether the named player is an operator.
 func (p *Policy) IsOperator(name string) bool {
 	if p == nil {

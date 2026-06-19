@@ -5,6 +5,8 @@ import (
 	"io"
 
 	"github.com/solar-mc/solar/internal/entity"
+	"github.com/solar-mc/solar/internal/world"
+	"github.com/solar-mc/solar/plugin"
 )
 
 func (s *session) handleHandshake() error {
@@ -76,6 +78,10 @@ func (s *session) handleHandshake() error {
 	}
 	s.markLoggedIn()
 	s.joinRoom()
+
+	if plugin.OnPlayerConnect.HasHandlers() {
+		plugin.OnPlayerConnect.Fire(plugin.PlayerConnectData{Player: s})
+	}
 	return nil
 }
 
@@ -110,7 +116,13 @@ func encodeMotd(version byte, serverName, motd string) []byte {
 }
 
 func (s *session) sendLevel(fastMap bool) error {
-	stream, err := s.worlds.LevelStream(fastMap)
+	return s.sendLevelFrom(s.worlds, fastMap)
+}
+
+// sendLevelFrom streams a level from the given Manager to the client:
+// level begin + data chunks + finalize + teleport to spawn.
+func (s *session) sendLevelFrom(mgr *world.Manager, fastMap bool) error {
+	stream, err := mgr.LevelStream(fastMap)
 	if err != nil {
 		return err
 	}
@@ -149,6 +161,32 @@ func (s *session) sendLevel(fastMap bool) error {
 		level.Spawn.Yaw,
 		level.Spawn.Pitch,
 	})
+}
+
+// changeMap switches the session's active world Manager and sends the new
+// level stream to the client.
+// ponytail: s.worlds swap under stateMu; existing direct reads in the read
+// loop don't hold the lock — benign pointer race, old Manager is never freed.
+// Switch to atomic.Pointer[world.Manager] if race detector matters.
+// ponytail: single room — peers on other levels also see the teleport.
+// Per-level rooms fix this when entity visibility matters.
+func (s *session) changeMap(mgr *world.Manager) error {
+	s.stateMu.Lock()
+	s.worlds = mgr
+	s.stateMu.Unlock()
+
+	if err := s.sendLevelFrom(mgr, s.currentSupportsFastMap()); err != nil {
+		return err
+	}
+
+	spawn := mgr.Spawn()
+	entityID := s.currentEntityID()
+	if s.entities != nil && entityID != 0 {
+		pos := entityPosition(spawn.X, spawn.Y, spawn.Z)
+		s.entities.SetLocation(entityID, pos, spawn.Yaw, spawn.Pitch)
+		s.broadcastToPeers(encodeEntityTeleport(byte(entityID), pos, spawn.Yaw, spawn.Pitch))
+	}
+	return nil
 }
 
 func encodeLevelBegin(volume int, fastMap bool) []byte {

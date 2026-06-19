@@ -20,6 +20,7 @@ import (
 	"github.com/solar-mc/solar/internal/storage"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
+	"github.com/solar-mc/solar/plugin"
 )
 
 // Server wires the CLI, network, and core subsystems together.
@@ -35,6 +36,8 @@ type Server struct {
 	logger    *slog.Logger
 	sema      chan struct{}
 	pprofAddr string
+	cancel    context.CancelFunc
+	physics   *pluginPhysics
 }
 
 // New creates the bootstrap server.
@@ -67,6 +70,7 @@ func New(
 		logger:    logger,
 		sema:      make(chan struct{}, cfg.MaxPlayers),
 		pprofAddr: "",
+		physics:   newPluginPhysics(worlds),
 	}
 }
 
@@ -89,6 +93,10 @@ func (s *Server) SetPprofAddress(addr string) {
 // occurs. It guarantees graceful shutdown: background goroutines are stopped
 // and state is persisted before returning.
 func (s *Server) Run(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	s.cancel = cancel
+	defer cancel()
+
 	worldPath, policyPath, err := s.loadState()
 	if err != nil {
 		return err
@@ -148,6 +156,11 @@ func (s *Server) Run(ctx context.Context) error {
 	stopTicks()
 	tickWG.Wait()
 	debugWG.Wait()
+
+	if plugin.OnShutdown.HasHandlers() {
+		plugin.OnShutdown.Fire(plugin.ShutdownData{Reason: "server stopping"})
+	}
+	plugin.UnloadAll(s.logger)
 
 	s.saveState(worldPath, policyPath)
 	s.workers.Close()
@@ -232,6 +245,11 @@ func (s *Server) runTicks(ctx context.Context) {
 				s.entities.Tick()
 			}
 			s.codec.BroadcastEntityUpdates()
+			s.physics.Tick()
+			plugin.DefaultScheduler.Tick()
+			if plugin.OnTick.HasHandlers() {
+				plugin.OnTick.Fire(plugin.TickData{Tick: s.worlds.TickCount()})
+			}
 		}
 	}
 }
