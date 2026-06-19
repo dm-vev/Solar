@@ -25,11 +25,11 @@ func TestWorldFile(t *testing.T) {
 	root := t.TempDir()
 	store := NewLocalStore(root)
 
-	if got := store.WorldFile("main"); got != filepath.Join(root, "worlds", "main.json") {
-		t.Fatalf("WorldFile(main) = %q, want %q", got, filepath.Join(root, "worlds", "main.json"))
+	if got := store.WorldFile("main"); got != filepath.Join(root, "worlds", "main.swld") {
+		t.Fatalf("WorldFile(main) = %q, want %q", got, filepath.Join(root, "worlds", "main.swld"))
 	}
-	if got := store.WorldFile("arena"); got != filepath.Join(root, "worlds", "arena.json") {
-		t.Fatalf("WorldFile(arena) = %q, want %q", got, filepath.Join(root, "worlds", "arena.json"))
+	if got := store.WorldFile("arena"); got != filepath.Join(root, "worlds", "arena.swld") {
+		t.Fatalf("WorldFile(arena) = %q, want %q", got, filepath.Join(root, "worlds", "arena.swld"))
 	}
 }
 
