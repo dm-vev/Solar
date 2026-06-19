@@ -68,11 +68,18 @@ type Handler func(Context, []string) (string, bool)
 type Registry struct {
 	mu       sync.RWMutex
 	handlers map[string]Handler
+	admin    map[string]struct{}
 }
 
 // NewRegistry creates the command registry with the built-in commands.
 func NewRegistry() *Registry {
-	registry := &Registry{handlers: make(map[string]Handler)}
+	registry := &Registry{
+		handlers: make(map[string]Handler),
+		admin:    make(map[string]struct{}),
+	}
+	for _, cmd := range []string{"tp", "setspawn", "save", "kick", "ban", "unban", "whitelist", "newlvl"} {
+		registry.admin[cmd] = struct{}{}
+	}
 	registry.Register("help", helpCommand(registry))
 	registry.Register("where", whereCommand)
 	registry.Register("setblock", setBlockCommand)
@@ -86,6 +93,16 @@ func NewRegistry() *Registry {
 	registry.Register("players", playersCommand)
 	registry.Register("newlvl", newLevelCommand)
 	return registry
+}
+
+// SetAdminCommands replaces the set of commands requiring operator privileges.
+func (r *Registry) SetAdminCommands(cmds []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.admin = make(map[string]struct{}, len(cmds))
+	for _, cmd := range cmds {
+		r.admin[strings.ToLower(cmd)] = struct{}{}
+	}
 }
 
 // Register adds or replaces a command handler.
@@ -123,9 +140,16 @@ func (r *Registry) Execute(ctx Context, line string) (string, bool) {
 		return fmt.Sprintf("unknown command: /%s", name), true
 	}
 
-	if requiresAdmin(name) && (ctx.Authority == nil || !ctx.Authority.CanAdmin()) {
+	if r.requiresAdmin(name) && (ctx.Authority == nil || !ctx.Authority.CanAdmin()) {
 		return "permission denied", true
 	}
 
 	return handler(ctx, args)
+}
+
+func (r *Registry) requiresAdmin(name string) bool {
+	r.mu.RLock()
+	_, ok := r.admin[name]
+	r.mu.RUnlock()
+	return ok
 }
