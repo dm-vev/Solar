@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/player"
@@ -54,6 +55,7 @@ type Codec struct {
 	writeBatchSize      int
 	shutdownBatchSize   int
 	tcpNoDelay          bool
+	blockDefs           *blockdef.Registry
 	buildCommandContext func(SessionBackend) command.Context
 }
 
@@ -156,6 +158,11 @@ func (c *Codec) SetTCPNoDelay(enable bool) {
 	c.tcpNoDelay = enable
 }
 
+// SetBlockDefinitions configures the custom block definition registry.
+func (c *Codec) SetBlockDefinitions(reg *blockdef.Registry) {
+	c.blockDefs = reg
+}
+
 // SetSendTimeout configures the send timeout mode and base duration.
 // mode is "fixed" (constant timeout) or "adaptive" (scales with player count).
 // In adaptive mode, timeout = min(base + players*0.3ms, 150ms).
@@ -196,6 +203,8 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		outboxSize:          c.outboxSize,
 		writeBatchSize:      c.writeBatchSize,
 		shutdownBatchSize:   c.shutdownBatchSize,
+		tcpNoDelay:          c.tcpNoDelay,
+		blockDefs:           c.blockDefs,
 		outbox:              make(chan []byte, c.outboxSize),
 		stop:                make(chan struct{}),
 		writerDone:          make(chan struct{}),
@@ -246,6 +255,8 @@ type session struct {
 	outboxSize          int
 	writeBatchSize      int
 	shutdownBatchSize   int
+	tcpNoDelay          bool
+	blockDefs           *blockdef.Registry
 	outbox              chan []byte
 	stop                chan struct{}
 	writerDone          chan struct{}

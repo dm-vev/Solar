@@ -68,6 +68,9 @@ func (s *session) handleHandshake() error {
 	if err := s.writePacket(encodeMotd(version, s.serverName, s.motd)); err != nil {
 		return err
 	}
+	if err := s.sendBlockDefinitions(); err != nil {
+		return err
+	}
 	if err := s.sendLevel(s.currentSupportsFastMap()); err != nil {
 		return err
 	}

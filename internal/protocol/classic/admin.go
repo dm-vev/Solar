@@ -3,6 +3,7 @@ package classic
 import (
 	"fmt"
 
+	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
 	"github.com/solar-mc/solar/internal/world"
@@ -34,6 +35,12 @@ type SessionBackend interface {
 
 	OnlineNames() []string
 	WhitelistNames() []string
+
+	AddBlockDef(def blockdef.BlockDefinition) bool
+	RemoveBlockDef(id byte) bool
+	GetBlockDef(id byte) (blockdef.BlockDefinition, bool)
+	ListBlockDefs() []blockdef.BlockDefinition
+	FreeBlockID() byte
 }
 
 // --- SessionBackend implementation on *session ---
@@ -326,4 +333,47 @@ func (s *session) generateWorld(name, theme string, width, height, length int, s
 
 func entityPosition(x, y, z int) entity.Position {
 	return entity.Position{X: x * coordScale, Y: y * coordScale, Z: z * coordScale}
+}
+
+// --- Block definition methods ---
+
+func (s *session) AddBlockDef(def blockdef.BlockDefinition) bool {
+	if s.blockDefs == nil {
+		return false
+	}
+	s.blockDefs.Add(def)
+	s.broadcastBlockDef(def)
+	return true
+}
+
+func (s *session) RemoveBlockDef(id byte) bool {
+	if s.blockDefs == nil {
+		return false
+	}
+	if !s.blockDefs.Remove(id) {
+		return false
+	}
+	s.broadcastUndefineBlock(id)
+	return true
+}
+
+func (s *session) GetBlockDef(id byte) (blockdef.BlockDefinition, bool) {
+	if s.blockDefs == nil {
+		return blockdef.BlockDefinition{}, false
+	}
+	return s.blockDefs.Get(id)
+}
+
+func (s *session) ListBlockDefs() []blockdef.BlockDefinition {
+	if s.blockDefs == nil {
+		return nil
+	}
+	return s.blockDefs.All()
+}
+
+func (s *session) FreeBlockID() byte {
+	if s.blockDefs == nil {
+		return 0
+	}
+	return s.blockDefs.FreeID()
 }

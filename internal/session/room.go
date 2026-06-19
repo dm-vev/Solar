@@ -73,6 +73,15 @@ func (r *Room[T]) ForEachPeerExcept(entityID uint32, fn func(peer T)) {
 	r.mu.RUnlock()
 }
 
+// ForEachPeer calls fn for every participant in the room.
+func (r *Room[T]) ForEachPeer(fn func(peer T)) {
+	r.mu.RLock()
+	for _, peer := range r.sessions {
+		fn(peer)
+	}
+	r.mu.RUnlock()
+}
+
 // FindByName returns the first participant with a case-insensitive username match.
 func (r *Room[T]) FindByName(name string) (T, bool) {
 	key := strings.TrimSpace(name)
