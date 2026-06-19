@@ -55,34 +55,22 @@ func LoadDirectory(dir string, logger *slog.Logger) error {
 
 	for _, name := range soFiles {
 		path := filepath.Join(dir, name)
-		loadSOSafe(path, logger)
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("plugin panicked during load", "path", path, "panic", r)
+				}
+			}()
+			if _, err := plugin.Open(path); err != nil {
+				hint := ""
+				if strings.Contains(err.Error(), "different version") {
+					hint = "rebuild with same Go version: go build -buildmode=plugin -o <file> <source>"
+				}
+				logger.Error("plugin load failed", "path", path, "error", err, "hint", hint)
+				return
+			}
+			logger.Info("plugin loaded", "path", path)
+		}()
 	}
 	return nil
-}
-
-// loadSOSafe opens a single .so plugin with panic recovery.
-// A panic in the plugin's init() is caught and logged, not propagated.
-func loadSOSafe(path string, logger *slog.Logger) {
-	defer func() {
-		if r := recover(); r != nil {
-			logger.Error("plugin panicked during load",
-				"path", path, "panic", r)
-		}
-	}()
-
-	if _, err := plugin.Open(path); err != nil {
-		hint := ""
-		if strings.Contains(err.Error(), "different version") {
-			hint = "rebuild the .so with the same Go version and dependencies: " +
-				"go build -buildmode=plugin -o " + path + " ./yourplugin"
-		}
-		logger.Error("plugin load failed",
-			"path", path,
-			"error", err,
-			"go_version", runtime.Version(),
-			"hint", hint,
-		)
-		return
-	}
-	logger.Info("plugin loaded", "path", path)
 }
