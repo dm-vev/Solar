@@ -22,7 +22,8 @@ func TestLoadDirectory(t *testing.T) {
 	tmp := t.TempDir()
 	soPath := filepath.Join(tmp, "soplug.so")
 
-	cmd := exec.Command("go", "build", "-buildmode=plugin", "-o", soPath, "./plugins/soplug")
+	cmd := exec.Command("go", "build", "-buildmode=plugin", "-tags=plugin",
+		"-o", soPath, "./plugins/soplug")
 	cmd.Dir = ".." // repo root
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {

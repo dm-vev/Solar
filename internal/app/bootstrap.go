@@ -78,6 +78,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	// Load runtime .so plugins before enabling any registered plugins.
 	// Each .so's init() calls plugin.Register; LoadAll then enables them
 	// alongside compile-time plugins.
+	// On non-linux/darwin platforms LoadDirectory is a no-op that logs a warning.
 	if cfg.Plugins.Enabled {
 		pluginDir := filepath.Join(cfg.DataDir, cfg.Plugins.Dir)
 		if err := plugin.LoadDirectory(pluginDir, logger); err != nil {

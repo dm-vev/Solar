@@ -1,3 +1,5 @@
+//go:build plugin
+
 // Package main is a .so plugin example for Solar.
 //
 // Build with:
