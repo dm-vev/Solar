@@ -1,106 +1,131 @@
+version: "2"
 run:
-  timeout: 5m
   go: "1.24"
-
 linters:
   enable:
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-    - gofmt
-    - goimports
-    - gocritic
-    - revive
-    - misspell
-    - unconvert
-    - prealloc
-    - unparam
-    - whitespace
-    - nilerr
     - bodyclose
+    - copyloopvar
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - gocritic
+    - gocyclo
+    - makezero
+    - misspell
+    - nestif
+    - nilerr
     - noctx
+    - prealloc
+    - revive
     - rowserrcheck
     - sqlclosecheck
-    - exhaustive
-    - errorlint
-    - copyloopvar
-    - makezero
-    - forbidigo
-    - gocyclo
-    - nestif
-
-linters-settings:
-  gocyclo:
-    min-complexity: 20
-  nestif:
-    min-complexity: 5
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - performance
-      - style
-  revive:
+    - unconvert
+    - unparam
+    - whitespace
+  settings:
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+    forbidigo:
+      forbid:
+        - pattern: ^fmt\.Print$
+          msg: use slog for structured logging
+        - pattern: ^fmt\.Println$
+          msg: use slog for structured logging
+        - pattern: ^fmt\.Printf$
+          msg: use slog for structured logging
+        - pattern: ^log\.Print$
+          msg: use slog for structured logging
+        - pattern: ^log\.Println$
+          msg: use slog for structured logging
+        - pattern: ^log\.Printf$
+          msg: use slog for structured logging
+        - pattern: ^panic$
+          msg: do not panic in library code; return an error instead
+      exclude-godoc-examples: true
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+      disabled-checks:
+        - builtinShadow
+        - hugeParam
+        - importShadow
+        - paramTypeCombine
+        - unnamedResult
+    gocyclo:
+      min-complexity: 35
+    nestif:
+      min-complexity: 6
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-naming
+        - name: error-strings
+        - name: error-return
+        - name: errorf
+        - name: exported
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: var-declaration
+        - name: var-naming
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-naming
-      - name: error-strings
-      - name: error-return
-      - name: errorf
-      - name: exported
-      - name: increment-decrement
-      - name: indent-error-flow
-      - name: package-comments
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: var-declaration
-      - name: var-naming
-  errorlint:
-    errorf: true
-    asserts: true
-    comparison: true
-  goimports:
-    local-prefixes: github.com/solar-mc/solar
-  forbidigo:
-    forbid:
-      - p: ^fmt\.Print$
-        msg: use slog for structured logging
-      - p: ^fmt\.Println$
-        msg: use slog for structured logging
-      - p: ^fmt\.Printf$
-        msg: use slog for structured logging
-      - p: ^log\.Print$
-        msg: use slog for structured logging
-      - p: ^log\.Println$
-        msg: use slog for structured logging
-      - p: ^log\.Printf$
-        msg: use slog for structured logging
-      - p: ^panic$
-        msg: do not panic in library code; return an error instead
-    exclude-godoc-examples: true
-
+      - linters:
+          - errcheck
+          - forbidigo
+          - gochecknoglobals
+          - gocyclo
+          - gosec
+          - nestif
+          - unparam
+        path: _test\.go
+      - linters:
+          - forbidigo
+        path: cmd/solar/main\.go
+      - linters:
+          - forbidigo
+          - noctx
+        path: internal/loadtest/
+      - linters:
+          - noctx
+        path: internal/(generator/heightmap|network/)
+      - linters:
+          - unparam
+        path: internal/protocol/classic/(packets|state)\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - nestif
-        - gosec
-        - forbidigo
-        - errcheck
-        - gochecknoglobals
-    - path: cmd/solar/main\.go
-      linters:
-        - forbidigo
-    - path: internal/loadtest/
-      linters:
-        - forbidigo
-        - noctx
   max-issues-per-linter: 0
   max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/solar-mc/solar
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

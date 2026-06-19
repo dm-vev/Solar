@@ -15,7 +15,6 @@ var fCraftTemplates = []string{
 func FCraftGenerators() []Generator {
 	gens := make([]Generator, 0, len(fCraftTemplates))
 	for _, t := range fCraftTemplates {
-		t := t
 		gens = append(gens, Generator{
 			Name: t,
 			Type: GenTypeFCraft,

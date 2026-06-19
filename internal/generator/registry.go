@@ -80,11 +80,10 @@ func (r *Registry) Register(gen Generator) {
 
 // Find looks up a generator by case-insensitive name.
 func (r *Registry) Find(name string) (Generator, bool) {
-	lower := strings.ToLower(name)
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	for k, v := range r.generators {
-		if strings.ToLower(k) == lower {
+		if strings.EqualFold(k, name) {
 			return v, true
 		}
 	}

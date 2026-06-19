@@ -60,7 +60,6 @@ func Run(ctx context.Context, cfg Config) error {
 	wg.Add(cfg.Clients)
 
 	for i := 0; i < cfg.Clients; i++ {
-		i := i
 		go func() {
 			defer wg.Done()
 			if err := runClient(runCtx, cfg, i); err != nil {

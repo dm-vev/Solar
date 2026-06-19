@@ -160,7 +160,7 @@ func (g *classicGen) carveCaves() {
 			caveZ += math.Cos(theta) * math.Cos(phi)
 			caveY += math.Sin(phi)
 
-			theta = theta + deltaTheta*0.2
+			theta += deltaTheta * 0.2
 			deltaTheta = deltaTheta*0.9 + g.rnd.NextDouble() - g.rnd.NextDouble()
 			phi = phi/2 + deltaPhi/4
 			deltaPhi = deltaPhi*0.75 + g.rnd.NextDouble() - g.rnd.NextDouble()
@@ -174,7 +174,7 @@ func (g *classicGen) carveCaves() {
 
 			radius := (float64(g.height) - float64(cenY)) / float64(g.height)
 			radius = 1.2 + (radius*3.5+1)*caveRadius
-			radius = radius * math.Sin(float64(j)*math.Pi/float64(caveLen))
+			radius *= math.Sin(float64(j) * math.Pi / float64(caveLen))
 			g.fillOblateSpheroid(cenX, cenY, cenZ, float32(radius), Air)
 		}
 	}
@@ -197,7 +197,7 @@ func (g *classicGen) carveOreVeins(abundance float64, block byte) {
 			veinZ += math.Cos(theta) * math.Cos(phi)
 			veinY += math.Sin(phi)
 
-			theta = theta + deltaTheta*0.2
+			theta += deltaTheta * 0.2
 			deltaTheta = deltaTheta*0.9 + g.rnd.NextDouble() - g.rnd.NextDouble()
 			phi = phi/2 + deltaPhi/4
 			deltaPhi = deltaPhi*0.9 + g.rnd.NextDouble() - g.rnd.NextDouble()
@@ -380,8 +380,8 @@ func (g *classicGen) plantFlowers() {
 			flowerX := patchX
 			flowerZ := patchZ
 			for k := 0; k < 5; k++ {
-				flowerX += g.rnd.NextInt(6) - g.rnd.NextInt(6)
-				flowerZ += g.rnd.NextInt(6) - g.rnd.NextInt(6)
+				flowerX += g.randomCenteredOffset()
+				flowerZ += g.randomCenteredOffset()
 				if flowerX < 0 || flowerZ < 0 || flowerX >= g.width || flowerZ >= g.length {
 					continue
 				}
@@ -412,8 +412,8 @@ func (g *classicGen) plantMushrooms() {
 		for j := 0; j < 20; j++ {
 			mushX, mushY, mushZ := patchX, patchY, patchZ
 			for k := 0; k < 5; k++ {
-				mushX += g.rnd.NextInt(6) - g.rnd.NextInt(6)
-				mushZ += g.rnd.NextInt(6) - g.rnd.NextInt(6)
+				mushX += g.randomCenteredOffset()
+				mushZ += g.randomCenteredOffset()
 				if mushX < 0 || mushZ < 0 || mushX >= g.width || mushZ >= g.length {
 					continue
 				}
@@ -460,8 +460,8 @@ func (g *classicGen) plantTreePatch(surface byte, tree Tree, goRng *rand.Rand) {
 		treeX := patchX
 		treeZ := patchZ
 		for k := 0; k < 20; k++ {
-			treeX += g.rnd.NextInt(6) - g.rnd.NextInt(6)
-			treeZ += g.rnd.NextInt(6) - g.rnd.NextInt(6)
+			treeX += g.randomCenteredOffset()
+			treeZ += g.randomCenteredOffset()
 			if !g.inBounds(treeX, treeZ) || g.rnd.NextDouble() >= 0.25 {
 				continue
 			}
@@ -496,6 +496,12 @@ func (g *classicGen) tryGrowTree(treeX, treeZ int, surface byte, tree Tree, goRn
 		}
 		g.lvl.Blocks[idx] = bT
 	})
+}
+
+func (g *classicGen) randomCenteredOffset() int {
+	positive := g.rnd.NextInt(6)
+	negative := g.rnd.NextInt(6)
+	return positive - negative
 }
 
 // inBounds reports whether x and z lie within the horizontal level bounds.
