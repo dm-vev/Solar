@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,16 +15,88 @@ import (
 
 // Config holds the server bootstrap settings.
 type Config struct {
-	ListenAddress    string        `toml:"listen"`
-	DataDir          string        `toml:"data_dir"`
-	Workers          int           `toml:"workers"`
-	MaxPlayers       int           `toml:"max_players"`
-	ConnectRate      int           `toml:"connect_rate"`
-	Autosave         time.Duration `toml:"autosave_interval"`
-	DefaultGenerator string        `toml:"default_generator"`
-	Name             string        `toml:"server_name"`
-	MOTD             string        `toml:"motd"`
-	Operators        []string      `toml:"operators"`
+	ListenAddress    string         `toml:"listen"`
+	DataDir          string         `toml:"data_dir"`
+	Workers          int            `toml:"workers"`
+	MaxPlayers       int            `toml:"max_players"`
+	ConnectRate      int            `toml:"connect_rate"`
+	Autosave         time.Duration  `toml:"autosave_interval"`
+	DefaultGenerator string         `toml:"default_generator"`
+	Name             string         `toml:"server_name"`
+	MOTD             string         `toml:"motd"`
+	Operators        []string       `toml:"operators"`
+	Network          NetworkConfig  `toml:"network"`
+	Simulation       SimConfig      `toml:"simulation"`
+	World            WorldConfig    `toml:"world"`
+	Storage          StorageConfig  `toml:"storage"`
+	Commands         CommandsConfig `toml:"commands"`
+	Player           PlayerConfig   `toml:"player"`
+	CPE              CPEConfig      `toml:"cpe"`
+	Debug            DebugConfig    `toml:"debug"`
+	Log              LogConfig      `toml:"log"`
+}
+
+// NetworkConfig controls per-session TCP I/O tuning.
+type NetworkConfig struct {
+	ReadTimeout    time.Duration `toml:"read_timeout"`
+	WriteTimeout   time.Duration `toml:"write_timeout"`
+	TCPNoDelay     bool          `toml:"tcp_nodelay"`
+	SessionOutbox  int           `toml:"session_outbox_size"`
+	WriteBatchSize int           `toml:"write_batch_size"`
+}
+
+// SimConfig controls the world/entity simulation loop.
+type SimConfig struct {
+	TickInterval time.Duration `toml:"tick_interval"`
+}
+
+// WorldConfig controls default world generation and safety limits.
+type WorldConfig struct {
+	DefaultWidth  int `toml:"default_width"`
+	DefaultHeight int `toml:"default_height"`
+	DefaultLength int `toml:"default_length"`
+	MaxBlocks     int `toml:"max_blocks"`
+}
+
+// DebugConfig controls the pprof/health HTTP server.
+type DebugConfig struct {
+	PprofAddress         string        `toml:"pprof_address"`
+	PprofShutdownTimeout time.Duration `toml:"pprof_shutdown_timeout"`
+}
+
+// LogConfig controls structured logging output.
+type LogConfig struct {
+	Level  string `toml:"level"`
+	Format string `toml:"format"`
+}
+
+// StorageConfig controls world/player persistence layout. Backend is
+// forward-compatible: only "local" is implemented today.
+type StorageConfig struct {
+	Backend       string `toml:"backend"`
+	WorldsDir     string `toml:"worlds_dir"`
+	PlayersDir    string `toml:"players_dir"`
+	PolicyFile    string `toml:"policy_file"`
+	WorldFileExt  string `toml:"world_file_ext"`
+	MainWorldName string `toml:"main_world_name"`
+}
+
+// CommandsConfig controls command permissions.
+type CommandsConfig struct {
+	AdminCommands []string `toml:"admin_commands"`
+}
+
+// PlayerConfig controls player policy defaults and validation.
+type PlayerConfig struct {
+	WhitelistEnabled  bool `toml:"whitelist_enabled"`
+	MaxUsernameLength int  `toml:"max_username_length"`
+}
+
+// CPEConfig controls which CPE extensions the server advertises.
+type CPEConfig struct {
+	ExtPlayerList bool `toml:"ext_player_list"`
+	FastMap       bool `toml:"fast_map"`
+	TwoWayPing    bool `toml:"two_way_ping"`
 }
 
 // Load returns bootstrap config and ensures base directories exist.
@@ -38,6 +112,50 @@ func Load(path string) (Config, error) {
 		Name:             "Solar",
 		MOTD:             "CLI-only classic server",
 		Operators:        parseOperatorsEnv(),
+		Network: NetworkConfig{
+			ReadTimeout:    30 * time.Second,
+			WriteTimeout:   10 * time.Second,
+			TCPNoDelay:     true,
+			SessionOutbox:  256,
+			WriteBatchSize: 32,
+		},
+		Simulation: SimConfig{
+			TickInterval: 50 * time.Millisecond,
+		},
+		World: WorldConfig{
+			DefaultWidth:  128,
+			DefaultHeight: 64,
+			DefaultLength: 128,
+			MaxBlocks:     64 * 1024 * 1024,
+		},
+		Debug: DebugConfig{
+			PprofAddress:         "",
+			PprofShutdownTimeout: 5 * time.Second,
+		},
+		Log: LogConfig{
+			Level:  "info",
+			Format: "text",
+		},
+		Storage: StorageConfig{
+			Backend:       "local",
+			WorldsDir:     "worlds",
+			PlayersDir:    "players",
+			PolicyFile:    "policy.json",
+			WorldFileExt:  ".swld",
+			MainWorldName: "main",
+		},
+		Commands: CommandsConfig{
+			AdminCommands: []string{"tp", "setspawn", "save", "kick", "ban", "unban", "whitelist", "newlvl"},
+		},
+		Player: PlayerConfig{
+			WhitelistEnabled:  false,
+			MaxUsernameLength: 32,
+		},
+		CPE: CPEConfig{
+			ExtPlayerList: true,
+			FastMap:       true,
+			TwoWayPing:    true,
+		},
 	}
 
 	if err := loadFile(path, &cfg); err != nil {
@@ -91,6 +209,61 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.DefaultGenerator) == "" {
 		return fmt.Errorf("default generator is empty")
 	}
+	if c.Network.ReadTimeout < 0 {
+		return fmt.Errorf("network.read_timeout cannot be negative")
+	}
+	if c.Network.WriteTimeout < 0 {
+		return fmt.Errorf("network.write_timeout cannot be negative")
+	}
+	if c.Network.SessionOutbox < 1 {
+		return fmt.Errorf("network.session_outbox_size must be at least 1")
+	}
+	if c.Network.WriteBatchSize < 1 {
+		return fmt.Errorf("network.write_batch_size must be at least 1")
+	}
+	if c.Simulation.TickInterval < 0 {
+		return fmt.Errorf("simulation.tick_interval cannot be negative")
+	}
+	if c.World.DefaultWidth < 1 || c.World.DefaultHeight < 1 || c.World.DefaultLength < 1 {
+		return fmt.Errorf("world default dimensions must be positive")
+	}
+	if c.World.MaxBlocks < 1 {
+		return fmt.Errorf("world.max_blocks must be at least 1")
+	}
+	if c.Debug.PprofShutdownTimeout < 0 {
+		return fmt.Errorf("debug.pprof_shutdown_timeout cannot be negative")
+	}
+	switch c.Log.Level {
+	case "debug", "info", "warn", "error":
+	default:
+		return fmt.Errorf("log.level %q is not one of debug|info|warn|error", c.Log.Level)
+	}
+	switch c.Log.Format {
+	case "text", "json":
+	default:
+		return fmt.Errorf("log.format %q is not one of text|json", c.Log.Format)
+	}
+	if c.Storage.Backend != "local" {
+		return fmt.Errorf("storage.backend %q is not supported (only \"local\")", c.Storage.Backend)
+	}
+	if strings.TrimSpace(c.Storage.WorldsDir) == "" {
+		return fmt.Errorf("storage.worlds_dir is empty")
+	}
+	if strings.TrimSpace(c.Storage.PlayersDir) == "" {
+		return fmt.Errorf("storage.players_dir is empty")
+	}
+	if strings.TrimSpace(c.Storage.PolicyFile) == "" {
+		return fmt.Errorf("storage.policy_file is empty")
+	}
+	if strings.TrimSpace(c.Storage.WorldFileExt) == "" {
+		return fmt.Errorf("storage.world_file_ext is empty")
+	}
+	if strings.TrimSpace(c.Storage.MainWorldName) == "" {
+		return fmt.Errorf("storage.main_world_name is empty")
+	}
+	if c.Player.MaxUsernameLength < 1 || c.Player.MaxUsernameLength > 64 {
+		return fmt.Errorf("player.max_username_length must be 1..64")
+	}
 	return nil
 }
 
@@ -126,10 +299,66 @@ autosave_interval = "%s"
 default_generator = "%s"
 server_name = "%s"
 motd = "%s"
-# SOLAR_OPERATORS="alice,bob" seeds admin usernames.
+# operators = ["alice", "bob"]
+# SOLAR_OPERATORS="alice,bob" also seeds admin usernames.
+
+[network]
+read_timeout = "%s"
+write_timeout = "%s"
+tcp_nodelay = %v
+session_outbox_size = %d
+write_batch_size = %d
+
+[simulation]
+tick_interval = "%s"
+
+[world]
+default_width = %d
+default_height = %d
+default_length = %d
+max_blocks = %d
+
+[storage]
+backend = "%s"
+worlds_dir = "%s"
+players_dir = "%s"
+policy_file = "%s"
+world_file_ext = "%s"
+main_world_name = "%s"
+
+[commands]
+admin_commands = %s
+
+[player]
+whitelist_enabled = %v
+max_username_length = %d
+
+[cpe]
+ext_player_list = %v
+fast_map = %v
+two_way_ping = %v
+
+[debug]
+pprof_address = "%s"
+pprof_shutdown_timeout = "%s"
+
+[log]
+level = "%s"
+format = "%s"
 `, cfg.ListenAddress, cfg.DataDir, cfg.Workers, cfg.MaxPlayers,
 		cfg.ConnectRate, cfg.Autosave.String(), cfg.DefaultGenerator,
-		cfg.Name, cfg.MOTD)
+		cfg.Name, cfg.MOTD,
+		cfg.Network.ReadTimeout.String(), cfg.Network.WriteTimeout.String(),
+		cfg.Network.TCPNoDelay, cfg.Network.SessionOutbox, cfg.Network.WriteBatchSize,
+		cfg.Simulation.TickInterval.String(),
+		cfg.World.DefaultWidth, cfg.World.DefaultHeight, cfg.World.DefaultLength, cfg.World.MaxBlocks,
+		cfg.Storage.Backend, cfg.Storage.WorldsDir, cfg.Storage.PlayersDir,
+		cfg.Storage.PolicyFile, cfg.Storage.WorldFileExt, cfg.Storage.MainWorldName,
+		formatStringSlice(cfg.Commands.AdminCommands),
+		cfg.Player.WhitelistEnabled, cfg.Player.MaxUsernameLength,
+		cfg.CPE.ExtPlayerList, cfg.CPE.FastMap, cfg.CPE.TwoWayPing,
+		cfg.Debug.PprofAddress, cfg.Debug.PprofShutdownTimeout.String(),
+		cfg.Log.Level, cfg.Log.Format)
 
 	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		return fmt.Errorf("write config %s: %w", path, err)
@@ -164,6 +393,26 @@ func loadFile(path string, cfg *Config) error {
 	return nil
 }
 
+// Logger builds a *slog.Logger from the log config.
+func (c Config) Logger(w io.Writer) *slog.Logger {
+	var level slog.Level
+	switch c.Log.Level {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+	}
+	opts := &slog.HandlerOptions{Level: level}
+	if c.Log.Format == "json" {
+		return slog.New(slog.NewJSONHandler(w, opts))
+	}
+	return slog.New(slog.NewTextHandler(w, opts))
+}
+
 func parseOperatorsEnv() []string {
 	raw := strings.TrimSpace(os.Getenv("SOLAR_OPERATORS"))
 	if raw == "" {
@@ -182,4 +431,15 @@ func parseOperatorsEnv() []string {
 		}
 	}
 	return operators
+}
+
+func formatStringSlice(ss []string) string {
+	if len(ss) == 0 {
+		return "[]"
+	}
+	quoted := make([]string, len(ss))
+	for i, s := range ss {
+		quoted[i] = fmt.Sprintf("%q", s)
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
 }
