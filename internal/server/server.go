@@ -174,7 +174,11 @@ func (s *Server) runDebugServer(ctx context.Context) {
 
 	go func() {
 		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		timeout := s.cfg.Debug.PprofShutdownTimeout
+		if timeout <= 0 {
+			timeout = 5 * time.Second
+		}
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
 	}()
@@ -211,7 +215,11 @@ func isNonLocalAddress(addr string) bool {
 }
 
 func (s *Server) runTicks(ctx context.Context) {
-	ticker := time.NewTicker(50 * time.Millisecond)
+	interval := s.cfg.Simulation.TickInterval
+	if interval <= 0 {
+		interval = 50 * time.Millisecond
+	}
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {

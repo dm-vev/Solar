@@ -39,6 +39,19 @@ func TestLoadStateGeneratesDefaultWorld(t *testing.T) {
 		DefaultGenerator: "Classic",
 		Name:             "Solar",
 		MOTD:             "Test",
+		World: config.WorldConfig{
+			DefaultWidth:  128,
+			DefaultHeight: 64,
+			DefaultLength: 128,
+		},
+		Storage: config.StorageConfig{
+			Backend:       "local",
+			WorldsDir:     "worlds",
+			PlayersDir:    "players",
+			PolicyFile:    "policy.json",
+			WorldFileExt:  ".swld",
+			MainWorldName: "main",
+		},
 	}
 
 	store := storage.NewLocalStore(dir)
@@ -89,6 +102,14 @@ func TestLoadStateUsesExistingWorld(t *testing.T) {
 		DefaultGenerator: "Classic",
 		Name:             "Solar",
 		MOTD:             "Test",
+		Storage: config.StorageConfig{
+			Backend:       "local",
+			WorldsDir:     "worlds",
+			PlayersDir:    "players",
+			PolicyFile:    "policy.json",
+			WorldFileExt:  ".swld",
+			MainWorldName: "main",
+		},
 	}
 
 	store := storage.NewLocalStore(dir)
@@ -147,6 +168,14 @@ func TestLoadStateRejectsUnknownDefaultGenerator(t *testing.T) {
 		DefaultGenerator: "VoidGenerator",
 		Name:             "Solar",
 		MOTD:             "Test",
+		Storage: config.StorageConfig{
+			Backend:       "local",
+			WorldsDir:     "worlds",
+			PlayersDir:    "players",
+			PolicyFile:    "policy.json",
+			WorldFileExt:  ".swld",
+			MainWorldName: "main",
+		},
 	}
 
 	store := storage.NewLocalStore(dir)

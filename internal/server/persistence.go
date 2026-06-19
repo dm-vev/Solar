@@ -19,7 +19,7 @@ func (s *Server) loadState() (string, string, error) {
 		return "", "", fmt.Errorf("create players directory: %w", err)
 	}
 
-	worldPath := s.store.WorldFile("main")
+	worldPath := s.store.WorldFile(s.cfg.Storage.MainWorldName)
 	if _, err := os.Stat(worldPath); err != nil && errors.Is(err, os.ErrNotExist) {
 		if err := s.generateDefaultWorld(worldPath); err != nil {
 			return "", "", fmt.Errorf("generate default world %s: %w", worldPath, err)
@@ -47,13 +47,6 @@ func (s *Server) loadState() (string, string, error) {
 	return worldPath, policyPath, nil
 }
 
-// defaultWorldDimensions are the dimensions for a generated default world.
-const (
-	defaultWorldWidth  = 128
-	defaultWorldHeight = 64
-	defaultWorldLength = 128
-)
-
 func (s *Server) generateDefaultWorld(worldPath string) error {
 	gen, ok := generator.Find(s.cfg.DefaultGenerator)
 	if !ok {
@@ -65,7 +58,7 @@ func (s *Server) generateDefaultWorld(worldPath string) error {
 		return fmt.Errorf("parse default generator args: %w", err)
 	}
 
-	lvl, err := generator.Generate(gen, "main", defaultWorldWidth, defaultWorldHeight, defaultWorldLength, args)
+	lvl, err := generator.Generate(gen, s.cfg.Storage.MainWorldName, s.cfg.World.DefaultWidth, s.cfg.World.DefaultHeight, s.cfg.World.DefaultLength, args)
 	if err != nil {
 		return fmt.Errorf("generate default world: %w", err)
 	}
