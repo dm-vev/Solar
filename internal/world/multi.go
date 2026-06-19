@@ -3,6 +3,8 @@ package world
 import (
 	"strings"
 	"sync"
+
+	"github.com/solar-mc/solar/plugin"
 )
 
 // MultiManager manages multiple loaded levels keyed by name (case-insensitive).
@@ -25,9 +27,15 @@ func NewMultiManager() *MultiManager {
 }
 
 // SetMain registers the main level and records its name.
+// Fires OnMainLevelChanging with the new name (modifiable) before applying.
 func (m *MultiManager) SetMain(name string, mgr *Manager, path string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if plugin.OnMainLevelChanging.HasHandlers() {
+		n := name
+		plugin.OnMainLevelChanging.Fire(plugin.MainLevelChangingData{Map: &n})
+		name = n
+	}
 	m.main = name
 	m.levels[strings.ToLower(name)] = &managedLevel{manager: mgr, name: name, path: path}
 }

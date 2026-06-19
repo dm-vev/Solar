@@ -1,6 +1,9 @@
 package classic
 
-import "github.com/solar-mc/solar/internal/entity"
+import (
+	"github.com/solar-mc/solar/internal/entity"
+	"github.com/solar-mc/solar/plugin"
+)
 
 func (s *session) joinRoom() {
 	if s.room == nil {
@@ -26,26 +29,46 @@ func (s *session) joinRoom() {
 		peerState, ok := peer.entitySnapshot()
 		if ok {
 			peerUsername, peerEntityID, _ := peer.sessionIdentity()
-			if err := s.writePacket(encodeAddEntity(byte(peerEntityID), peerUsername, peerState.Pos, peerState.Yaw, peerState.Pitch)); err != nil {
-				s.logger.Debug("send peer join packet", "username", s.currentUsername(), "peer", peerUsername, "error", err)
-			}
-			if s.supportsExt(cpeExtPlayerListName) {
-				if err := s.writePacket(encodeExtAddPlayerName(byte(peerEntityID), peerUsername)); err != nil {
-					s.logger.Debug("send peer list packet", "username", s.currentUsername(), "peer", peerUsername, "error", err)
+			if s.canSee(peer) {
+				if err := s.writePacket(encodeAddEntity(byte(peerEntityID), peerUsername, peerState.Pos, peerState.Yaw, peerState.Pitch)); err != nil {
+					s.logger.Debug("send peer join packet", "username", s.currentUsername(), "peer", peerUsername, "error", err)
+				}
+				if s.supportsExt(cpeExtPlayerListName) {
+					if err := s.writePacket(encodeExtAddPlayerName(byte(peerEntityID), peerUsername)); err != nil {
+						s.logger.Debug("send peer list packet", "username", s.currentUsername(), "peer", peerUsername, "error", err)
+					}
 				}
 			}
 		}
-		if err := peer.writePacket(selfPacket); err != nil {
-			s.logger.Debug("broadcast join packet", "username", username, "peer", peer.currentUsername(), "error", err)
-		}
-		if peer.currentSupportsExtPlayerList() {
-			if err := peer.writePacket(encodeExtAddPlayerName(byte(entityID), username)); err != nil {
-				s.logger.Debug("broadcast player list packet", "username", username, "peer", peer.currentUsername(), "error", err)
+		if peer.canSee(s) {
+			if err := peer.writePacket(selfPacket); err != nil {
+				s.logger.Debug("broadcast join packet", "username", username, "peer", peer.currentUsername(), "error", err)
+			}
+			if peer.currentSupportsExtPlayerList() {
+				if err := peer.writePacket(encodeExtAddPlayerName(byte(entityID), username)); err != nil {
+					s.logger.Debug("broadcast player list packet", "username", username, "peer", peer.currentUsername(), "error", err)
+				}
 			}
 		}
 	}
 
 	s.markJoined(true)
+}
+
+// canSee reports whether s can see peer, consulting OnGettingCanSee handlers.
+// ponytail: fires the event per check; join-only path is not hot.
+// If no handlers are registered, returns true (default visible).
+func (s *session) canSee(peer *session) bool {
+	if !plugin.OnGettingCanSee.HasHandlers() {
+		return true
+	}
+	canSee := true
+	plugin.OnGettingCanSee.Fire(plugin.GettingCanSeeData{
+		Player: s,
+		Target: peer,
+		CanSee: &canSee,
+	})
+	return canSee
 }
 
 func (s *session) leaveRoom() {

@@ -203,6 +203,16 @@ func (s *session) handleMessage() error {
 	}
 
 	packet := encodeMessage(selfID, fmt.Sprintf("<%s> %s", s.currentUsername(), text))
+	formatted := readFixedString(packet[2:])
+	if plugin.OnChatFrom.HasHandlers() {
+		plugin.OnChatFrom.Fire(plugin.ChatFromData{Source: s, Message: &formatted})
+	}
+	if plugin.OnChat.HasHandlers() {
+		plugin.OnChat.Fire(plugin.ChatData{Source: s, Message: &formatted})
+	}
+	if formatted != readFixedString(packet[2:]) {
+		packet = encodeMessage(selfID, formatted)
+	}
 	if err := s.writePacket(packet); err != nil {
 		return err
 	}
@@ -230,6 +240,15 @@ func (s *session) handleCommand(line string) error {
 		})
 		if ctx.Cancelled() {
 			return nil
+		}
+		if cmdName == "help" && plugin.OnPlayerHelp.HasHandlers() {
+			helpCtx := plugin.OnPlayerHelp.Fire(plugin.PlayerHelpData{
+				Player: s,
+				Target: cmdArgs,
+			})
+			if helpCtx.Cancelled() {
+				return nil
+			}
 		}
 	}
 

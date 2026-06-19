@@ -9,6 +9,7 @@ import (
 
 	"github.com/solar-mc/solar/internal/generator"
 	"github.com/solar-mc/solar/internal/world"
+	"github.com/solar-mc/solar/plugin"
 )
 
 func (s *Server) loadState() (string, string, error) {
@@ -27,8 +28,17 @@ func (s *Server) loadState() (string, string, error) {
 	} else if err != nil {
 		return "", "", fmt.Errorf("stat world %s: %w", worldPath, err)
 	} else {
-		if err := s.worlds.Load(worldPath); err != nil {
-			return "", "", fmt.Errorf("load world %s: %w", worldPath, err)
+		if plugin.OnLevelLoad.HasHandlers() {
+			ctx := plugin.OnLevelLoad.Fire(plugin.LevelLoadData{Name: s.cfg.Storage.MainWorldName})
+			if !ctx.Cancelled() {
+				if err := s.worlds.Load(worldPath); err != nil {
+					return "", "", fmt.Errorf("load world %s: %w", worldPath, err)
+				}
+			}
+		} else {
+			if err := s.worlds.Load(worldPath); err != nil {
+				return "", "", fmt.Errorf("load world %s: %w", worldPath, err)
+			}
 		}
 	}
 
@@ -74,8 +84,15 @@ func (s *Server) generateDefaultWorld(worldPath string) error {
 
 func (s *Server) saveState(worldPath, policyPath string) {
 	if worldPath != "" {
-		if err := s.worlds.Save(worldPath); err != nil {
-			s.logger.Error("save world", "path", worldPath, "error", err)
+		skipSave := false
+		if plugin.OnLevelSave.HasHandlers() {
+			ctx := plugin.OnLevelSave.Fire(plugin.LevelSaveData{})
+			skipSave = ctx.Cancelled()
+		}
+		if !skipSave {
+			if err := s.worlds.Save(worldPath); err != nil {
+				s.logger.Error("save world", "path", worldPath, "error", err)
+			}
 		}
 	}
 	if policyPath != "" {

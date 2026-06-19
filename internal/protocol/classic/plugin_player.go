@@ -14,6 +14,11 @@ func (s *session) SendCpeMessage(messageType byte, msg string) {
 }
 
 func (s *session) SetColor(color string) {
+	if plugin.OnSettingColor.HasHandlers() {
+		c := color
+		plugin.OnSettingColor.Fire(plugin.SettingColorData{Player: s, Color: &c})
+		color = c
+	}
 	s.stateMu.Lock()
 	s.color = color
 	s.stateMu.Unlock()
@@ -27,13 +32,19 @@ func (s *session) Color() string {
 }
 
 func (s *session) SetModel(model string) {
+	if plugin.OnSendingModel.HasHandlers() {
+		m := model
+		plugin.OnSendingModel.Fire(plugin.SendingModelData{Player: s, Model: &m})
+		model = m
+	}
 	s.stateMu.Lock()
 	s.model = model
 	s.stateMu.Unlock()
 	entityID := s.currentEntityID()
 	if entityID != 0 {
-		_ = s.writePacket(encodeChangeModel(byte(entityID), model))
-		s.broadcastToPeers(encodeChangeModel(byte(entityID), model))
+		pkt := encodeChangeModel(byte(entityID), model)
+		_ = s.writePacket(pkt)
+		s.broadcastToPeers(pkt)
 	}
 }
 
@@ -67,6 +78,17 @@ func (s *session) SetHidden(hidden bool) {
 	s.stateMu.Unlock()
 	if wasHidden == hidden {
 		return
+	}
+	if plugin.OnPlayerAction.HasHandlers() {
+		action := "hide"
+		if !hidden {
+			action = "un-hide"
+		}
+		plugin.OnPlayerAction.Fire(plugin.PlayerActionData{
+			Player:  s,
+			Action:  action,
+			Message: action,
+		})
 	}
 	entityID := s.currentEntityID()
 	if entityID == 0 {
@@ -114,6 +136,44 @@ func (s *session) IsAfk() bool {
 	return a
 }
 
+func (s *session) SetAfk(afk bool) {
+	s.stateMu.Lock()
+	was := s.afk
+	s.afk = afk
+	s.stateMu.Unlock()
+	if was == afk {
+		return
+	}
+	if plugin.OnPlayerAction.HasHandlers() {
+		action := "afk"
+		if !afk {
+			action = "un-afk"
+		}
+		plugin.OnPlayerAction.Fire(plugin.PlayerActionData{
+			Player:  s,
+			Action:  action,
+			Message: action,
+		})
+	}
+}
+
+// Kill triggers player death. Fires OnPlayerDying (cancelable); if not
+// cancelled, fires OnPlayerDied and respawns. Returns false if cancelled.
+func (s *session) Kill(cause byte) bool {
+	if plugin.OnPlayerDying.HasHandlers() {
+		ctx := plugin.OnPlayerDying.Fire(plugin.PlayerDyingData{Player: s, Cause: cause})
+		if ctx.Cancelled() {
+			return false
+		}
+	}
+	cooldown := 0
+	if plugin.OnPlayerDied.HasHandlers() {
+		plugin.OnPlayerDied.Fire(plugin.PlayerDiedData{Player: s, Cause: cause, Cooldown: &cooldown})
+	}
+	s.Respawn()
+	return true
+}
+
 func (s *session) IP() string {
 	return s.conn.RemoteAddr().String()
 }
@@ -149,7 +209,15 @@ func (s *session) Respawn() {
 		return
 	}
 	spawn := s.worlds.Spawn()
-	s.teleportSelf(spawn.X, spawn.Y, spawn.Z, spawn.Yaw, spawn.Pitch)
+	x, y, z, yaw, pitch := spawn.X, spawn.Y, spawn.Z, spawn.Yaw, spawn.Pitch
+	if plugin.OnPlayerSpawn.HasHandlers() {
+		plugin.OnPlayerSpawn.Fire(plugin.PlayerSpawnData{
+			Player: s,
+			X:      &x, Y: &y, Z: &z,
+			Yaw: &yaw, Pitch: &pitch,
+		})
+	}
+	s.teleportSelf(x, y, z, yaw, pitch)
 }
 
 func (s *session) AllowBuild() bool {

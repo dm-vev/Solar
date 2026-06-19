@@ -77,6 +77,14 @@ type Player interface {
 	// IsAfk reports whether the player is marked AFK.
 	IsAfk() bool
 
+	// SetAfk marks the player AFK or not. Fires OnPlayerAction.
+	SetAfk(afk bool)
+
+	// Kill triggers player death with the given cause byte.
+	// Fires OnPlayerDying (cancelable); if not cancelled, fires OnPlayerDied
+	// and respawns the player. Returns false if a handler cancelled the death.
+	Kill(cause byte) bool
+
 	// IP returns the player's remote IP address.
 	IP() string
 

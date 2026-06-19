@@ -61,13 +61,28 @@ func (s *session) handleHandshake() error {
 	}
 	s.setIdentity(username, entityID, tracked)
 
+	if plugin.OnPlayerStartConnecting.HasHandlers() {
+		plugin.OnPlayerStartConnecting.Fire(plugin.PlayerStartConnectingData{Player: s})
+	}
+
 	if cpeRequested {
 		if err := s.negotiateCPE(); err != nil {
 			return fmt.Errorf("negotiate cpe: %w", err)
 		}
 	}
 
-	if err := s.writePacket(encodeMotd(version, s.serverName, s.motd)); err != nil {
+	if plugin.OnPlayerFinishConnecting.HasHandlers() {
+		plugin.OnPlayerFinishConnecting.Fire(plugin.PlayerFinishConnectingData{Player: s})
+	}
+
+	motd := s.motd
+	if plugin.OnGettingMotd.HasHandlers() {
+		plugin.OnGettingMotd.Fire(plugin.GettingMotdData{Player: s, Motd: &motd})
+	}
+	if plugin.OnSendingMotd.HasHandlers() {
+		plugin.OnSendingMotd.Fire(plugin.SendingMotdData{Player: s, Motd: &motd})
+	}
+	if err := s.writePacket(encodeMotd(version, s.serverName, motd)); err != nil {
 		return err
 	}
 	if err := s.sendBlockDefinitions(); err != nil {
@@ -152,15 +167,33 @@ func (s *session) sendLevelFrom(mgr *world.Manager, fastMap bool) error {
 		s.players.MarkSpawned(username)
 	}
 
-	return s.writePacket([]byte{
+	spawnX, spawnY, spawnZ := level.Spawn.X, level.Spawn.Y, level.Spawn.Z
+	spawnYaw, spawnPitch := level.Spawn.Yaw, level.Spawn.Pitch
+	if plugin.OnPlayerSpawn.HasHandlers() {
+		plugin.OnPlayerSpawn.Fire(plugin.PlayerSpawnData{
+			Player: s,
+			X:      &spawnX, Y: &spawnY, Z: &spawnZ,
+			Yaw: &spawnYaw, Pitch: &spawnPitch,
+		})
+	}
+
+	teleportPkt := []byte{
 		opcodeEntityTeleport,
 		selfID,
-		byte(level.Spawn.X * coordScale >> 8), byte(level.Spawn.X * coordScale),
-		byte((level.Spawn.Y*coordScale + eyeHeight) >> 8), byte(level.Spawn.Y*coordScale + eyeHeight),
-		byte(level.Spawn.Z * coordScale >> 8), byte(level.Spawn.Z * coordScale),
-		level.Spawn.Yaw,
-		level.Spawn.Pitch,
-	})
+		byte(spawnX * coordScale >> 8), byte(spawnX * coordScale),
+		byte((spawnY*coordScale + eyeHeight) >> 8), byte(spawnY*coordScale + eyeHeight),
+		byte(spawnZ * coordScale >> 8), byte(spawnZ * coordScale),
+		spawnYaw,
+		spawnPitch,
+	}
+	if err := s.writePacket(teleportPkt); err != nil {
+		return err
+	}
+
+	if plugin.OnSentMap.HasHandlers() {
+		plugin.OnSentMap.Fire(plugin.SentMapData{Player: s})
+	}
+	return nil
 }
 
 // changeMap switches the session's active world Manager and sends the new
@@ -171,6 +204,22 @@ func (s *session) sendLevelFrom(mgr *world.Manager, fastMap bool) error {
 // ponytail: single room — peers on other levels also see the teleport.
 // Per-level rooms fix this when entity visibility matters.
 func (s *session) changeMap(mgr *world.Manager) error {
+	levelName := mgr.Current().Name
+	prevName := ""
+	if s.worlds != nil {
+		prevName = s.worlds.Current().Name
+	}
+
+	if plugin.OnJoiningLevel.HasHandlers() {
+		ctx := plugin.OnJoiningLevel.Fire(plugin.JoiningLevelData{
+			Player:    s,
+			LevelName: levelName,
+		})
+		if ctx.Cancelled() {
+			return nil
+		}
+	}
+
 	s.stateMu.Lock()
 	s.worlds = mgr
 	s.stateMu.Unlock()
@@ -185,6 +234,14 @@ func (s *session) changeMap(mgr *world.Manager) error {
 		pos := entityPosition(spawn.X, spawn.Y, spawn.Z)
 		s.entities.SetLocation(entityID, pos, spawn.Yaw, spawn.Pitch)
 		s.broadcastToPeers(encodeEntityTeleport(byte(entityID), pos, spawn.Yaw, spawn.Pitch))
+	}
+
+	if plugin.OnJoinedLevel.HasHandlers() {
+		plugin.OnJoinedLevel.Fire(plugin.JoinedLevelData{
+			Player:    s,
+			LevelName: levelName,
+			PrevLevel: prevName,
+		})
 	}
 	return nil
 }

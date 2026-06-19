@@ -186,6 +186,16 @@ func (c *Codec) SetServerName(name string) {
 // ServeConn handles a single client connection until it closes, sends bad
 // data, or ctx is canceled.
 func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
+	if plugin.OnConnectionReceived.HasHandlers() {
+		ctx2 := plugin.OnConnectionReceived.Fire(plugin.ConnectionReceivedData{
+			RemoteAddr: conn.RemoteAddr().String(),
+		})
+		if ctx2.Cancelled() {
+			_ = conn.Close()
+			return
+		}
+	}
+
 	defer conn.Close()
 
 	s := &session{
@@ -407,6 +417,17 @@ func (s *session) cleanup() {
 func (s *session) Name() string { return s.currentUsername() }
 
 func (s *session) Message(msg string) {
+	if plugin.OnMessageReceived.HasHandlers() {
+		m := msg
+		ctx := plugin.OnMessageReceived.Fire(plugin.MessageReceivedData{
+			Player:  s,
+			Message: &m,
+		})
+		if ctx.Cancelled() {
+			return
+		}
+		msg = m
+	}
 	_ = s.writePacket(encodeMessage(selfID, msg))
 }
 
@@ -437,10 +458,19 @@ func (s *session) SupportsCPE(extName string) bool { return s.supportsExt(extNam
 
 // BroadcastMessage sends a chat message to all online players.
 func (c *Codec) BroadcastMessage(msg string) {
-	packet := encodeMessage(selfID, msg)
-	c.room.ForEachPeerExcept(0, func(peer *session) {
-		_ = peer.writePacket(packet)
-	})
+	if plugin.OnChatSys.HasHandlers() {
+		m := msg
+		plugin.OnChatSys.Fire(plugin.ChatSysData{Message: &m})
+		msg = m
+	}
+	if plugin.OnChat.HasHandlers() {
+		m := msg
+		plugin.OnChat.Fire(plugin.ChatData{Source: nil, Message: &m})
+		msg = m
+	}
+	for _, p := range c.OnlinePlayers() {
+		p.Message(msg)
+	}
 }
 
 // OnlinePlayers returns all currently connected sessions as plugin.Player.

@@ -195,16 +195,26 @@ type pluginConfig struct {
 	server *Server
 }
 
+func (c *pluginConfig) fireConfigUpdated() {
+	if plugin.OnConfigUpdated.HasHandlers() {
+		plugin.OnConfigUpdated.Fire(plugin.ConfigUpdatedData{})
+	}
+}
+
 func (c *pluginConfig) Name() string { return c.server.cfg.Name }
 
 func (c *pluginConfig) SetName(name string) {
 	c.server.cfg.Name = name
 	c.server.codec.SetServerName(name)
+	c.fireConfigUpdated()
 }
 
 func (c *pluginConfig) MOTD() string { return c.server.cfg.MOTD }
 
-func (c *pluginConfig) SetMOTD(motd string) { c.server.cfg.MOTD = motd }
+func (c *pluginConfig) SetMOTD(motd string) {
+	c.server.cfg.MOTD = motd
+	c.fireConfigUpdated()
+}
 
 func (c *pluginConfig) MaxPlayers() int { return c.server.cfg.MaxPlayers }
 
@@ -213,6 +223,7 @@ func (c *pluginConfig) MaxPlayers() int { return c.server.cfg.MaxPlayers }
 func (c *pluginConfig) SetMaxPlayers(n int) {
 	if n >= 1 {
 		c.server.cfg.MaxPlayers = n
+		c.fireConfigUpdated()
 	}
 }
 
@@ -221,6 +232,7 @@ func (c *pluginConfig) ConnectRate() int { return c.server.cfg.ConnectRate }
 func (c *pluginConfig) SetConnectRate(rate int) {
 	if rate >= 1 {
 		c.server.cfg.ConnectRate = rate
+		c.fireConfigUpdated()
 	}
 }
 
@@ -231,6 +243,7 @@ func (c *pluginConfig) TCPNoDelay() bool { return c.server.cfg.Network.TCPNoDela
 
 func (c *pluginConfig) SetTCPNoDelay(enable bool) {
 	c.server.cfg.Network.TCPNoDelay = enable
+	c.fireConfigUpdated()
 }
 
 func (c *pluginConfig) TickInterval() time.Duration { return c.server.cfg.Simulation.TickInterval }
@@ -238,6 +251,7 @@ func (c *pluginConfig) TickInterval() time.Duration { return c.server.cfg.Simula
 func (c *pluginConfig) SetTickInterval(d time.Duration) {
 	if d >= 0 {
 		c.server.cfg.Simulation.TickInterval = d
+		c.fireConfigUpdated()
 	}
 }
 
@@ -251,6 +265,7 @@ func (c *pluginConfig) AutosaveInterval() time.Duration { return c.server.cfg.Au
 func (c *pluginConfig) SetAutosaveInterval(d time.Duration) {
 	if d >= 0 {
 		c.server.cfg.Autosave = d
+		c.fireConfigUpdated()
 	}
 }
 
@@ -293,6 +308,11 @@ func (w *pluginWorld) Dimensions() (int, int, int) {
 }
 
 func (w *pluginWorld) Save() error {
+	if plugin.OnLevelSave.HasHandlers() {
+		if ctx := plugin.OnLevelSave.Fire(plugin.LevelSaveData{}); ctx.Cancelled() {
+			return nil
+		}
+	}
 	return w.mgr.Save(w.worldPath)
 }
 
@@ -457,6 +477,11 @@ func (l *pluginLevel) Dimensions() (int, int, int) {
 }
 
 func (l *pluginLevel) Save() error {
+	if plugin.OnLevelSave.HasHandlers() {
+		if ctx := plugin.OnLevelSave.Fire(plugin.LevelSaveData{}); ctx.Cancelled() {
+			return nil
+		}
+	}
 	return l.mgr.Save(l.path)
 }
 
@@ -598,6 +623,12 @@ func (m *pluginLevelManager) Load(name string) (plugin.Level, error) {
 	if m.srv.multiMgr.Has(name) {
 		return nil, fmt.Errorf("level %q already loaded", name)
 	}
+	if plugin.OnLevelLoad.HasHandlers() {
+		ctx := plugin.OnLevelLoad.Fire(plugin.LevelLoadData{Name: name})
+		if ctx.Cancelled() {
+			return nil, fmt.Errorf("level load cancelled")
+		}
+	}
 	path := m.srv.server.store.WorldFile(name)
 	mgr := world.NewManager()
 	if err := mgr.Load(path); err != nil {
@@ -624,7 +655,11 @@ func (m *pluginLevelManager) Unload(name string) bool {
 	if plugin.OnLevelUnload.HasHandlers() {
 		plugin.OnLevelUnload.Fire(plugin.LevelUnloadData{Name: name})
 	}
-	return m.srv.multiMgr.Remove(name)
+	removed := m.srv.multiMgr.Remove(name)
+	if removed && plugin.OnLevelRemoved.HasHandlers() {
+		plugin.OnLevelRemoved.Fire(plugin.LevelRemovedData{Name: name})
+	}
+	return removed
 }
 
 func (m *pluginLevelManager) SaveAll() error {
@@ -815,7 +850,17 @@ func (e *entityManager) Spawn(info plugin.EntityInfo) byte {
 	e.slots[slot] = entitySlot{internalID: id, info: info}
 	e.codec.BroadcastAddEntity(slot, info.Name, info.X, info.Y, info.Z, info.Yaw, info.Pitch)
 	if info.Model != "" && info.Model != "humanoid" {
+		if plugin.OnSendingModel.HasHandlers() {
+			m := info.Model
+			plugin.OnSendingModel.Fire(plugin.SendingModelData{Model: &m})
+			info.Model = m
+		}
 		e.codec.BroadcastChangeModel(slot, info.Model)
+	}
+	if plugin.OnEntitySpawned.HasHandlers() {
+		name := info.Name
+		model := info.Model
+		plugin.OnEntitySpawned.Fire(plugin.EntitySpawnedData{Name: &name, Model: &model})
 	}
 	return slot
 }
@@ -831,6 +876,9 @@ func (e *entityManager) Despawn(entityID byte) bool {
 	e.mu.Unlock()
 	e.entities.Remove(slot.internalID)
 	e.codec.BroadcastRemoveEntity(entityID)
+	if plugin.OnEntityDespawned.HasHandlers() {
+		plugin.OnEntityDespawned.Fire(plugin.EntityDespawnedData{EntityID: entityID})
+	}
 	return true
 }
 
