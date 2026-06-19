@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/solar-mc/solar/internal/blockdef"
 )
 
 // Position is a coarse world position used by chat commands.
@@ -48,6 +50,15 @@ type PlayerDirectory interface {
 	ListWhitelisted() []string
 }
 
+// BlockDefService exposes custom block definition operations.
+type BlockDefService interface {
+	AddBlockDef(def blockdef.BlockDefinition) bool
+	RemoveBlockDef(id byte) bool
+	GetBlockDef(id byte) (blockdef.BlockDefinition, bool)
+	ListBlockDefs() []blockdef.BlockDefinition
+	FreeBlockID() byte
+}
+
 // Context carries command execution state.
 type Context struct {
 	Username    string
@@ -59,6 +70,7 @@ type Context struct {
 	Persistence PersistenceService
 	Moderation  ModerationService
 	Players     PlayerDirectory
+	BlockDefs   BlockDefService
 }
 
 // Handler processes a command and returns a user-facing response.
@@ -77,7 +89,7 @@ func NewRegistry() *Registry {
 		handlers: make(map[string]Handler),
 		admin:    make(map[string]struct{}),
 	}
-	for _, cmd := range []string{"tp", "setspawn", "save", "kick", "ban", "unban", "whitelist", "newlvl"} {
+	for _, cmd := range []string{"tp", "setspawn", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb"} {
 		registry.admin[cmd] = struct{}{}
 	}
 	registry.Register("help", helpCommand(registry))
@@ -92,6 +104,8 @@ func NewRegistry() *Registry {
 	registry.Register("whitelist", whitelistCommand)
 	registry.Register("players", playersCommand)
 	registry.Register("newlvl", newLevelCommand)
+	registry.Register("gb", globalBlockCommand)
+	registry.Register("lb", levelBlockCommand)
 	return registry
 }
 
