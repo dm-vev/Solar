@@ -55,8 +55,24 @@ func FromGeneratorLevel(lvl *generator.Level) Level {
 const (
 	fileMagic   = "SWLD"
 	fileVersion = 1
-	maxBlocks   = 64 * 1024 * 1024
 )
+
+// maxBlocks is the hard cap on world volume. Set once at startup via
+// SetMaxBlocks; defaults to 64M blocks.
+var maxBlocks int64 = 64 * 1024 * 1024
+
+// SetMaxBlocks updates the global world volume limit. Must be called
+// before any world is loaded or generated.
+func SetMaxBlocks(n int) {
+	if n > 0 {
+		maxBlocks = int64(n)
+	}
+}
+
+// MaxBlocks returns the current world volume limit.
+func MaxBlocks() int64 {
+	return maxBlocks
+}
 
 // Spawn describes the spawn point for a world.
 type Spawn struct {
@@ -324,8 +340,8 @@ func normalizeLevel(level Level) Level {
 		level.Length = 1
 	}
 	volume := level.Volume()
-	if volume > maxBlocks {
-		volume = maxBlocks
+	if int64(volume) > maxBlocks {
+		volume = int(maxBlocks)
 	}
 	if len(level.Blocks) != volume {
 		blocks := make([]byte, volume)
@@ -343,7 +359,7 @@ func validateLevelBounds(level Level) error {
 	if volume < 1 || volume > maxBlocks {
 		return fmt.Errorf("world volume %d exceeds limit %d", volume, maxBlocks)
 	}
-	if len(level.Blocks) > maxBlocks {
+	if int64(len(level.Blocks)) > maxBlocks {
 		return fmt.Errorf("block payload length %d exceeds limit %d", len(level.Blocks), maxBlocks)
 	}
 	return nil

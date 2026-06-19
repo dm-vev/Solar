@@ -119,15 +119,26 @@ func NewLevel(name string, width, height, length int) *Level {
 	}
 }
 
+// genMaxBlocks is the hard cap on generated world volume. Set once at
+// startup via SetMaxBlocks; defaults to 64M blocks.
+var genMaxBlocks int64 = 64 * 1024 * 1024
+
+// SetMaxBlocks updates the generator volume limit. Must be called
+// before any world is generated.
+func SetMaxBlocks(n int) {
+	if n > 0 {
+		genMaxBlocks = int64(n)
+	}
+}
+
 // ValidateDimensions checks if level dimensions are reasonable.
 func ValidateDimensions(width, height, length int) error {
 	if width < 1 || height < 1 || length < 1 {
 		return errors.New("dimensions must be positive")
 	}
 	volume := int64(width) * int64(height) * int64(length)
-	const maxBlocks = 64 * 1024 * 1024
-	if volume > maxBlocks {
-		return fmt.Errorf("volume %d exceeds limit %d", volume, maxBlocks)
+	if volume > genMaxBlocks {
+		return fmt.Errorf("volume %d exceeds limit %d", volume, genMaxBlocks)
 	}
 	return nil
 }
