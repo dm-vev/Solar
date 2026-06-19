@@ -3,9 +3,75 @@ data_dir = "data"
 workers = 8
 max_players = 128
 connect_rate = 32
-# autosave_interval controls how often the world and policy are saved to disk.
-# Set to 0 to disable automatic saves; negative values are rejected.
+# Set to "0s" to disable automatic saves; negative values are rejected.
 autosave_interval = "60s"
+default_generator = "Classic"
 server_name = "Solar"
 motd = "CLI-only classic server"
-# SOLAR_OPERATORS="alice,bob" seeds admin usernames.
+# operators = ["alice", "bob"]
+# SOLAR_OPERATORS="alice,bob" also seeds admin usernames.
+
+[network]
+# Per-session TCP read deadline (slowloris protection). 0 disables.
+read_timeout = "30s"
+# Per-session TCP write deadline (stuck-client protection). 0 disables.
+write_timeout = "10s"
+# Set TCP_NODELAY on accepted connections to reduce latency.
+tcp_nodelay = true
+# Per-session outbound packet queue depth. When full the client is disconnected.
+session_outbox_size = 256
+# Max packets batched per flush in the write loop.
+write_batch_size = 32
+
+[simulation]
+# World + entity tick interval (20 TPS = 50ms).
+tick_interval = "50ms"
+
+[world]
+# Default generated world dimensions (used when no world file exists).
+default_width = 128
+default_height = 64
+default_length = 128
+# Hard cap on world volume in blocks (64M = 67108864).
+max_blocks = 67108864
+
+[storage]
+# Storage backend. Only "local" is implemented.
+backend = "local"
+# Subdirectory names under data_dir for worlds and player policy.
+worlds_dir = "worlds"
+players_dir = "players"
+# Player policy filename inside players_dir.
+policy_file = "policy.json"
+# World file extension (saves are binary SWLD format).
+world_file_ext = ".swld"
+# Name of the primary world snapshot.
+main_world_name = "main"
+
+[commands]
+# Commands that require operator privileges.
+admin_commands = ["tp", "setspawn", "save", "kick", "ban", "unban", "whitelist", "newlvl"]
+
+[player]
+# Start with whitelist enforcement on. Players not on the whitelist are rejected.
+whitelist_enabled = false
+# Maximum accepted username length (protocol max is 64).
+max_username_length = 32
+
+[cpe]
+# Toggle individual CPE extensions the server advertises.
+ext_player_list = true
+fast_map = true
+two_way_ping = true
+
+[debug]
+# pprof/health HTTP server address. Empty disables it.
+# Prefer localhost (e.g. "127.0.0.1:6060") to avoid exposing pprof.
+pprof_address = ""
+pprof_shutdown_timeout = "5s"
+
+[log]
+# One of: debug, info, warn, error.
+level = "info"
+# One of: text, json.
+format = "text"

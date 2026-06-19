@@ -17,7 +17,9 @@ Connect a Classic/ClassiCube client to `127.0.0.1:25565`.
 
 ## Configuration
 
-Solar reads `configs/server.toml` by default:
+Solar reads `configs/server.toml` by default. Top-level keys control core
+server parameters; nested `[table]` sections tune network, simulation, world,
+debug, and logging:
 
 ```toml
 listen = ":25565"
@@ -25,15 +27,89 @@ data_dir = "data"
 workers = 8
 max_players = 128
 connect_rate = 32
+autosave_interval = "60s"
+default_generator = "Classic"
 server_name = "Solar"
 motd = "CLI-only classic server"
 operators = ["alice", "bob"]
-autosave_interval = "60s"
+
+[network]
+read_timeout = "30s"
+write_timeout = "10s"
+tcp_nodelay = true
+session_outbox_size = 256
+write_batch_size = 32
+
+[simulation]
+tick_interval = "50ms"
+
+[world]
+default_width = 128
+default_height = 64
+default_length = 128
+max_blocks = 67108864
+
+[storage]
+backend = "local"
+worlds_dir = "worlds"
+players_dir = "players"
+policy_file = "policy.json"
+world_file_ext = ".swld"
+main_world_name = "main"
+
+[commands]
+admin_commands = ["tp", "setspawn", "save", "kick", "ban", "unban", "whitelist", "newlvl"]
+
+[player]
+whitelist_enabled = false
+max_username_length = 32
+
+[cpe]
+ext_player_list = true
+fast_map = true
+two_way_ping = true
+
+[debug]
+pprof_address = ""
+pprof_shutdown_timeout = "5s"
+
+[log]
+level = "info"
+format = "text"
 ```
 
-`autosave_interval` accepts a duration; use `0` to disable automatic saves. Negative values are rejected.
+`autosave_interval` accepts a duration; use `0s` to disable automatic saves.
+Negative values are rejected.
 
-Operators can also be seeded with `SOLAR_OPERATORS="alice,bob"` or the legacy `SOLAR_ADMIN` variable.
+Operators can also be seeded with `SOLAR_OPERATORS="alice,bob"` or the legacy
+`SOLAR_ADMIN` variable.
+
+`[network]` — `read_timeout` / `write_timeout` set per-session TCP deadlines
+(0 disables); `session_outbox_size` is the per-client packet queue depth
+(client is disconnected when full); `write_batch_size` controls how many
+packets are coalesced per flush.
+
+`[simulation]` — `tick_interval` drives world and entity updates (50ms = 20 TPS).
+
+`[world]` — `default_*` dimensions are used when generating a fresh world;
+`max_blocks` is the hard volume cap (default 64M).
+
+`[storage]` — `backend` selects the persistence backend (only `"local"`);
+`worlds_dir`/`players_dir`/`policy_file`/`world_file_ext`/`main_world_name`
+control the on-disk layout.
+
+`[commands]` — `admin_commands` lists commands that require operator privileges.
+
+`[player]` — `whitelist_enabled` starts the server with whitelist enforcement
+on; `max_username_length` caps accepted usernames (protocol max 64).
+
+`[cpe]` — toggle individual CPE extensions the server advertises to clients.
+
+`[debug]` — `pprof_address` enables the pprof/health HTTP server
+(`--pprof` CLI flag overrides); `pprof_shutdown_timeout` controls graceful
+shutdown of that server.
+
+`[log]` — `level` is one of `debug|info|warn|error`; `format` is `text` or `json`.
 
 ## Commands
 
