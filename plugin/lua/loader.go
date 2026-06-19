@@ -61,6 +61,7 @@ type luaPlugin struct {
 	name string
 	path string
 	L    *glua.LState
+	api  *api
 }
 
 func (p *luaPlugin) Name() string { return p.name }
@@ -68,8 +69,8 @@ func (p *luaPlugin) Init() error  { return nil }
 
 func (p *luaPlugin) Enable(s plugin.Server) error {
 	p.L = glua.NewState()
-	api := newAPI(p.L, s)
-	api.register()
+	p.api = newAPI(p.L, s)
+	p.api.register()
 	if err := p.L.DoFile(p.path); err != nil {
 		return fmt.Errorf("lua %s: %w", p.name, err)
 	}
@@ -77,6 +78,9 @@ func (p *luaPlugin) Enable(s plugin.Server) error {
 }
 
 func (p *luaPlugin) Disable() error {
+	if p.api != nil {
+		p.api.closed = true
+	}
 	if p.L != nil {
 		p.L.Close()
 		p.L = nil

@@ -13,7 +13,7 @@ import (
 )
 
 // TestLoadLuaScripts loads the example.lua script and verifies it
-// registers as a plugin.
+// registers as a plugin and initializes without error.
 func TestLoadLuaScripts(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping lua integration test in short mode")
