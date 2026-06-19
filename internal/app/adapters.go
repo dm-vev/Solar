@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/protocol/classic"
 	"github.com/solar-mc/solar/internal/world"
@@ -91,6 +92,31 @@ func (d sessionDirectory) ListWhitelisted() []string {
 	return d.backend.WhitelistNames()
 }
 
+// sessionBlockDefs implements command.BlockDefService.
+type sessionBlockDefs struct {
+	backend classic.SessionBackend
+}
+
+func (b sessionBlockDefs) AddBlockDef(def blockdef.BlockDefinition) bool {
+	return b.backend.AddBlockDef(def)
+}
+
+func (b sessionBlockDefs) RemoveBlockDef(id byte) bool {
+	return b.backend.RemoveBlockDef(id)
+}
+
+func (b sessionBlockDefs) GetBlockDef(id byte) (blockdef.BlockDefinition, bool) {
+	return b.backend.GetBlockDef(id)
+}
+
+func (b sessionBlockDefs) ListBlockDefs() []blockdef.BlockDefinition {
+	return b.backend.ListBlockDefs()
+}
+
+func (b sessionBlockDefs) FreeBlockID() byte {
+	return b.backend.FreeBlockID()
+}
+
 // buildCommandContext assembles a command.Context from a SessionBackend.
 // This function is injected into the codec via SetCommandContextBuilder,
 // keeping the protocol layer decoupled from the command adapter types.
@@ -111,5 +137,6 @@ func buildCommandContext(backend classic.SessionBackend) command.Context {
 		Persistence: sessionPersistence{backend},
 		Moderation:  sessionModeration{backend},
 		Players:     sessionDirectory{backend},
+		BlockDefs:   sessionBlockDefs{backend},
 	}
 }

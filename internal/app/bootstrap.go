@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"os"
+	"path/filepath"
 
+	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/config"
 	"github.com/solar-mc/solar/internal/entity"
@@ -36,6 +38,12 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	world.SetMaxBlocks(cfg.World.MaxBlocks)
 	core.SetMaxBlocks(cfg.World.MaxBlocks)
 
+	blockDefsDir := filepath.Join(cfg.DataDir, cfg.Storage.BlockDefsDir)
+	blockDefs := blockdef.NewRegistry(blockDefsDir)
+	if err := blockDefs.LoadGlobal(); err != nil {
+		logger.Error("load block definitions", "error", err)
+	}
+
 	codec := classic.NewCodec(cfg.Name, cfg.MOTD, worlds, players, entities, commands)
 	codec.SetLogger(logger)
 	codec.SetPersistencePaths(store.WorldFile(cfg.Storage.MainWorldName), store.PlayerPolicyFile())
@@ -46,6 +54,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	codec.SetWriteBatchSize(cfg.Network.WriteBatchSize, cfg.Network.SessionOutbox)
 	codec.SetTCPNoDelay(cfg.Network.TCPNoDelay)
 	codec.SetSendTimeout(cfg.Network.SendTimeoutMode, cfg.Network.SendTimeout)
+	codec.SetBlockDefinitions(blockDefs)
 
 	srv := server.New(
 		cfg,
