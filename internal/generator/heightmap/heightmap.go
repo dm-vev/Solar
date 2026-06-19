@@ -1,4 +1,4 @@
-package generator
+package heightmap
 
 import (
 	"bytes"
@@ -13,29 +13,31 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/solar-mc/solar/internal/generator/core"
 )
 
-// HeightmapModule exposes image-based terrain generation.
-var HeightmapModule = Module{
+// Module exposes image-based terrain generation.
+var Module = core.Module{
 	Name: "heightmap",
-	Generators: func() []Generator {
-		return []Generator{{
+	Generators: func() []core.Generator {
+		return []core.Generator{{
 			Name: "Heightmap",
-			Type: GenTypeAdvanced,
+			Type: core.GenTypeAdvanced,
 			Desc: "Seed specifies the URL of a heightmap image",
 			Func: genHeightmap,
 		}}
 	},
 }
 
-func genHeightmap(args *Args, lvl *Level) error {
+func genHeightmap(args *core.Args, lvl *core.Level) error {
 	fields := strings.Fields(args.Raw)
 	var source string
 	for _, f := range fields {
 		if _, err := strconv.ParseInt(f, 10, 64); err == nil {
 			continue
 		}
-		if _, ok := FindBiome(f); ok {
+		if _, ok := core.FindBiome(f); ok {
 			continue
 		}
 		if source == "" {
@@ -51,7 +53,7 @@ func genHeightmap(args *Args, lvl *Level) error {
 		return fmt.Errorf("load heightmap: %w", err)
 	}
 
-	biome := biomeOrDefault(args)
+	biome := core.BiomeOrDefault(args)
 	return applyHeightmap(lvl, img, biome)
 }
 
@@ -81,7 +83,12 @@ func isHTTPURL(s string) bool {
 	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")
 }
 
-func applyHeightmap(lvl *Level, img image.Image, biome Biome) error {
+// Apply renders a heightmap image onto a level using the given biome.
+func Apply(lvl *core.Level, img image.Image, biome core.Biome) error {
+	return applyHeightmap(lvl, img, biome)
+}
+
+func applyHeightmap(lvl *core.Level, img image.Image, biome core.Biome) error {
 	width := lvl.Width
 	length := lvl.Length
 	oneY := width * length

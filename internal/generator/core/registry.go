@@ -1,4 +1,4 @@
-package generator
+package core
 
 import (
 	"fmt"
@@ -143,46 +143,4 @@ func Generate(gen Generator, name string, width, height, length int, args Args) 
 		return nil, err
 	}
 	return lvl, nil
-}
-
-// defaultRegistry is the package-level registry initialised by RegisterDefaults.
-var defaultRegistry = NewRegistry()
-
-// RegisterDefaults populates the default registry with all built-in generator
-// modules. It is safe to call multiple times.
-func RegisterDefaults() {
-	for _, module := range BuiltinModules() {
-		defaultRegistry.RegisterModule(module)
-	}
-}
-
-// BuiltinModules returns the built-in generator families.
-func BuiltinModules() []Module {
-	return []Module{
-		SimpleModule,
-		ClassicModule,
-		FCraftModule,
-		HeightmapModule,
-	}
-}
-
-// DefaultRegistry returns the package-level registry.
-func DefaultRegistry() *Registry {
-	return defaultRegistry
-}
-
-// Find looks up a generator by case-insensitive name in the default registry.
-func Find(name string) (Generator, bool) {
-	return defaultRegistry.Find(name)
-}
-
-// Names returns all registered generator names grouped by type from the
-// default registry.
-func Names() map[GenType][]string {
-	return defaultRegistry.Names()
-}
-
-// AllGenerators returns all registered generators from the default registry.
-func AllGenerators() []Generator {
-	return defaultRegistry.All()
 }

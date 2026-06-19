@@ -1,28 +1,30 @@
-package generator
+package fcraft
 
 import (
 	"math"
 	"math/rand"
+
+	"github.com/solar-mc/solar/internal/generator/core"
 )
 
-// FCraftModule exposes fCraft-style terrain template generators.
-var FCraftModule = Module{Name: "fcraft", Generators: FCraftGenerators}
+// Module exposes fCraft-style terrain template generators.
+var Module = core.Module{Name: "fcraft", Generators: Generators}
 
-// fCraftTemplates lists the named fCraft generator templates.
-var fCraftTemplates = []string{
+// Templates lists the named fCraft generator templates.
+var Templates = []string{
 	"Archipelago", "Atoll", "Bay", "Dunes", "Hills", "Ice", "Island2",
 	"Lake", "Mountains2", "Peninsula", "Random", "River", "Streams",
 }
 
-// FCraftGenerators returns all fCraft template generators.
-func FCraftGenerators() []Generator {
-	gens := make([]Generator, 0, len(fCraftTemplates))
-	for _, t := range fCraftTemplates {
-		gens = append(gens, Generator{
+// Generators returns all fCraft template generators.
+func Generators() []core.Generator {
+	gens := make([]core.Generator, 0, len(Templates))
+	for _, t := range Templates {
+		gens = append(gens, core.Generator{
 			Name: t,
-			Type: GenTypeFCraft,
+			Type: core.GenTypeFCraft,
 			Desc: "fCraft " + t + " terrain template",
-			Func: func(args *Args, lvl *Level) error {
+			Func: func(args *core.Args, lvl *core.Level) error {
 				return genFCraftTemplate(args, lvl, t)
 			},
 		})
@@ -32,7 +34,7 @@ func FCraftGenerators() []Generator {
 
 type fCraftMapGenArgs struct {
 	Seed               int
-	Biome              Biome
+	Biome              core.Biome
 	FeatureScale       int
 	DetailScale        int
 	Roughness          float64
@@ -65,9 +67,9 @@ type fCraftMapGenArgs struct {
 	TreeSpacingMax     int
 }
 
-// fCraftTemplateOverrides maps template names to the fields that differ from
+// templateOverrides maps template names to the fields that differ from
 // the default fCraftMapGenArgs.
-var fCraftTemplateOverrides = map[string]func(*fCraftMapGenArgs){
+var templateOverrides = map[string]func(*fCraftMapGenArgs){
 	"Archipelago": func(a *fCraftMapGenArgs) {
 		a.FeatureScale = 16
 		a.Roughness = 0.6
@@ -137,7 +139,7 @@ var fCraftTemplateOverrides = map[string]func(*fCraftMapGenArgs){
 func makeTemplate(name string) fCraftMapGenArgs {
 	args := defaultFCraftArgs()
 
-	if override, ok := fCraftTemplateOverrides[name]; ok {
+	if override, ok := templateOverrides[name]; ok {
 		override(&args)
 	}
 	if name == "Random" {
@@ -177,15 +179,15 @@ func defaultFCraftArgs() fCraftMapGenArgs {
 	}
 }
 
-func genFCraftTemplate(args *Args, lvl *Level, template string) error {
+func genFCraftTemplate(args *core.Args, lvl *core.Level, template string) error {
 	genArgs := makeTemplate(template)
-	genArgs.Biome = biomeOrDefault(args)
+	genArgs.Biome = core.BiomeOrDefault(args)
 	genArgs.Seed = args.Seed
 
 	ratio := float64(lvl.Height) / 96.0
-	genArgs.MaxHeight = Round(float64(genArgs.MaxHeight) * ratio)
-	genArgs.MaxDepth = Round(float64(genArgs.MaxDepth) * ratio)
-	genArgs.SnowAltitude = Round(float64(genArgs.SnowAltitude) * ratio)
+	genArgs.MaxHeight = core.Round(float64(genArgs.MaxHeight) * ratio)
+	genArgs.MaxDepth = core.Round(float64(genArgs.MaxDepth) * ratio)
+	genArgs.SnowAltitude = core.Round(float64(genArgs.SnowAltitude) * ratio)
 	genArgs.WaterLevel = (lvl.Height - 1) / 2
 
 	newFCraftMapGen(genArgs).Generate(lvl)
@@ -196,7 +198,7 @@ func genFCraftTemplate(args *Args, lvl *Level, template string) error {
 type fCraftMapGen struct {
 	args       fCraftMapGenArgs
 	randSource *rand.Rand
-	noise      *Noise
+	noise      *core.Noise
 	heightmap  []float64
 	slopemap   []float64
 	surfaceMap []uint16
@@ -206,35 +208,35 @@ func newFCraftMapGen(args fCraftMapGenArgs) *fCraftMapGen {
 	return &fCraftMapGen{
 		args:       args,
 		randSource: rand.New(rand.NewSource(int64(args.Seed))),
-		noise:      NewNoise(args.Seed, args.FeatureScale, args.DetailScale, args.Roughness),
+		noise:      core.NewNoise(args.Seed, args.FeatureScale, args.DetailScale, args.Roughness),
 	}
 }
 
-func (g *fCraftMapGen) Generate(lvl *Level) {
+func (g *fCraftMapGen) Generate(lvl *core.Level) {
 	g.generateHeightmap(lvl.Width, lvl.Length)
 	g.generateMap(lvl)
 }
 
 func (g *fCraftMapGen) generateHeightmap(width, length int) {
 	heightmap := make([]float64, width*length)
-	PerlinNoise(g.args.Seed, heightmap, width, length, g.args.FeatureScale, g.args.DetailScale, g.args.Roughness)
+	core.PerlinNoise(g.args.Seed, heightmap, width, length, g.args.FeatureScale, g.args.DetailScale, g.args.Roughness)
 
 	if g.args.UseBias && !g.args.DelayBias {
-		NormalizeFloat(heightmap)
+		core.NormalizeFloat(heightmap)
 		g.applyBias(heightmap, width, length)
 	}
-	NormalizeFloat(heightmap)
+	core.NormalizeFloat(heightmap)
 	if g.args.MarbledHeightmap {
-		Marble(heightmap)
+		core.Marble(heightmap)
 	}
 	if g.args.InvertHeightmap {
-		Invert(heightmap)
+		core.Invert(heightmap)
 	}
 	if g.args.UseBias && g.args.DelayBias {
-		NormalizeFloat(heightmap)
+		core.NormalizeFloat(heightmap)
 		g.applyBias(heightmap, width, length)
 	}
-	NormalizeFloat(heightmap)
+	core.NormalizeFloat(heightmap)
 	g.heightmap = heightmap
 }
 
@@ -262,18 +264,18 @@ func (g *fCraftMapGen) applyBias(heightmap []float64, width, length int) {
 			corners[j-1], corners[j] = corners[j], corners[j-1]
 		}
 	}
-	ApplyBias(heightmap, width, length, corners[0], corners[1], corners[2], corners[3], midpoint)
+	core.ApplyBias(heightmap, width, length, corners[0], corners[1], corners[2], corners[3], midpoint)
 }
 
-func (g *fCraftMapGen) generateMap(lvl *Level) {
+func (g *fCraftMapGen) generateMap(lvl *core.Level) {
 	width := lvl.Width
 	length := lvl.Length
 	args := g.args
 
 	desiredWaterLevel := 0.5
 	if args.MatchWaterCoverage {
-		sorted := SortCopy(g.heightmap)
-		desiredWaterLevel = FindThresholdSorted(sorted, args.WaterCoverage)
+		sorted := core.SortCopy(g.heightmap)
+		desiredWaterLevel = core.FindThresholdSorted(sorted, args.WaterCoverage)
 	}
 
 	aboveWaterMultiplier := 0.0
@@ -282,10 +284,10 @@ func (g *fCraftMapGen) generateMap(lvl *Level) {
 	}
 
 	if args.CliffSmoothing {
-		blurred := GaussianBlur5X5(g.heightmap, width, length)
-		g.slopemap = CalculateSlope(blurred, width, length)
+		blurred := core.GaussianBlur5X5(g.heightmap, width, length)
+		g.slopemap = core.CalculateSlope(blurred, width, length)
 	} else {
-		g.slopemap = CalculateSlope(g.heightmap, width, length)
+		g.slopemap = core.CalculateSlope(g.heightmap, width, length)
 	}
 
 	var altmap []float64
@@ -295,8 +297,8 @@ func (g *fCraftMapGen) generateMap(lvl *Level) {
 		if blendDetail < 1 {
 			blendDetail = 1
 		}
-		PerlinNoise(g.randSource.Int(), altmap, width, length, blendDetail, 3, 0.5)
-		NormalizeToRange(altmap, -1, 1)
+		core.PerlinNoise(g.randSource.Int(), altmap, width, length, blendDetail, 3, 0.5)
+		core.NormalizeToRange(altmap, -1, 1)
 	}
 	g.surfaceMap = make([]uint16, width*length)
 
@@ -316,14 +318,14 @@ func (g *fCraftMapGen) generateMap(lvl *Level) {
 	}
 }
 
-func (g *fCraftMapGen) fillColumn(lvl *Level, x, z, i int, desiredWaterLevel, aboveWaterMultiplier float64, altmap []float64) (int, int) {
+func (g *fCraftMapGen) fillColumn(lvl *core.Level, x, z, i int, desiredWaterLevel, aboveWaterMultiplier float64, altmap []float64) (int, int) {
 	if g.heightmap[i] < desiredWaterLevel {
 		return g.fillColumnUnderwater(lvl, x, z, i, desiredWaterLevel, altmap)
 	}
 	return g.fillColumnAboveWater(lvl, x, z, i, desiredWaterLevel, aboveWaterMultiplier, altmap)
 }
 
-func (g *fCraftMapGen) fillColumnUnderwater(lvl *Level, x, z, i int, desiredWaterLevel float64, altmap []float64) (int, int) {
+func (g *fCraftMapGen) fillColumnUnderwater(lvl *core.Level, x, z, i int, desiredWaterLevel float64, altmap []float64) (int, int) {
 	width := lvl.Width
 	length := lvl.Length
 	height := lvl.Height
@@ -334,7 +336,7 @@ func (g *fCraftMapGen) fillColumnUnderwater(lvl *Level, x, z, i int, desiredWate
 		depth += altmap[i] * float64(args.MaxDepthVariation)
 	}
 	slope := g.slopemap[i] * depth
-	level := args.WaterLevel - Round((1-g.heightmap[i]/desiredWaterLevel)*depth)
+	level := args.WaterLevel - core.Round((1-g.heightmap[i]/desiredWaterLevel)*depth)
 	surface := args.WaterLevel
 
 	if args.AddWater {
@@ -345,7 +347,7 @@ func (g *fCraftMapGen) fillColumnUnderwater(lvl *Level, x, z, i int, desiredWate
 	return surface, surface
 }
 
-func (g *fCraftMapGen) fillUnderwaterWithWater(lvl *Level, x, z, width, length, height, level int, args fCraftMapGenArgs) {
+func (g *fCraftMapGen) fillUnderwaterWithWater(lvl *core.Level, x, z, width, length, height, level int, args fCraftMapGenArgs) {
 	idx := (args.WaterLevel*length+z)*width + x
 	if args.WaterLevel >= 0 && args.WaterLevel < height {
 		lvl.Blocks[idx] = args.Biome.Water
@@ -370,7 +372,7 @@ func (g *fCraftMapGen) fillUnderwaterWithWater(lvl *Level, x, z, width, length, 
 	}
 }
 
-func (g *fCraftMapGen) fillColumnAboveWater(lvl *Level, x, z, i int, desiredWaterLevel, aboveWaterMultiplier float64, altmap []float64) (int, int) {
+func (g *fCraftMapGen) fillColumnAboveWater(lvl *core.Level, x, z, i int, desiredWaterLevel, aboveWaterMultiplier float64, altmap []float64) (int, int) {
 	width := lvl.Width
 	length := lvl.Length
 	height := lvl.Height
@@ -383,7 +385,7 @@ func (g *fCraftMapGen) fillColumnAboveWater(lvl *Level, x, z, i int, desiredWate
 	slope := g.slopemap[i] * maxH
 	level := args.WaterLevel
 	if maxH != 0 {
-		level = args.WaterLevel + Round((g.heightmap[i]-desiredWaterLevel)*aboveWaterMultiplier/float64(args.MaxHeight)*maxH)
+		level = args.WaterLevel + core.Round((g.heightmap[i]-desiredWaterLevel)*aboveWaterMultiplier/float64(args.MaxHeight)*maxH)
 	}
 	surface := level
 
@@ -392,7 +394,7 @@ func (g *fCraftMapGen) fillColumnAboveWater(lvl *Level, x, z, i int, desiredWate
 
 	topBlock := args.Biome.Surface
 	if snow {
-		topBlock = WhiteWool
+		topBlock = core.WhiteWool
 	}
 	if slope >= args.CliffThreshold {
 		topBlock = args.Biome.Cliff
@@ -403,7 +405,7 @@ func (g *fCraftMapGen) fillColumnAboveWater(lvl *Level, x, z, i int, desiredWate
 	if snow && slope < args.CliffThreshold {
 		idx := (level*length+z)*width + x
 		if level >= 0 && level < height {
-			lvl.Blocks[idx] = WhiteWool
+			lvl.Blocks[idx] = core.WhiteWool
 		}
 	}
 
@@ -412,7 +414,7 @@ func (g *fCraftMapGen) fillColumnAboveWater(lvl *Level, x, z, i int, desiredWate
 
 // fillColumnGround fills a column from level down to 0 with surface, ground,
 // and bedrock layers based on slope and cliff threshold.
-func (g *fCraftMapGen) fillColumnGround(lvl *Level, x, z, width, length, height, level int, slope float64, args fCraftMapGenArgs, topBlock byte) {
+func (g *fCraftMapGen) fillColumnGround(lvl *core.Level, x, z, width, length, height, level int, slope float64, args fCraftMapGenArgs, topBlock byte) {
 	idx := (level*length+z)*width + x
 	if level >= 0 && level < height {
 		lvl.Blocks[idx] = topBlock
@@ -448,7 +450,7 @@ func (a fCraftMapGenArgs) groundThickness() int {
 	return 5
 }
 
-func (g *fCraftMapGen) addBeaches(lvl *Level) {
+func (g *fCraftMapGen) addBeaches(lvl *core.Level) {
 	args := g.args
 	width := lvl.Width
 	length := lvl.Length
@@ -476,7 +478,7 @@ func (g *fCraftMapGen) addBeaches(lvl *Level) {
 
 // hasAdjacentWater checks whether any block within beachExtent of (x,y,z)
 // is water. Used by addBeaches to determine beach placement.
-func (g *fCraftMapGen) hasAdjacentWater(lvl *Level, x, y, z, width, length int) bool {
+func (g *fCraftMapGen) hasAdjacentWater(lvl *core.Level, x, y, z, width, length int) bool {
 	args := g.args
 	beachExtentSqr := (args.BeachExtent + 1) * (args.BeachExtent + 1)
 
@@ -502,13 +504,13 @@ func (g *fCraftMapGen) hasAdjacentWater(lvl *Level, x, y, z, width, length int) 
 	return false
 }
 
-func (g *fCraftMapGen) generateTrees(lvl *Level) {
+func (g *fCraftMapGen) generateTrees(lvl *core.Level) {
 	args := g.args
 	width := lvl.Width
 	length := lvl.Length
 	rn := rand.New(rand.NewSource(int64(args.Seed) + 1))
 	treeType := args.Biome.TreeDefault("fCraft")
-	ctor, ok := FindTree(treeType)
+	ctor, ok := core.FindTree(treeType)
 	if !ok {
 		return
 	}
@@ -534,7 +536,7 @@ func (g *fCraftMapGen) generateTrees(lvl *Level) {
 						return
 					}
 					bidx := (yT*length+zT)*width + xT
-					if lvl.Blocks[bidx] == Air {
+					if lvl.Blocks[bidx] == core.Air {
 						lvl.Blocks[bidx] = bT
 					}
 				})

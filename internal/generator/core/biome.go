@@ -1,4 +1,4 @@
-package generator
+package core
 
 // Biome describes the blocks and environment used by a generator.
 type Biome struct {

@@ -1,4 +1,6 @@
-package generator
+package classic
+
+import "github.com/solar-mc/solar/internal/generator/core"
 
 // mcNoise.go contains the exact MCGalaxy Classic noise implementations.
 // Based on MCGalaxy/Generator/Classic/Noise.cs and
@@ -10,7 +12,7 @@ type mcImprovedNoise struct {
 }
 
 // newMCImprovedNoise creates a noise instance using MCGalaxy's permutation.
-func newMCImprovedNoise(rnd *JavaRandom) *mcImprovedNoise {
+func newMCImprovedNoise(rnd *core.JavaRandom) *mcImprovedNoise {
 	n := &mcImprovedNoise{}
 	for i := 0; i < 256; i++ {
 		n.p[i] = byte(i)
@@ -72,7 +74,7 @@ type mcOctaveNoise struct {
 }
 
 // newMCOctaveNoise creates an octave noise with the given number of octaves.
-func newMCOctaveNoise(octaves int, rnd *JavaRandom) *mcOctaveNoise {
+func newMCOctaveNoise(octaves int, rnd *core.JavaRandom) *mcOctaveNoise {
 	n := &mcOctaveNoise{baseNoise: make([]*mcImprovedNoise, octaves)}
 	for i := 0; i < octaves; i++ {
 		n.baseNoise[i] = newMCImprovedNoise(rnd)

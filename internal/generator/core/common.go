@@ -1,5 +1,5 @@
-// Package generator ports MCGalaxy map generators to Solar.
-package generator
+// Package core provides shared types and utilities used by generator families.
+package core
 
 import (
 	"errors"
@@ -202,20 +202,6 @@ func Floor32(value float32) int {
 	return i
 }
 
-func max32(a, b float32) float32 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min32(a, b float32) float32 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // Round mirrors C# Math.Round (half to even, but simplified).
 func Round(value float64) int {
 	if value < 0 {
@@ -262,4 +248,23 @@ func Sqr(x float64) float64 { return x * x }
 // Dist3 returns the Euclidean distance between two points.
 func Dist3(x1, y1, z1, x2, y2, z2 float64) float64 {
 	return math.Sqrt(Sqr(x1-x2) + Sqr(y1-y2) + Sqr(z1-z2))
+}
+
+// FillLayer fills an entire horizontal layer with a single block.
+func FillLayer(l *Level, y int, block byte) {
+	if y < 0 || y >= l.Height {
+		return
+	}
+	for z := 0; z < l.Length; z++ {
+		for x := 0; x < l.Width; x++ {
+			l.Blocks[PackIndex(*l, x, y, z)] = block
+		}
+	}
+}
+
+func BiomeOrDefault(a *Args) Biome {
+	if a.Biome.Name == "" {
+		return Forest
+	}
+	return a.Biome
 }

@@ -1,38 +1,40 @@
-package generator
+package classic
 
 import (
 	"math"
 	"math/rand"
+
+	"github.com/solar-mc/solar/internal/generator/core"
 )
 
-// ClassicModule exposes the MCGalaxy Classic generator.
-var ClassicModule = Module{Name: "classic", Generators: ClassicGenerators}
+// Module exposes the MCGalaxy Classic generator.
+var Module = core.Module{Name: "classic", Generators: Generators}
 
-// ClassicGenerators returns the MCGalaxy Classic generator.
-func ClassicGenerators() []Generator {
-	return []Generator{{
+// Generators returns the MCGalaxy Classic generator.
+func Generators() []core.Generator {
+	return []core.Generator{{
 		Name: "Classic",
-		Type: GenTypeSimple,
+		Type: core.GenTypeSimple,
 		Desc: "Original Minecraft Classic terrain with caves and trees",
 		Func: genClassic,
 	}}
 }
 
 type classicGen struct {
-	lvl        *Level
+	lvl        *core.Level
 	width      int
 	length     int
 	height     int
 	oneY       int
 	waterLevel int
 	minHeight  int
-	biome      Biome
-	rnd        *JavaRandom
+	biome      core.Biome
+	rnd        *core.JavaRandom
 	seed       int
 	heightmap  []int16
 }
 
-func genClassic(args *Args, lvl *Level) error {
+func genClassic(args *core.Args, lvl *core.Level) error {
 	g := &classicGen{
 		lvl:        lvl,
 		width:      lvl.Width,
@@ -41,16 +43,16 @@ func genClassic(args *Args, lvl *Level) error {
 		oneY:       lvl.Width * lvl.Length,
 		waterLevel: lvl.Height / 2,
 		minHeight:  lvl.Height,
-		biome:      biomeOrDefault(args),
-		rnd:        NewJavaRandom(args.Seed),
+		biome:      core.BiomeOrDefault(args),
+		rnd:        core.NewJavaRandom(args.Seed),
 		seed:       args.Seed,
 	}
 	g.createHeightmap()
 	g.createStrata()
 	g.carveCaves()
-	g.carveOreVeins(0.9, CoalOre)
-	g.carveOreVeins(0.7, IronOre)
-	g.carveOreVeins(0.5, GoldOre)
+	g.carveOreVeins(0.9, core.CoalOre)
+	g.carveOreVeins(0.7, core.IronOre)
+	g.carveOreVeins(0.5, core.GoldOre)
 	g.floodFillWaterBorders()
 	g.floodFillWater()
 	g.floodFillLava()
@@ -106,8 +108,8 @@ func (g *classicGen) createStrata() {
 			dirtHeight := int(g.heightmap[hMapIndex])
 			stoneHeight := dirtHeight + dirtThickness
 
-			stoneHeight = Min(stoneHeight, g.height-1)
-			dirtHeight = Min(dirtHeight, g.height-1)
+			stoneHeight = core.Min(stoneHeight, g.height-1)
+			dirtHeight = core.Min(dirtHeight, g.height-1)
 
 			mapIndex := minStoneY*g.oneY + z*g.width + x
 			for y := minStoneY; y <= stoneHeight; y++ {
@@ -115,7 +117,7 @@ func (g *classicGen) createStrata() {
 				mapIndex += g.oneY
 			}
 
-			stoneHeight = Max(stoneHeight, 0)
+			stoneHeight = core.Max(stoneHeight, 0)
 			mapIndex = (stoneHeight+1)*g.oneY + z*g.width + x
 			for y := stoneHeight + 1; y <= dirtHeight; y++ {
 				g.lvl.Blocks[mapIndex] = ground
@@ -130,7 +132,7 @@ func (g *classicGen) createStrataFast() int {
 	mapIndex := 0
 	count := g.length * g.width
 	for i := 0; i < count; i++ {
-		g.lvl.Blocks[mapIndex] = Lava
+		g.lvl.Blocks[mapIndex] = core.Lava
 		mapIndex++
 	}
 
@@ -180,7 +182,7 @@ func (g *classicGen) carveCaves() {
 			radius := (float64(g.height) - float64(cenY)) / float64(g.height)
 			radius = 1.2 + (radius*3.5+1)*caveRadius
 			radius *= math.Sin(float64(j) * math.Pi / float64(caveLen))
-			g.fillOblateSpheroid(cenX, cenY, cenZ, float32(radius), Air)
+			g.fillOblateSpheroid(cenX, cenY, cenZ, float32(radius), core.Air)
 		}
 	}
 }
@@ -214,12 +216,12 @@ func (g *classicGen) carveOreVeins(abundance float64, block byte) {
 }
 
 func (g *classicGen) fillOblateSpheroid(x, y, z int, radius float32, block byte) {
-	xBeg := Floor32(max32(float32(x)-radius, 0))
-	xEnd := Floor32(min32(float32(x)+radius, float32(g.width-1)))
-	yBeg := Floor32(max32(float32(y)-radius, 0))
-	yEnd := Floor32(min32(float32(y)+radius, float32(g.height-1)))
-	zBeg := Floor32(max32(float32(z)-radius, 0))
-	zEnd := Floor32(min32(float32(z)+radius, float32(g.length-1)))
+	xBeg := core.Floor32(max32(float32(x)-radius, 0))
+	xEnd := core.Floor32(min32(float32(x)+radius, float32(g.width-1)))
+	yBeg := core.Floor32(max32(float32(y)-radius, 0))
+	yEnd := core.Floor32(min32(float32(y)+radius, float32(g.height-1)))
+	zBeg := core.Floor32(max32(float32(z)-radius, 0))
+	zEnd := core.Floor32(min32(float32(z)+radius, float32(g.length-1)))
 	radiusSq := radius * radius
 
 	for yy := yBeg; yy <= yEnd; yy++ {
@@ -230,7 +232,7 @@ func (g *classicGen) fillOblateSpheroid(x, y, z int, radius float32, block byte)
 				dz := zz - z
 				if float32(dx*dx+2*dy*dy+dz*dz) < radiusSq {
 					idx := (yy*g.length+zz)*g.width + xx
-					if g.lvl.Blocks[idx] == Stone {
+					if g.lvl.Blocks[idx] == core.Stone {
 						g.lvl.Blocks[idx] = block
 					}
 				}
@@ -245,7 +247,7 @@ func (g *classicGen) floodFillWaterBorders() {
 		return
 	}
 	water := g.biome.Water
-	if water == Air {
+	if water == core.Air {
 		return
 	}
 
@@ -271,7 +273,7 @@ func (g *classicGen) floodFillWaterBorders() {
 func (g *classicGen) floodFillWater() {
 	numSources := g.width * g.length / 800
 	water := g.biome.Water
-	if water == Air {
+	if water == core.Air {
 		return
 	}
 	for i := 0; i < numSources; i++ {
@@ -294,7 +296,7 @@ func (g *classicGen) floodFillLava() {
 		if y < 0 || y >= g.height {
 			continue
 		}
-		g.floodFill((y*g.length+z)*g.width+x, StillLava)
+		g.floodFill((y*g.length+z)*g.width+x, core.StillLava)
 	}
 }
 
@@ -307,7 +309,7 @@ func (g *classicGen) floodFill(startIndex int, block byte) {
 	for len(stack) > 0 {
 		idx := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
-		if g.lvl.Blocks[idx] != Air {
+		if g.lvl.Blocks[idx] != core.Air {
 			continue
 		}
 		g.lvl.Blocks[idx] = block
@@ -355,11 +357,11 @@ func (g *classicGen) createSurfaceLayer() {
 			if y < g.height-1 {
 				blockAbove = g.lvl.Blocks[idx+g.oneY]
 			} else {
-				blockAbove = Air
+				blockAbove = core.Air
 			}
 			if blockAbove == water && n2.compute(float64(x), float64(z)) > 12 {
 				g.lvl.Blocks[idx] = rocky
-			} else if blockAbove == Air {
+			} else if blockAbove == core.Air {
 				if y <= g.waterLevel && n1.compute(float64(x), float64(z)) > 8 {
 					g.lvl.Blocks[idx] = sandy
 				} else {
@@ -374,7 +376,7 @@ func (g *classicGen) plantFlowers() {
 	numPatches := g.width * g.length / 3000
 	surface := g.biome.Surface
 	for i := 0; i < numPatches; i++ {
-		flowerType := byte(Dandelion + g.rnd.NextInt(2))
+		flowerType := byte(core.Dandelion + g.rnd.NextInt(2))
 		patchX := g.rnd.NextInt(g.width)
 		patchZ := g.rnd.NextInt(g.length)
 		for j := 0; j < 10; j++ {
@@ -391,7 +393,7 @@ func (g *classicGen) plantFlowers() {
 					continue
 				}
 				idx := (flowerY*g.length+flowerZ)*g.width + flowerX
-				if g.lvl.Blocks[idx] == Air && g.lvl.Blocks[idx-g.oneY] == surface {
+				if g.lvl.Blocks[idx] == core.Air && g.lvl.Blocks[idx-g.oneY] == surface {
 					g.lvl.Blocks[idx] = flowerType
 				}
 			}
@@ -403,7 +405,7 @@ func (g *classicGen) plantMushrooms() {
 	numPatches := len(g.lvl.Blocks) / 2000
 	cliff := g.biome.Cliff
 	for i := 0; i < numPatches; i++ {
-		mushType := byte(BrownMushroom + g.rnd.NextInt(2))
+		mushType := byte(core.BrownMushroom + g.rnd.NextInt(2))
 		patchX := g.rnd.NextInt(g.width)
 		patchY := g.rnd.NextInt(g.height)
 		patchZ := g.rnd.NextInt(g.length)
@@ -420,7 +422,7 @@ func (g *classicGen) plantMushrooms() {
 					continue
 				}
 				idx := (mushY*g.length+mushZ)*g.width + mushX
-				if g.lvl.Blocks[idx] == Air && g.lvl.Blocks[idx-g.oneY] == cliff {
+				if g.lvl.Blocks[idx] == core.Air && g.lvl.Blocks[idx-g.oneY] == cliff {
 					g.lvl.Blocks[idx] = mushType
 				}
 			}
@@ -432,12 +434,12 @@ func (g *classicGen) plantTrees() {
 	numPatches := g.width * g.length / 4000
 	surface := g.biome.Surface
 	treeType := g.biome.TreeDefault("Classic")
-	ctor, ok := FindTree(treeType)
+	ctor, ok := core.FindTree(treeType)
 	if !ok {
 		return
 	}
 	tree := ctor()
-	if ct, ok := tree.(*ClassicTree); ok {
+	if ct, ok := tree.(*core.ClassicTree); ok {
 		ct.SetJavaRandom(g.rnd)
 	}
 	goRng := rand.New(rand.NewSource(int64(g.seed)))
@@ -448,7 +450,7 @@ func (g *classicGen) plantTrees() {
 }
 
 // plantTreePatch attempts to grow a cluster of trees around one random point.
-func (g *classicGen) plantTreePatch(surface byte, tree Tree, goRng *rand.Rand) {
+func (g *classicGen) plantTreePatch(surface byte, tree core.Tree, goRng *rand.Rand) {
 	patchX := g.rnd.NextInt(g.width)
 	patchZ := g.rnd.NextInt(g.length)
 	for j := 0; j < 20; j++ {
@@ -466,14 +468,14 @@ func (g *classicGen) plantTreePatch(surface byte, tree Tree, goRng *rand.Rand) {
 }
 
 // tryGrowTree grows a single tree at a location if the surface and space allow.
-func (g *classicGen) tryGrowTree(treeX, treeZ int, surface byte, tree Tree, goRng *rand.Rand) {
+func (g *classicGen) tryGrowTree(treeX, treeZ int, surface byte, tree core.Tree, goRng *rand.Rand) {
 	treeY := int(g.heightmap[treeZ*g.width+treeX]) + 1
 	if treeY >= g.height {
 		return
 	}
 	treeHeight := tree.DefaultSize(goRng)
 	idx := (treeY*g.length+treeZ)*g.width + treeX
-	blockUnder := byte(Air)
+	blockUnder := byte(core.Air)
 	if treeY > 0 {
 		blockUnder = g.lvl.Blocks[idx-g.oneY]
 	}
@@ -486,7 +488,7 @@ func (g *classicGen) tryGrowTree(treeX, treeZ int, surface byte, tree Tree, goRn
 	tree.SetData(goRng, treeHeight)
 	tree.Generate(treeX, treeY, treeZ, func(xT, yT, zT int, bT byte) {
 		idx := (yT*g.length+zT)*g.width + xT
-		if bT == Leaves && g.lvl.Blocks[idx] == Log {
+		if bT == core.Leaves && g.lvl.Blocks[idx] == core.Log {
 			return
 		}
 		g.lvl.Blocks[idx] = bT
@@ -516,7 +518,7 @@ func (g *classicGen) canGrowTree(x, y, z, height int) bool {
 		for zz := z - 1; zz <= z+1; zz++ {
 			for xx := x - 1; xx <= x+1; xx++ {
 				idx := (yy*g.length+zz)*g.width + xx
-				if g.lvl.Blocks[idx] != Air {
+				if g.lvl.Blocks[idx] != core.Air {
 					return false
 				}
 			}
@@ -526,7 +528,7 @@ func (g *classicGen) canGrowTree(x, y, z, height int) bool {
 		for zz := z - 2; zz <= z+2; zz++ {
 			for xx := x - 2; xx <= x+2; xx++ {
 				idx := (yy*g.length+zz)*g.width + xx
-				if g.lvl.Blocks[idx] != Air {
+				if g.lvl.Blocks[idx] != core.Air {
 					return false
 				}
 			}
@@ -550,4 +552,18 @@ func (g *classicGen) placeSpawn() {
 	}
 	g.lvl.Spawn.Yaw = 0
 	g.lvl.Spawn.Pitch = 0
+}
+
+func max32(a, b float32) float32 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min32(a, b float32) float32 {
+	if a < b {
+		return a
+	}
+	return b
 }
