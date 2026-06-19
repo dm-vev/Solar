@@ -193,6 +193,29 @@ func Floor(value float64) int {
 	return i
 }
 
+// Floor32 mirrors MCGalaxy's ClassicGenerator.Floor(float).
+func Floor32(value float32) int {
+	i := int(value)
+	if value < float32(i) {
+		i--
+	}
+	return i
+}
+
+func max32(a, b float32) float32 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min32(a, b float32) float32 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // Round mirrors C# Math.Round (half to even, but simplified).
 func Round(value float64) int {
 	if value < 0 {

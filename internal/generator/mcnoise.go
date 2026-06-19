@@ -27,8 +27,8 @@ func newMCImprovedNoise(rnd *JavaRandom) *mcImprovedNoise {
 
 // compute evaluates the noise at (x, z). In MCGalaxy y is always 0.
 func (n *mcImprovedNoise) compute(x, y float64) float64 {
-	xFloor := Floor(x)
-	yFloor := Floor(y)
+	xFloor := mcNoiseFloor(x)
+	yFloor := mcNoiseFloor(y)
 	X := xFloor & 0xFF
 	Y := yFloor & 0xFF
 	x -= float64(xFloor)
@@ -57,6 +57,13 @@ func (n *mcImprovedNoise) compute(x, y float64) float64 {
 	c2 := g21 + u*(g11-g21)
 
 	return c1 + v*(c2-c1)
+}
+
+func mcNoiseFloor(value float64) int {
+	if value >= 0 {
+		return int(value)
+	}
+	return int(value) - 1
 }
 
 // mcOctaveNoise implements MCGalaxy's OctaveNoise.

@@ -68,16 +68,18 @@ func (g *classicGen) createHeightmap() {
 	idx := 0
 	for z := 0; z < g.length; z++ {
 		for x := 0; x < g.width; x++ {
-			hLow := n1.compute(float64(x)*1.3, float64(z)*1.3)/12 - 2
+			nx := float64(float32(x) * 1.3)
+			nz := float64(float32(z) * 1.3)
+			hLow := n1.compute(nx, nz)/12 - 2
 			height := hLow
 			if n3.compute(float64(x), float64(z)) <= 0 {
-				hHigh := n2.compute(float64(x)*1.3, float64(z)*1.3)/10 + 3
+				hHigh := n2.compute(nx, nz)/10 + 3
 				height = math.Max(hLow, hHigh)
 			}
 			if height < 0 {
-				height *= 0.8
+				height *= float64(float32(0.8))
 			}
-			adjHeight := int(height) + g.waterLevel
+			adjHeight := int(height + float64(g.waterLevel))
 			if adjHeight < g.minHeight {
 				g.minHeight = adjHeight
 			}
@@ -149,11 +151,11 @@ func (g *classicGen) carveCaves() {
 		caveY := float64(g.rnd.NextInt(g.height))
 		caveZ := float64(g.rnd.NextInt(g.length))
 		caveLen := int(float64(g.rnd.NextFloat()) * float64(g.rnd.NextFloat()) * 200)
-		theta := g.rnd.NextDouble() * 2 * math.Pi
+		theta := float64(g.rnd.NextFloat()) * 2 * math.Pi
 		deltaTheta := 0.0
-		phi := g.rnd.NextDouble() * 2 * math.Pi
+		phi := float64(g.rnd.NextFloat()) * 2 * math.Pi
 		deltaPhi := 0.0
-		caveRadius := g.rnd.NextDouble() * g.rnd.NextDouble()
+		caveRadius := float64(g.rnd.NextFloat()) * float64(g.rnd.NextFloat())
 
 		for j := 0; j < caveLen; j++ {
 			caveX += math.Sin(theta) * math.Cos(phi)
@@ -161,10 +163,10 @@ func (g *classicGen) carveCaves() {
 			caveY += math.Sin(phi)
 
 			theta += deltaTheta * 0.2
-			deltaTheta = deltaTheta*0.9 + g.rnd.NextDouble() - g.rnd.NextDouble()
+			deltaTheta = deltaTheta*0.9 + float64(g.rnd.NextFloat()) - float64(g.rnd.NextFloat())
 			phi = phi/2 + deltaPhi/4
-			deltaPhi = deltaPhi*0.75 + g.rnd.NextDouble() - g.rnd.NextDouble()
-			if g.rnd.NextDouble() < 0.25 {
+			deltaPhi = deltaPhi*0.75 + float64(g.rnd.NextFloat()) - float64(g.rnd.NextFloat())
+			if g.rnd.NextFloat() < 0.25 {
 				continue
 			}
 
@@ -187,9 +189,9 @@ func (g *classicGen) carveOreVeins(abundance float64, block byte) {
 		veinY := float64(g.rnd.NextInt(g.height))
 		veinZ := float64(g.rnd.NextInt(g.length))
 		veinLen := int(float64(g.rnd.NextFloat()) * float64(g.rnd.NextFloat()) * 75.0 * abundance)
-		theta := g.rnd.NextDouble() * 2 * math.Pi
+		theta := float64(g.rnd.NextFloat()) * 2 * math.Pi
 		deltaTheta := 0.0
-		phi := g.rnd.NextDouble() * 2 * math.Pi
+		phi := float64(g.rnd.NextFloat()) * 2 * math.Pi
 		deltaPhi := 0.0
 
 		for j := 0; j < veinLen; j++ {
@@ -197,26 +199,25 @@ func (g *classicGen) carveOreVeins(abundance float64, block byte) {
 			veinZ += math.Cos(theta) * math.Cos(phi)
 			veinY += math.Sin(phi)
 
-			theta += deltaTheta * 0.2
-			deltaTheta = deltaTheta*0.9 + g.rnd.NextDouble() - g.rnd.NextDouble()
+			theta = deltaTheta * 0.2
+			deltaTheta = deltaTheta*0.9 + float64(g.rnd.NextFloat()) - float64(g.rnd.NextFloat())
 			phi = phi/2 + deltaPhi/4
-			deltaPhi = deltaPhi*0.9 + g.rnd.NextDouble() - g.rnd.NextDouble()
+			deltaPhi = deltaPhi*0.9 + float64(g.rnd.NextFloat()) - float64(g.rnd.NextFloat())
 
-			radius := abundance * (math.Sin(float64(j)*math.Pi/float64(veinLen)) + 1)
+			radius := abundance*math.Sin(float64(j)*math.Pi/float64(veinLen)) + 1
 			g.fillOblateSpheroid(int(veinX), int(veinY), int(veinZ), float32(radius), block)
 		}
 	}
 }
 
 func (g *classicGen) fillOblateSpheroid(x, y, z int, radius float32, block byte) {
-	r := float64(radius)
-	xBeg := Floor(MaxF(float64(x)-r, 0))
-	xEnd := Floor(MinF(float64(x)+r, float64(g.width-1)))
-	yBeg := Floor(MaxF(float64(y)-r, 0))
-	yEnd := Floor(MinF(float64(y)+r, float64(g.height-1)))
-	zBeg := Floor(MaxF(float64(z)-r, 0))
-	zEnd := Floor(MinF(float64(z)+r, float64(g.length-1)))
-	radiusSq := r * r
+	xBeg := Floor32(max32(float32(x)-radius, 0))
+	xEnd := Floor32(min32(float32(x)+radius, float32(g.width-1)))
+	yBeg := Floor32(max32(float32(y)-radius, 0))
+	yEnd := Floor32(min32(float32(y)+radius, float32(g.height-1)))
+	zBeg := Floor32(max32(float32(z)-radius, 0))
+	zEnd := Floor32(min32(float32(z)+radius, float32(g.length-1)))
+	radiusSq := radius * radius
 
 	for yy := yBeg; yy <= yEnd; yy++ {
 		for zz := zBeg; zz <= zEnd; zz++ {
@@ -224,7 +225,7 @@ func (g *classicGen) fillOblateSpheroid(x, y, z int, radius float32, block byte)
 				dx := xx - x
 				dy := yy - y
 				dz := zz - z
-				if float64(dx*dx+2*dy*dy+dz*dz) < radiusSq {
+				if float32(dx*dx+2*dy*dy+dz*dz) < radiusSq {
 					idx := (yy*g.length+zz)*g.width + xx
 					if g.lvl.Blocks[idx] == Stone {
 						g.lvl.Blocks[idx] = block
@@ -286,7 +287,7 @@ func (g *classicGen) floodFillLava() {
 	for i := 0; i < numSources; i++ {
 		x := g.rnd.NextInt(g.width)
 		z := g.rnd.NextInt(g.length)
-		y := int(float64(g.waterLevel-3) * g.rnd.NextDouble() * g.rnd.NextDouble())
+		y := int(float32(g.waterLevel-3) * g.rnd.NextFloat() * g.rnd.NextFloat())
 		if y < 0 || y >= g.height {
 			continue
 		}
@@ -368,9 +369,6 @@ func (g *classicGen) createSurfaceLayer() {
 
 func (g *classicGen) plantFlowers() {
 	numPatches := g.width * g.length / 3000
-	if numPatches == 0 {
-		numPatches = 1
-	}
 	surface := g.biome.Surface
 	for i := 0; i < numPatches; i++ {
 		flowerType := byte(Dandelion + g.rnd.NextInt(2))
@@ -400,9 +398,6 @@ func (g *classicGen) plantFlowers() {
 
 func (g *classicGen) plantMushrooms() {
 	numPatches := len(g.lvl.Blocks) / 2000
-	if numPatches == 0 {
-		numPatches = 1
-	}
 	cliff := g.biome.Cliff
 	for i := 0; i < numPatches; i++ {
 		mushType := byte(BrownMushroom + g.rnd.NextInt(2))
@@ -432,9 +427,6 @@ func (g *classicGen) plantMushrooms() {
 
 func (g *classicGen) plantTrees() {
 	numPatches := g.width * g.length / 4000
-	if numPatches == 0 {
-		numPatches = 1
-	}
 	surface := g.biome.Surface
 	treeType := g.biome.TreeDefault("Classic")
 	ctor, ok := FindTree(treeType)
@@ -462,7 +454,7 @@ func (g *classicGen) plantTreePatch(surface byte, tree Tree, goRng *rand.Rand) {
 		for k := 0; k < 20; k++ {
 			treeX += g.randomCenteredOffset()
 			treeZ += g.randomCenteredOffset()
-			if !g.inBounds(treeX, treeZ) || g.rnd.NextDouble() >= 0.25 {
+			if !g.inBounds(treeX, treeZ) || g.rnd.NextFloat() >= 0.25 {
 				continue
 			}
 			g.tryGrowTree(treeX, treeZ, surface, tree, goRng)
@@ -476,6 +468,7 @@ func (g *classicGen) tryGrowTree(treeX, treeZ int, surface byte, tree Tree, goRn
 	if treeY >= g.height {
 		return
 	}
+	treeHeight := tree.DefaultSize(goRng)
 	idx := (treeY*g.length+treeZ)*g.width + treeX
 	blockUnder := byte(Air)
 	if treeY > 0 {
@@ -484,7 +477,6 @@ func (g *classicGen) tryGrowTree(treeX, treeZ int, surface byte, tree Tree, goRn
 	if blockUnder != surface {
 		return
 	}
-	treeHeight := tree.DefaultSize(goRng)
 	if !g.canGrowTree(treeX, treeY, treeZ, treeHeight) {
 		return
 	}

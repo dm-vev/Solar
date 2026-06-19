@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"image"
 	"image/color"
 	"math/rand"
@@ -86,6 +88,45 @@ func TestClassicGenerator(t *testing.T) {
 	}
 	if lvl.Spawn.Y < 1 || lvl.Spawn.Y >= lvl.Height {
 		t.Fatalf("spawn y = %d, want within level", lvl.Spawn.Y)
+	}
+}
+
+func TestClassicGeneratorMatchesMCGalaxy(t *testing.T) {
+	t.Parallel()
+
+	gen, ok := Find("Classic")
+	if !ok {
+		t.Fatal("Classic generator not found")
+	}
+
+	cases := []struct {
+		name          string
+		seed          int
+		width         int
+		height        int
+		length        int
+		wantBlocksSHA string
+	}{
+		{name: "classic-default-seed", seed: 12345, width: 128, height: 64, length: 128, wantBlocksSHA: "270b5bd06a0063985c021997feede35cecc3eb10a04b410f8e7cbb51f23baafa"},
+		{name: "classic-zero-seed", seed: 0, width: 128, height: 64, length: 128, wantBlocksSHA: "6aa26fa9afbbf338f0affc6960eea606a0de0cc09f8a94f40664713cda9c146b"},
+		{name: "classic-64-cube", seed: 12345, width: 64, height: 64, length: 64, wantBlocksSHA: "30d1919fc29012fafd2a66455de55676b067cf5dfd52faaab51480270911fbec"},
+		{name: "classic-small", seed: 42, width: 32, height: 32, length: 32, wantBlocksSHA: "b2e0fb92a45f76c6c1cd634cf9ff5e54ad07c4c7e5b5d3533e4c863b5b9b7296"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			lvl, err := Generate(gen, "classic", tc.width, tc.height, tc.length, Args{Seed: tc.seed, Biome: Forest})
+			if err != nil {
+				t.Fatalf("generate: %v", err)
+			}
+			sum := sha256.Sum256(lvl.Blocks)
+			got := hex.EncodeToString(sum[:])
+			if got != tc.wantBlocksSHA {
+				t.Fatalf("blocks sha256 = %s, want %s", got, tc.wantBlocksSHA)
+			}
+		})
 	}
 }
 
