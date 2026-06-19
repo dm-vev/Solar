@@ -82,3 +82,11 @@ pprof_shutdown_timeout = "5s"
 level = "info"
 # One of: text, json.
 format = "text"
+
+[plugins]
+# Load .so plugin files from this directory (relative to data_dir).
+# Each .so's init() should call plugin.Register("name", &MyPlugin{}).
+# Build plugins with: go build -buildmode=plugin -o data/plugins/myplugin.so ./plugins/myplugin
+# ponytail: Go plugin package requires same Go version + deps as the server binary.
+enabled = false
+dir = "plugins"

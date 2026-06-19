@@ -34,6 +34,7 @@ type Config struct {
 	CPE              CPEConfig      `toml:"cpe"`
 	Debug            DebugConfig    `toml:"debug"`
 	Log              LogConfig      `toml:"log"`
+	Plugins          PluginsConfig  `toml:"plugins"`
 }
 
 // NetworkConfig controls per-session TCP I/O tuning.
@@ -102,6 +103,17 @@ type CPEConfig struct {
 	TwoWayPing    bool `toml:"two_way_ping"`
 }
 
+// PluginsConfig controls runtime .so plugin loading.
+// The server scans dir (relative to data_dir) for *.so files and opens
+// each with the Go plugin package. Each .so's init() should call
+// plugin.Register to add itself to the registry.
+// ponytail: Go's plugin package requires the main binary and .so to be
+// built with the same Go version and dependency versions.
+type PluginsConfig struct {
+	Enabled bool   `toml:"enabled"`
+	Dir     string `toml:"dir"`
+}
+
 // Load returns bootstrap config and ensures base directories exist.
 func Load(path string) (Config, error) {
 	cfg := Config{
@@ -161,6 +173,10 @@ func Load(path string) (Config, error) {
 			ExtPlayerList: true,
 			FastMap:       true,
 			TwoWayPing:    true,
+		},
+		Plugins: PluginsConfig{
+			Enabled: false,
+			Dir:     "plugins",
 		},
 	}
 

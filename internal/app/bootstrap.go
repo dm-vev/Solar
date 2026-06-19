@@ -75,6 +75,16 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 
 	generator.RegisterDefaults()
 
+	// Load runtime .so plugins before enabling any registered plugins.
+	// Each .so's init() calls plugin.Register; LoadAll then enables them
+	// alongside compile-time plugins.
+	if cfg.Plugins.Enabled {
+		pluginDir := filepath.Join(cfg.DataDir, cfg.Plugins.Dir)
+		if err := plugin.LoadDirectory(pluginDir, logger); err != nil {
+			logger.Error("plugin directory load failed", "dir", pluginDir, "error", err)
+		}
+	}
+
 	// Load plugins: create the server API handle and enable all registered plugins.
 	pluginSrv := server.NewPluginServer(codec, worlds, commands, srv)
 	if err := plugin.LoadAll(pluginSrv, logger); err != nil {
