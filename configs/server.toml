@@ -26,7 +26,7 @@ write_batch_size = 32
 send_timeout = "50ms"
 # "fixed" = constant send_timeout; "adaptive" = scales with online players
 # (20ms + players × 0.3ms, capped at 150ms).
-send_timeout_mode = "fixed"
+send_timeout_mode = "adaptive"
 
 [simulation]
 # World + entity tick interval (20 TPS = 50ms).
@@ -52,6 +52,8 @@ policy_file = "policy.json"
 world_file_ext = ".swld"
 # Name of the primary world snapshot.
 main_world_name = "main"
+# Subdirectory for custom block definition JSON files.
+blockdefs_dir = "blockdefs"
 
 [commands]
 # Commands that require operator privileges.

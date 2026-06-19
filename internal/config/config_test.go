@@ -280,7 +280,7 @@ func TestLoadAppliesNestedDefaults(t *testing.T) {
 	if cfg.Storage.Backend != "local" || cfg.Storage.WorldFileExt != ".swld" || cfg.Storage.MainWorldName != "main" {
 		t.Fatalf("default Storage = %+v", cfg.Storage)
 	}
-	if len(cfg.Commands.AdminCommands) != 8 {
+	if len(cfg.Commands.AdminCommands) != 10 {
 		t.Fatalf("default Commands.AdminCommands = %#v", cfg.Commands.AdminCommands)
 	}
 	if cfg.Player.WhitelistEnabled || cfg.Player.MaxUsernameLength != 32 {

@@ -81,6 +81,7 @@ type StorageConfig struct {
 	PolicyFile    string `toml:"policy_file"`
 	WorldFileExt  string `toml:"world_file_ext"`
 	MainWorldName string `toml:"main_world_name"`
+	BlockDefsDir  string `toml:"blockdefs_dir"`
 }
 
 // CommandsConfig controls command permissions.
@@ -147,9 +148,10 @@ func Load(path string) (Config, error) {
 			PolicyFile:    "policy.json",
 			WorldFileExt:  ".swld",
 			MainWorldName: "main",
+			BlockDefsDir:  "blockdefs",
 		},
 		Commands: CommandsConfig{
-			AdminCommands: []string{"tp", "setspawn", "save", "kick", "ban", "unban", "whitelist", "newlvl"},
+			AdminCommands: []string{"tp", "setspawn", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb"},
 		},
 		Player: PlayerConfig{
 			WhitelistEnabled:  false,
@@ -339,6 +341,7 @@ players_dir = "%s"
 policy_file = "%s"
 world_file_ext = "%s"
 main_world_name = "%s"
+blockdefs_dir = "%s"
 
 [commands]
 admin_commands = %s
@@ -369,6 +372,7 @@ format = "%s"
 		cfg.World.DefaultWidth, cfg.World.DefaultHeight, cfg.World.DefaultLength, cfg.World.MaxBlocks,
 		cfg.Storage.Backend, cfg.Storage.WorldsDir, cfg.Storage.PlayersDir,
 		cfg.Storage.PolicyFile, cfg.Storage.WorldFileExt, cfg.Storage.MainWorldName,
+		cfg.Storage.BlockDefsDir,
 		formatStringSlice(cfg.Commands.AdminCommands),
 		cfg.Player.WhitelistEnabled, cfg.Player.MaxUsernameLength,
 		cfg.CPE.ExtPlayerList, cfg.CPE.FastMap, cfg.CPE.TwoWayPing,

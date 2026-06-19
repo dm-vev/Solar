@@ -120,6 +120,38 @@ shutdown of that server.
 - `/setspawn [x y z [yaw pitch]]` updates world spawn.
 - `/save` queues a world and policy save.
 - `/kick`, `/ban`, `/unban`, `/whitelist`, and `/players` manage moderation.
+- `/gb` and `/lb` manage custom block definitions (see Custom Blocks below).
+
+## Custom Blocks
+
+Solar supports custom block definitions via the ClassiCube CPE
+`BlockDefinitions` and `BlockDefinitionsExt` extensions. Definitions
+are stored as JSON in `data/blockdefs/`.
+
+### Commands
+
+```
+/gb add <id> [name]              — create a custom block (ID 66-255)
+/gb edit <id> <property> <value> — modify a block property
+/gb remove <id>                  — delete a custom block
+/gb info <id>                    — show block properties
+/gb list                         — list all custom blocks
+```
+
+`/lb` is an alias for `/gb` (both modify the shared registry).
+
+### Editable properties
+
+`name`, `collide` (0-7), `speed`, `toptex`, `sidetex`, `alltex`,
+`bottomtex`, `lefttex`, `righttex`, `fronttex`, `backtex`,
+`blockslight` (true/false), `sound` (0-9), `fullbright` (true/false),
+`shape` (0=sprite, 16=cube), `blockdraw` (0-5), `fallback` (0-65),
+`fogdensity`, `fogcolor` (r g b), `min` (x y z), `max` (x y z).
+
+### Persistence
+
+Block definitions are saved to `data/blockdefs/global.json` and loaded
+at startup. The file format is a JSON array of block definition objects.
 
 ## Load Testing
 
@@ -142,6 +174,7 @@ internal/protocol/classic/ Classic/ClassiCube wire protocol
 internal/world/          world model, persistence, generation, level mapping
 internal/player/         player registry and moderation policy (bans/whitelist/ops)
 internal/entity/         entity state and simulation
+internal/blockdef/      custom block definitions (CPE BlockDefinitions)
 internal/command/        command registry and built-ins
 internal/generator/      map generators (Simple, Classic, fCraft, Heightmap)
 internal/loadtest/       synthetic Classic clients

@@ -51,6 +51,7 @@ func TestLoadStateGeneratesDefaultWorld(t *testing.T) {
 			PolicyFile:    "policy.json",
 			WorldFileExt:  ".swld",
 			MainWorldName: "main",
+			BlockDefsDir:  "blockdefs",
 		},
 	}
 
@@ -109,6 +110,7 @@ func TestLoadStateUsesExistingWorld(t *testing.T) {
 			PolicyFile:    "policy.json",
 			WorldFileExt:  ".swld",
 			MainWorldName: "main",
+			BlockDefsDir:  "blockdefs",
 		},
 	}
 
@@ -175,6 +177,7 @@ func TestLoadStateRejectsUnknownDefaultGenerator(t *testing.T) {
 			PolicyFile:    "policy.json",
 			WorldFileExt:  ".swld",
 			MainWorldName: "main",
+			BlockDefsDir:  "blockdefs",
 		},
 	}
 
