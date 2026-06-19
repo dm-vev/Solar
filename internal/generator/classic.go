@@ -448,44 +448,59 @@ func (g *classicGen) plantTrees() {
 	goRng := rand.New(rand.NewSource(int64(g.seed)))
 
 	for i := 0; i < numPatches; i++ {
-		patchX := g.rnd.NextInt(g.width)
-		patchZ := g.rnd.NextInt(g.length)
-		for j := 0; j < 20; j++ {
-			treeX := patchX
-			treeZ := patchZ
-			for k := 0; k < 20; k++ {
-				treeX += g.rnd.NextInt(6) - g.rnd.NextInt(6)
-				treeZ += g.rnd.NextInt(6) - g.rnd.NextInt(6)
-				if treeX < 0 || treeZ < 0 || treeX >= g.width || treeZ >= g.length || g.rnd.NextDouble() >= 0.25 {
-					continue
-				}
-				treeY := int(g.heightmap[treeZ*g.width+treeX]) + 1
-				if treeY >= g.height {
-					continue
-				}
-				idx := (treeY*g.length+treeZ)*g.width + treeX
-				blockUnder := byte(Air)
-				if treeY > 0 {
-					blockUnder = g.lvl.Blocks[idx-g.oneY]
-				}
-				if blockUnder != surface {
-					continue
-				}
-				treeHeight := tree.DefaultSize(goRng)
-				if !g.canGrowTree(treeX, treeY, treeZ, treeHeight) {
-					continue
-				}
-				tree.SetData(goRng, treeHeight)
-				tree.Generate(treeX, treeY, treeZ, func(xT, yT, zT int, bT byte) {
-					idx := (yT*g.length+zT)*g.width + xT
-					if bT == Leaves && g.lvl.Blocks[idx] == Log {
-						return
-					}
-					g.lvl.Blocks[idx] = bT
-				})
+		g.plantTreePatch(surface, tree, goRng)
+	}
+}
+
+// plantTreePatch attempts to grow a cluster of trees around one random point.
+func (g *classicGen) plantTreePatch(surface byte, tree Tree, goRng *rand.Rand) {
+	patchX := g.rnd.NextInt(g.width)
+	patchZ := g.rnd.NextInt(g.length)
+	for j := 0; j < 20; j++ {
+		treeX := patchX
+		treeZ := patchZ
+		for k := 0; k < 20; k++ {
+			treeX += g.rnd.NextInt(6) - g.rnd.NextInt(6)
+			treeZ += g.rnd.NextInt(6) - g.rnd.NextInt(6)
+			if !g.inBounds(treeX, treeZ) || g.rnd.NextDouble() >= 0.25 {
+				continue
 			}
+			g.tryGrowTree(treeX, treeZ, surface, tree, goRng)
 		}
 	}
+}
+
+// tryGrowTree grows a single tree at a location if the surface and space allow.
+func (g *classicGen) tryGrowTree(treeX, treeZ int, surface byte, tree Tree, goRng *rand.Rand) {
+	treeY := int(g.heightmap[treeZ*g.width+treeX]) + 1
+	if treeY >= g.height {
+		return
+	}
+	idx := (treeY*g.length+treeZ)*g.width + treeX
+	blockUnder := byte(Air)
+	if treeY > 0 {
+		blockUnder = g.lvl.Blocks[idx-g.oneY]
+	}
+	if blockUnder != surface {
+		return
+	}
+	treeHeight := tree.DefaultSize(goRng)
+	if !g.canGrowTree(treeX, treeY, treeZ, treeHeight) {
+		return
+	}
+	tree.SetData(goRng, treeHeight)
+	tree.Generate(treeX, treeY, treeZ, func(xT, yT, zT int, bT byte) {
+		idx := (yT*g.length+zT)*g.width + xT
+		if bT == Leaves && g.lvl.Blocks[idx] == Log {
+			return
+		}
+		g.lvl.Blocks[idx] = bT
+	})
+}
+
+// inBounds reports whether x and z lie within the horizontal level bounds.
+func (g *classicGen) inBounds(x, z int) bool {
+	return x >= 0 && z >= 0 && x < g.width && z < g.length
 }
 
 func (g *classicGen) canGrowTree(x, y, z, height int) bool {

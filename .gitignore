@@ -8,3 +8,6 @@
 .worktrees/
 .security-key
 logs/security/
+
+# Build artifacts
+solar

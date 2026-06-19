@@ -65,15 +65,8 @@ func (t *ClassicTree) Generate(x, y, z int, setBlock func(x, y, z int, block byt
 	for yy := y + baseHeight; yy < topStartY; yy++ {
 		for dz := -2; dz <= 2; dz++ {
 			for dx := -2; dx <= 2; dx++ {
-				if abs(dx) == 2 && abs(dz) == 2 {
-					if t.javaRng != nil {
-						if t.javaRng.NextFloat() >= 0.5 {
-							setBlock(x+dx, yy, z+dz, Leaves)
-						}
-					} else if t.rng != nil && t.rng.Float32() >= 0.5 {
-						setBlock(x+dx, yy, z+dz, Leaves)
-					}
-				} else {
+				corner := abs(dx) == 2 && abs(dz) == 2
+				if !corner || t.chanceCornerLeaf() {
 					setBlock(x+dx, yy, z+dz, Leaves)
 				}
 			}
@@ -86,18 +79,23 @@ func (t *ClassicTree) Generate(x, y, z int, setBlock func(x, y, z int, block byt
 			for dx := -1; dx <= 1; dx++ {
 				if dx == 0 || dz == 0 {
 					setBlock(x+dx, yy, z+dz, Leaves)
-				} else if yy == topStartY {
-					if t.javaRng != nil {
-						if t.javaRng.NextFloat() >= 0.5 {
-							setBlock(x+dx, yy, z+dz, Leaves)
-						}
-					} else if t.rng != nil && t.rng.Float32() >= 0.5 {
-						setBlock(x+dx, yy, z+dz, Leaves)
-					}
+					continue
+				}
+				if yy == topStartY && t.chanceCornerLeaf() {
+					setBlock(x+dx, yy, z+dz, Leaves)
 				}
 			}
 		}
 	}
+}
+
+// chanceCornerLeaf returns true if a diagonal leaf block should be placed.
+// The original generator uses a 50% chance for corner leaves.
+func (t *ClassicTree) chanceCornerLeaf() bool {
+	if t.javaRng != nil {
+		return t.javaRng.NextFloat() >= 0.5
+	}
+	return t.rng != nil && t.rng.Float32() >= 0.5
 }
 
 func abs(a int) int {

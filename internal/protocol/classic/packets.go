@@ -6,14 +6,43 @@ import (
 	"io"
 	"math"
 	"strings"
+	"sync"
 
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/protocol/wire"
 )
 
+// payloadPool reuses small read buffers used by packet handlers.
+// The largest fixed payload is handleMessage at 65 bytes.
+var payloadPool = sync.Pool{
+	New: func() any {
+		buf := make([]byte, 65)
+		return &buf
+	},
+}
+
+func acquirePayload(size int) []byte {
+	buf := payloadPool.Get().(*[]byte)
+	if cap(*buf) < size {
+		newBuf := make([]byte, size)
+		payloadPool.Put(buf)
+		return newBuf
+	}
+	*buf = (*buf)[:size]
+	return *buf
+}
+
+func releasePayload(buf []byte) {
+	if cap(buf) < 65 {
+		return
+	}
+	payloadPool.Put(&buf)
+}
+
 func (s *session) handleSetBlock() error {
-	payload := make([]byte, 8)
+	payload := acquirePayload(8)
+	defer releasePayload(payload)
 	if _, err := io.ReadFull(s.reader, payload); err != nil {
 		return fmt.Errorf("read set block payload: %w", err)
 	}
@@ -31,7 +60,8 @@ func (s *session) handleSetBlock() error {
 }
 
 func (s *session) handleEntityTeleport() error {
-	payload := make([]byte, 9)
+	payload := acquirePayload(9)
+	defer releasePayload(payload)
 	if _, err := io.ReadFull(s.reader, payload); err != nil {
 		return fmt.Errorf("read entity teleport payload: %w", err)
 	}
@@ -62,7 +92,8 @@ func (s *session) handleRelativePosition(includePosition, includeRotation bool) 
 }
 
 func (s *session) handleRelativePositionAndOrientation() error {
-	payload := make([]byte, 6)
+	payload := acquirePayload(6)
+	defer releasePayload(payload)
 	if _, err := io.ReadFull(s.reader, payload); err != nil {
 		return fmt.Errorf("read relative position+orientation payload: %w", err)
 	}
@@ -72,7 +103,8 @@ func (s *session) handleRelativePositionAndOrientation() error {
 }
 
 func (s *session) handleRelativePositionOnly() error {
-	payload := make([]byte, 4)
+	payload := acquirePayload(4)
+	defer releasePayload(payload)
 	if _, err := io.ReadFull(s.reader, payload); err != nil {
 		return fmt.Errorf("read relative position payload: %w", err)
 	}
@@ -82,7 +114,8 @@ func (s *session) handleRelativePositionOnly() error {
 }
 
 func (s *session) handleOrientationOnly() error {
-	payload := make([]byte, 3)
+	payload := acquirePayload(3)
+	defer releasePayload(payload)
 	if _, err := io.ReadFull(s.reader, payload); err != nil {
 		return fmt.Errorf("read orientation payload: %w", err)
 	}
@@ -120,7 +153,8 @@ func (s *session) applyRelativeUpdate(targetID uint32, dx, dy, dz, yaw, pitch by
 }
 
 func (s *session) handleMessage() error {
-	payload := make([]byte, 65)
+	payload := acquirePayload(65)
+	defer releasePayload(payload)
 	if _, err := io.ReadFull(s.reader, payload); err != nil {
 		return fmt.Errorf("read message payload: %w", err)
 	}
