@@ -210,10 +210,27 @@ func (s *session) writeKick(message string) error {
 	return s.writePacket(encodeKick(message))
 }
 
+// writePacket queues a packet for asynchronous writing. The packet slice
+// is copied because the caller may reuse the underlying buffer.
 func (s *session) writePacket(packet []byte) error {
 	packetCopy := append([]byte(nil), packet...)
 	select {
 	case s.outbox <- packetCopy:
+		return nil
+	case <-s.stop:
+		return io.ErrClosedPipe
+	default:
+		s.fail()
+		return io.ErrShortWrite
+	}
+}
+
+// writePacketNoCopy queues a packet without copying. The caller must
+// guarantee that the packet slice will not be modified after this call.
+// Use this for broadcast packets that are shared between peers.
+func (s *session) writePacketNoCopy(packet []byte) error {
+	select {
+	case s.outbox <- packet:
 		return nil
 	case <-s.stop:
 		return io.ErrClosedPipe
@@ -230,26 +247,14 @@ func (s *session) writeLoop() {
 	for {
 		select {
 		case packet := <-s.outbox:
-			if packet == nil {
-				return
-			}
-			if _, err := s.writer.Write(packet); err != nil {
-				return
-			}
-			if err := s.writer.Flush(); err != nil {
+			if !s.writeOnePacket(packet) {
 				return
 			}
 		case <-s.stop:
 			for {
 				select {
 				case packet := <-s.outbox:
-					if packet == nil {
-						return
-					}
-					if _, err := s.writer.Write(packet); err != nil {
-						return
-					}
-					if err := s.writer.Flush(); err != nil {
+					if !s.writeOnePacket(packet) {
 						return
 					}
 				default:
@@ -258,6 +263,21 @@ func (s *session) writeLoop() {
 			}
 		}
 	}
+}
+
+// writeOnePacket writes a single packet to the buffered writer and flushes.
+// Returns false if the write failed and the loop should stop.
+func (s *session) writeOnePacket(packet []byte) bool {
+	if packet == nil {
+		return false
+	}
+	if _, err := s.writer.Write(packet); err != nil {
+		return false
+	}
+	if err := s.writer.Flush(); err != nil {
+		return false
+	}
+	return true
 }
 
 func (s *session) fail() {

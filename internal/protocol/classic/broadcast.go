@@ -84,11 +84,11 @@ func (s *session) broadcastToPeers(packet []byte) {
 		return
 	}
 
-	for _, peer := range s.room.PeersExcept(entityID) {
-		if err := peer.writePacket(packet); err != nil {
+	s.room.ForEachPeerExcept(entityID, func(peer *session) {
+		if err := peer.writePacketNoCopy(packet); err != nil {
 			s.logger.Debug("broadcast packet", "entity_id", entityID, "peer", peer.currentUsername(), "error", err)
 		}
-	}
+	})
 }
 
 func (s *session) entitySnapshot() (entity.Entity, bool) {

@@ -27,10 +27,13 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	entities := entity.NewManager()
 	listener := network.NewListener(cfg.ListenAddress)
 	listener.SetConnectRate(cfg.ConnectRate)
+	pool := worker.NewPool(ctx, cfg.Workers)
+
 	codec := classic.NewCodec(cfg.Name, cfg.MOTD, worlds, players, entities, commands)
 	codec.SetLogger(logger)
 	codec.SetPersistencePaths(store.WorldFile("main"), store.PlayerPolicyFile())
 	codec.SetCommandContextBuilder(buildCommandContext)
+	codec.SetWorkerPool(pool)
 
 	srv := server.New(
 		cfg,
@@ -40,7 +43,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 		players,
 		entities,
 		store,
-		worker.NewPool(ctx, cfg.Workers),
+		pool,
 	)
 	srv.SetLogger(logger)
 

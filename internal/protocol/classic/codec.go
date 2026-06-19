@@ -13,6 +13,7 @@ import (
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/player"
 	sess "github.com/solar-mc/solar/internal/session"
+	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
 )
 
@@ -28,6 +29,7 @@ type Codec struct {
 	logger              *slog.Logger
 	worldPath           string
 	policyPath          string
+	workers             *worker.Pool
 	buildCommandContext func(SessionBackend) command.Context
 }
 
@@ -84,6 +86,11 @@ func (c *Codec) SetCommandContextBuilder(fn func(SessionBackend) command.Context
 	c.buildCommandContext = fn
 }
 
+// SetWorkerPool configures the background job pool for save operations.
+func (c *Codec) SetWorkerPool(pool *worker.Pool) {
+	c.workers = pool
+}
+
 // ServeConn handles a single client connection until it closes, sends bad
 // data, or ctx is canceled.
 func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
@@ -103,6 +110,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		logger:              c.logger,
 		worldPath:           c.worldPath,
 		policyPath:          c.policyPath,
+		workers:             c.workers,
 		outbox:              make(chan []byte, 64),
 		stop:                make(chan struct{}),
 		writerDone:          make(chan struct{}),
@@ -140,6 +148,7 @@ type session struct {
 	logger                *slog.Logger
 	worldPath             string
 	policyPath            string
+	workers               *worker.Pool
 	outbox                chan []byte
 	stop                  chan struct{}
 	writerDone            chan struct{}

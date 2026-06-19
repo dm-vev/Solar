@@ -72,11 +72,21 @@ func NewManager() *Manager {
 	}
 }
 
-// Current returns a copy of the active world.
+// Current returns a copy of the active world. The Blocks slice is cloned
+// so callers can mutate it without affecting the shared state.
 func (m *Manager) Current() Level {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return cloneLevel(m.level)
+}
+
+// CurrentRef returns a read-only pointer to the active world. The caller
+// must not modify the Blocks slice. Use this in hot paths where cloning
+// the entire block array is wasteful (e.g. handshake level streaming).
+func (m *Manager) CurrentRef() *Level {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return &m.level
 }
 
 // SetCurrent replaces the active world snapshot.

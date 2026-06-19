@@ -2,7 +2,6 @@ package classic
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
@@ -158,7 +157,7 @@ func (s *session) currentLocation() (world.Spawn, byte, byte) {
 		}
 	}
 	if s.worlds != nil {
-		level := s.worlds.Current()
+		level := s.worlds.CurrentRef()
 		return level.Spawn, level.Spawn.Yaw, level.Spawn.Pitch
 	}
 	return world.Spawn{}, 0, 0
@@ -194,7 +193,7 @@ func (s *session) saveState() bool {
 	players := s.players
 	logger := s.logger
 
-	go func() {
+	save := func() {
 		if worldPath != "" && worlds != nil {
 			if err := worlds.Save(worldPath); err != nil {
 				logger.Error("save world", "path", worldPath, "error", err)
@@ -205,7 +204,14 @@ func (s *session) saveState() bool {
 				logger.Error("save player policy", "path", policyPath, "error", err)
 			}
 		}
-	}()
+	}
+
+	// Run synchronously if no worker pool, otherwise dispatch in background.
+	if s.workers != nil {
+		s.workers.Submit(save)
+	} else {
+		go save()
+	}
 	return true
 }
 
@@ -217,11 +223,17 @@ func (s *session) persistPlayerPolicy() bool {
 	players := s.players
 	logger := s.logger
 
-	go func() {
+	save := func() {
 		if err := players.SavePolicy(policyPath); err != nil {
 			logger.Error("save player policy", "path", policyPath, "error", err)
 		}
-	}()
+	}
+
+	if s.workers != nil {
+		s.workers.Submit(save)
+	} else {
+		go save()
+	}
 	return true
 }
 
@@ -256,7 +268,7 @@ func (s *session) banPlayer(name, reason string) bool {
 			target.disconnect(reason)
 		}
 	}
-	return changed || strings.TrimSpace(name) != ""
+	return changed
 }
 
 func (s *session) unbanPlayer(name string) bool {

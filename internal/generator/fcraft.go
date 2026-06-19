@@ -450,7 +450,6 @@ func (g *fCraftMapGen) addBeaches(lvl *Level) {
 	args := g.args
 	width := lvl.Width
 	length := lvl.Length
-	beachExtentSqr := (args.BeachExtent + 1) * (args.BeachExtent + 1)
 
 	for x := 0; x < width; x++ {
 		for z := 0; z < length; z++ {
@@ -459,28 +458,7 @@ func (g *fCraftMapGen) addBeaches(lvl *Level) {
 				if lvl.Blocks[idx] != args.Biome.Surface {
 					continue
 				}
-				found := false
-				for dx := -args.BeachExtent; dx <= args.BeachExtent && !found; dx++ {
-					for dz := -args.BeachExtent; dz <= args.BeachExtent && !found; dz++ {
-						for dy := -args.BeachHeight; dy <= 0; dy++ {
-							if dx*dx+dy*dy+dz*dz > beachExtentSqr {
-								continue
-							}
-							xx := x + dx
-							yy := y + dy
-							zz := z + dz
-							if xx < 0 || xx >= width || yy < 0 || yy >= lvl.Height || zz < 0 || zz >= length {
-								continue
-							}
-							bidx := (yy*length+zz)*width + xx
-							if lvl.Blocks[bidx] == args.Biome.Water {
-								found = true
-								break
-							}
-						}
-					}
-				}
-				if found {
+				if g.hasAdjacentWater(lvl, x, y, z, width, length) {
 					lvl.Blocks[idx] = args.Biome.BeachSandy
 					if y > 0 {
 						underIdx := ((y-1)*length+z)*width + x
@@ -492,6 +470,34 @@ func (g *fCraftMapGen) addBeaches(lvl *Level) {
 			}
 		}
 	}
+}
+
+// hasAdjacentWater checks whether any block within beachExtent of (x,y,z)
+// is water. Used by addBeaches to determine beach placement.
+func (g *fCraftMapGen) hasAdjacentWater(lvl *Level, x, y, z, width, length int) bool {
+	args := g.args
+	beachExtentSqr := (args.BeachExtent + 1) * (args.BeachExtent + 1)
+
+	for dx := -args.BeachExtent; dx <= args.BeachExtent; dx++ {
+		for dz := -args.BeachExtent; dz <= args.BeachExtent; dz++ {
+			for dy := -args.BeachHeight; dy <= 0; dy++ {
+				if dx*dx+dy*dy+dz*dz > beachExtentSqr {
+					continue
+				}
+				xx := x + dx
+				yy := y + dy
+				zz := z + dz
+				if xx < 0 || xx >= width || yy < 0 || yy >= lvl.Height || zz < 0 || zz >= length {
+					continue
+				}
+				bidx := (yy*length+zz)*width + xx
+				if lvl.Blocks[bidx] == args.Biome.Water {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (g *fCraftMapGen) generateTrees(lvl *Level) {

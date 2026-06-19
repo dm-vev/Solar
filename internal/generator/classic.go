@@ -197,7 +197,7 @@ func (g *classicGen) carveOreVeins(abundance float64, block byte) {
 			veinZ += math.Cos(theta) * math.Cos(phi)
 			veinY += math.Sin(phi)
 
-			theta = deltaTheta * 0.2
+			theta = theta + deltaTheta*0.2
 			deltaTheta = deltaTheta*0.9 + g.rnd.NextDouble() - g.rnd.NextDouble()
 			phi = phi/2 + deltaPhi/4
 			deltaPhi = deltaPhi*0.9 + g.rnd.NextDouble() - g.rnd.NextDouble()

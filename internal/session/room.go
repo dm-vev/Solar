@@ -60,6 +60,19 @@ func (r *Room[T]) PeersExcept(entityID uint32) []T {
 	return peers
 }
 
+// ForEachPeerExcept calls fn for each peer except the participant with
+// entityID, without allocating a slice. This is the preferred method
+// for broadcast fan-out in hot paths.
+func (r *Room[T]) ForEachPeerExcept(entityID uint32, fn func(peer T)) {
+	r.mu.RLock()
+	for id, peer := range r.sessions {
+		if id != entityID {
+			fn(peer)
+		}
+	}
+	r.mu.RUnlock()
+}
+
 // FindByName returns the first participant with a case-insensitive username match.
 func (r *Room[T]) FindByName(name string) (T, bool) {
 	key := strings.TrimSpace(name)

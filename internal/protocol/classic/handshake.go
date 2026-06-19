@@ -42,7 +42,7 @@ func (s *session) handleHandshake() error {
 			old.disconnect("reconnected from another client")
 		}
 	}
-	level := s.worlds.Current()
+	level := *s.worlds.CurrentRef()
 	entityID := uint32(0)
 	tracked := false
 	if s.entities != nil {
