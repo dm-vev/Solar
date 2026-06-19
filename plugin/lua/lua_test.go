@@ -1,6 +1,6 @@
 //go:build lua
 
-package plugin_test
+package lua_test
 
 import (
 	"log/slog"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/solar-mc/solar/plugin"
+	"github.com/solar-mc/solar/plugin/lua"
 )
 
 // TestLoadLuaScripts loads the example.lua script and verifies it
@@ -19,7 +20,7 @@ func TestLoadLuaScripts(t *testing.T) {
 	}
 
 	tmp := t.TempDir()
-	src, err := os.ReadFile("../plugins/example.lua")
+	src, err := os.ReadFile("../../plugins/example.lua")
 	if err != nil {
 		t.Fatalf("read example.lua: %v", err)
 	}
@@ -27,7 +28,7 @@ func TestLoadLuaScripts(t *testing.T) {
 		t.Fatalf("write lua file: %v", err)
 	}
 
-	if err := plugin.LoadLuaScripts(tmp, slog.Default()); err != nil {
+	if err := lua.LoadLuaScripts(tmp, slog.Default()); err != nil {
 		t.Fatalf("LoadLuaScripts: %v", err)
 	}
 

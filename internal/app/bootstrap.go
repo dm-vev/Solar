@@ -19,6 +19,7 @@ import (
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
+	"github.com/solar-mc/solar/plugin/lua"
 )
 
 func buildServer(ctx context.Context, cfg config.Config) *server.Server {
@@ -90,7 +91,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	// LoadLuaScripts is a no-op that logs a warning.
 	if cfg.Lua.Enabled {
 		luaDir := filepath.Join(cfg.DataDir, cfg.Lua.Dir)
-		if err := plugin.LoadLuaScripts(luaDir, logger); err != nil {
+		if err := lua.LoadLuaScripts(luaDir, logger); err != nil {
 			logger.Error("lua script load failed", "dir", luaDir, "error", err)
 		}
 	}

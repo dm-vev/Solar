@@ -1,6 +1,6 @@
 //go:build !lua
 
-package plugin
+package lua
 
 import "log/slog"
 

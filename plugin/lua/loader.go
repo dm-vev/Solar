@@ -1,6 +1,6 @@
 //go:build lua
 
-package plugin
+package lua
 
 import (
 	"fmt"
@@ -10,12 +10,13 @@ import (
 	"sort"
 	"strings"
 
-	lua "github.com/yuin/gopher-lua"
+	glua "github.com/yuin/gopher-lua"
+
+	"github.com/solar-mc/solar/plugin"
 )
 
 // LoadLuaScripts loads all *.lua files from dir and registers each as
-// a plugin. Each file becomes a separate luaPlugin instance with its
-// own Lua state.
+// a plugin. Each file becomes a separate luaPlugin with its own Lua state.
 func LoadLuaScripts(dir string, logger *slog.Logger) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -46,7 +47,7 @@ func LoadLuaScripts(dir string, logger *slog.Logger) error {
 	for _, name := range luaFiles {
 		path := filepath.Join(dir, name)
 		pluginName := strings.TrimSuffix(name, ".lua")
-		Register(pluginName, &luaPlugin{
+		plugin.Register(pluginName, &luaPlugin{
 			name: pluginName,
 			path: path,
 		})
@@ -59,17 +60,16 @@ func LoadLuaScripts(dir string, logger *slog.Logger) error {
 type luaPlugin struct {
 	name string
 	path string
-	L    *lua.LState
-	srv  Server
+	L    *glua.LState
 }
 
 func (p *luaPlugin) Name() string { return p.name }
 func (p *luaPlugin) Init() error  { return nil }
 
-func (p *luaPlugin) Enable(s Server) error {
-	p.srv = s
-	p.L = lua.NewState()
-	registerLuaAPI(p.L, s)
+func (p *luaPlugin) Enable(s plugin.Server) error {
+	p.L = glua.NewState()
+	api := newAPI(p.L, s)
+	api.register()
 	if err := p.L.DoFile(p.path); err != nil {
 		return fmt.Errorf("lua %s: %w", p.name, err)
 	}
