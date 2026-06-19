@@ -22,6 +22,11 @@ tcp_nodelay = true
 session_outbox_size = 256
 # Max packets batched per flush in the write loop.
 write_batch_size = 32
+# How long writePacket blocks when outbox is full before disconnecting the client.
+send_timeout = "50ms"
+# "fixed" = constant send_timeout; "adaptive" = scales with online players
+# (20ms + players × 0.3ms, capped at 150ms).
+send_timeout_mode = "fixed"
 
 [simulation]
 # World + entity tick interval (20 TPS = 50ms).
