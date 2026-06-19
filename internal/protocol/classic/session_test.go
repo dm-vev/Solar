@@ -227,7 +227,9 @@ func TestServeConnUsesWorldSnapshot(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		NewCodec("Solar", "CLI-only classic server", worlds, players, entities, command.NewRegistry()).ServeConn(context.Background(), server)
+		codec := NewCodec("Solar", "CLI-only classic server", worlds, players, entities, command.NewRegistry())
+		codec.SetCommandContextBuilder(testBuildContext)
+		codec.ServeConn(context.Background(), server)
 		close(done)
 	}()
 
@@ -313,7 +315,7 @@ func newTestCodecWithOperators(names ...string) *Codec {
 	players := player.NewRegistry()
 	players.AddOperators(names...)
 
-	return NewCodec(
+	codec := NewCodec(
 		"Solar",
 		"CLI-only classic server",
 		world.NewManager(),
@@ -321,7 +323,72 @@ func newTestCodecWithOperators(names ...string) *Codec {
 		entity.NewManager(),
 		command.NewRegistry(),
 	)
+	codec.SetCommandContextBuilder(testBuildContext)
+	return codec
 }
+
+// testBuildContext builds a command.Context for test sessions. It mirrors
+// what app.buildCommandContext does but is self-contained for tests.
+func testBuildContext(backend SessionBackend) command.Context {
+	position, yaw, pitch := backend.CurrentLocation()
+	return command.Context{
+		Username: backend.CurrentUsername(),
+		Position: command.Position{
+			X: position.X,
+			Y: position.Y,
+			Z: position.Z,
+		},
+		Yaw:         yaw,
+		Pitch:       pitch,
+		Authority:   testAuthority{backend: backend},
+		World:       testWorldSvc{backend: backend},
+		Persistence: testPersistence{backend: backend},
+		Moderation:  testModeration{backend: backend},
+		Players:     testDirectory{backend: backend},
+	}
+}
+
+type testAuthority struct{ backend SessionBackend }
+
+func (a testAuthority) CanAdmin() bool { return a.backend.IsOperator() }
+
+type testWorldSvc struct{ backend SessionBackend }
+
+func (w testWorldSvc) SetBlock(x, y, z int, blockID byte) bool {
+	return w.backend.ApplyBlockChange(x, y, z, blockID, true) == nil
+}
+func (w testWorldSvc) MovePlayer(x, y, z int, yaw, pitch byte) bool {
+	return w.backend.TeleportSelf(x, y, z, yaw, pitch)
+}
+func (w testWorldSvc) SetSpawn(x, y, z int, yaw, pitch byte) bool {
+	return w.backend.SetSpawn(world.Spawn{X: x, Y: y, Z: z, Yaw: yaw, Pitch: pitch})
+}
+func (w testWorldSvc) GenerateWorld(name, theme string, width, height, length int, seed string) bool {
+	return w.backend.GenerateWorld(name, theme, width, height, length, seed)
+}
+
+type testPersistence struct{ backend SessionBackend }
+
+func (p testPersistence) SaveState() bool { return p.backend.SaveState() }
+
+type testModeration struct{ backend SessionBackend }
+
+func (m testModeration) KickPlayer(name, reason string) bool {
+	return m.backend.KickPlayer(name, reason)
+}
+func (m testModeration) BanPlayer(name, reason string) bool { return m.backend.BanPlayer(name, reason) }
+func (m testModeration) UnbanPlayer(name string) bool       { return m.backend.UnbanPlayer(name) }
+func (m testModeration) WhitelistEnabled() bool             { return m.backend.WhitelistEnabled() }
+func (m testModeration) SetWhitelistEnabled(enabled bool) bool {
+	return m.backend.SetWhitelistEnabled(enabled)
+}
+func (m testModeration) WhitelistAdd(name string) bool    { return m.backend.WhitelistAdd(name) }
+func (m testModeration) WhitelistRemove(name string) bool { return m.backend.WhitelistRemove(name) }
+
+type testDirectory struct{ backend SessionBackend }
+
+func (d testDirectory) ListPlayers() []string     { return d.backend.OnlineNames() }
+func (d testDirectory) ListWhitelisted() []string { return d.backend.WhitelistNames() }
 
 func TestServeConnUpdatesSelfEntityPosition(t *testing.T) {
 	t.Parallel()
@@ -335,13 +402,15 @@ func TestServeConnUpdatesSelfEntityPosition(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		NewCodec("Solar", "CLI-only classic server", worlds, players, entities, command.NewRegistry()).ServeConn(context.Background(), server)
+		codec := NewCodec("Solar", "CLI-only classic server", worlds, players, entities, command.NewRegistry())
+		codec.SetCommandContextBuilder(testBuildContext)
+		codec.ServeConn(context.Background(), server)
 		close(done)
 	}()
 
 	loginAndDrain(t, client, 5, "tester", opcodePing)
 
-	if _, err := client.Write(encodeClientEntityTeleport(selfEntityID, entity.Position{X: 20, Y: 12, Z: 18}, 33, 44)); err != nil {
+	if _, err := client.Write(encodeClientEntityTeleport(selfID, entity.Position{X: 20, Y: 12, Z: 18}, 33, 44)); err != nil {
 		t.Fatalf("write entity teleport: %v", err)
 	}
 
@@ -364,7 +433,9 @@ func TestServeConnAppliesClientBlockUpdate(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		NewCodec("Solar", "CLI-only classic server", worlds, players, entities, command.NewRegistry()).ServeConn(context.Background(), server)
+		codec := NewCodec("Solar", "CLI-only classic server", worlds, players, entities, command.NewRegistry())
+		codec.SetCommandContextBuilder(testBuildContext)
+		codec.ServeConn(context.Background(), server)
 		close(done)
 	}()
 
@@ -421,8 +492,8 @@ func TestServeConnExecutesChatCommand(t *testing.T) {
 	if reply[0] != opcodeMessage {
 		t.Fatalf("reply opcode = %d, want %d", reply[0], opcodeMessage)
 	}
-	if reply[1] != selfEntityID {
-		t.Fatalf("reply type = %d, want %d", reply[1], selfEntityID)
+	if reply[1] != selfID {
+		t.Fatalf("reply type = %d, want %d", reply[1], selfID)
 	}
 	text := bytes.TrimRight(reply[2:66], " \x00")
 	if !strings.Contains(string(text), "tester is at 64 48 64") {
@@ -545,7 +616,9 @@ func TestServeConnExecutesTeleportAndSetSpawnCommands(t *testing.T) {
 	server, client := net.Pipe()
 	done := make(chan struct{})
 	go func() {
-		NewCodec("Solar", "CLI-only classic server", worlds, players, entities, command.NewRegistry()).ServeConn(context.Background(), server)
+		codec := NewCodec("Solar", "CLI-only classic server", worlds, players, entities, command.NewRegistry())
+		codec.SetCommandContextBuilder(testBuildContext)
+		codec.ServeConn(context.Background(), server)
 		close(done)
 	}()
 
@@ -706,7 +779,9 @@ func TestServeConnRejectsBannedUsername(t *testing.T) {
 	server, client := net.Pipe()
 	done := make(chan struct{})
 	go func() {
-		NewCodec("Solar", "CLI-only classic server", worlds, players, entities, command.NewRegistry()).ServeConn(context.Background(), server)
+		codec := NewCodec("Solar", "CLI-only classic server", worlds, players, entities, command.NewRegistry())
+		codec.SetCommandContextBuilder(testBuildContext)
+		codec.ServeConn(context.Background(), server)
 		close(done)
 	}()
 

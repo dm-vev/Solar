@@ -18,16 +18,17 @@ import (
 
 // Codec owns the Classic/ClassiCube wire format.
 type Codec struct {
-	serverName string
-	motd       string
-	worlds     *world.Manager
-	players    *player.Registry
-	entities   *entity.Manager
-	commands   *command.Registry
-	room       *sess.Room[*session]
-	logger     *slog.Logger
-	worldPath  string
-	policyPath string
+	serverName          string
+	motd                string
+	worlds              *world.Manager
+	players             *player.Registry
+	entities            *entity.Manager
+	commands            *command.Registry
+	room                *sess.Room[*session]
+	logger              *slog.Logger
+	worldPath           string
+	policyPath          string
+	buildCommandContext func(SessionBackend) command.Context
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -76,28 +77,36 @@ func (c *Codec) SetPersistencePaths(worldPath, policyPath string) {
 	c.policyPath = policyPath
 }
 
+// SetCommandContextBuilder configures the function that builds a
+// command.Context from a SessionBackend. This decouples the protocol
+// layer from the command adapter implementation.
+func (c *Codec) SetCommandContextBuilder(fn func(SessionBackend) command.Context) {
+	c.buildCommandContext = fn
+}
+
 // ServeConn handles a single client connection until it closes, sends bad
 // data, or ctx is canceled.
 func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 
 	s := &session{
-		conn:       conn,
-		reader:     bufio.NewReader(conn),
-		writer:     bufio.NewWriter(conn),
-		serverName: c.serverName,
-		motd:       c.motd,
-		worlds:     c.worlds,
-		players:    c.players,
-		entities:   c.entities,
-		commands:   c.commands,
-		room:       c.room,
-		logger:     c.logger,
-		worldPath:  c.worldPath,
-		policyPath: c.policyPath,
-		outbox:     make(chan []byte, 64),
-		stop:       make(chan struct{}),
-		writerDone: make(chan struct{}),
+		conn:                conn,
+		reader:              bufio.NewReader(conn),
+		writer:              bufio.NewWriter(conn),
+		serverName:          c.serverName,
+		motd:                c.motd,
+		worlds:              c.worlds,
+		players:             c.players,
+		entities:            c.entities,
+		commands:            c.commands,
+		room:                c.room,
+		logger:              c.logger,
+		worldPath:           c.worldPath,
+		policyPath:          c.policyPath,
+		outbox:              make(chan []byte, 64),
+		stop:                make(chan struct{}),
+		writerDone:          make(chan struct{}),
+		buildCommandContext: c.buildCommandContext,
 	}
 
 	// Close the connection when ctx is canceled, unblocking the read loop.
@@ -145,6 +154,7 @@ type session struct {
 	supportsExtPlayerList bool
 	supportsTwoWayPing    bool
 	supportsFastMap       bool
+	buildCommandContext   func(SessionBackend) command.Context
 }
 
 func (s *session) RoomEntityID() uint32 {

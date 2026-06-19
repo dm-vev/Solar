@@ -30,6 +30,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	codec := classic.NewCodec(cfg.Name, cfg.MOTD, worlds, players, entities, commands)
 	codec.SetLogger(logger)
 	codec.SetPersistencePaths(store.WorldFile("main"), store.PlayerPolicyFile())
+	codec.SetCommandContextBuilder(buildCommandContext)
 
 	srv := server.New(
 		cfg,

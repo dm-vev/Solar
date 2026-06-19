@@ -7,6 +7,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/protocol/wire"
 )
@@ -146,12 +147,22 @@ func (s *session) handleCommand(line string) error {
 		return nil
 	}
 
-	ctx := s.commandContext()
+	ctx := s.buildCommandContextFn()
 	reply, handled := s.commands.Execute(ctx, line)
 	if !handled || reply == "" {
 		return nil
 	}
 	return s.writePacket(encodeMessage(selfID, reply))
+}
+
+// buildCommandContextFn assembles the command execution context. It uses
+// the builder function injected via SetCommandContextBuilder, falling back
+// to a nil context if no builder is configured.
+func (s *session) buildCommandContextFn() command.Context {
+	if s.buildCommandContext != nil {
+		return s.buildCommandContext(s)
+	}
+	return command.Context{}
 }
 
 func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {

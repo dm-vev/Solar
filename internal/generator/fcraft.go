@@ -63,9 +63,91 @@ type fCraftMapGenArgs struct {
 	TreeSpacingMax     int
 }
 
+// fCraftTemplateOverrides maps template names to the fields that differ from
+// the default fCraftMapGenArgs.
+var fCraftTemplateOverrides = map[string]func(*fCraftMapGenArgs){
+	"Archipelago": func(a *fCraftMapGenArgs) {
+		a.FeatureScale = 16
+		a.Roughness = 0.6
+		a.Bias = 0.4
+		a.MidPoint = 0.5
+	},
+	"Atoll": func(a *fCraftMapGenArgs) {
+		a.Bias = 0.6
+		a.RaisedCorners = 4
+	},
+	"Bay": func(a *fCraftMapGenArgs) {
+		a.FeatureScale = 48
+		a.Bias = 0.3
+		a.LoweredCorners = 2
+	},
+	"Dunes": func(a *fCraftMapGenArgs) {
+		a.FeatureScale = 16
+		a.DetailScale = 2
+		a.Roughness = 0.8
+		a.Bias = 0.3
+		a.CliffThreshold = 0.6
+	},
+	"Hills": func(a *fCraftMapGenArgs) {
+		a.MaxHeight = 16
+	},
+	"Ice": func(a *fCraftMapGenArgs) {
+		a.Roughness = 0.4
+		a.Bias = 0.4
+		a.AddSnow = true
+	},
+	"Island2": func(a *fCraftMapGenArgs) {
+		a.FeatureScale = 24
+		a.Bias = 0.5
+		a.RaisedCorners = 4
+	},
+	"Lake": func(a *fCraftMapGenArgs) {
+		a.FeatureScale = 48
+		a.Roughness = 0.4
+		a.Bias = -0.2
+		a.MidPoint = 0.5
+	},
+	"Mountains2": func(a *fCraftMapGenArgs) {
+		a.FeatureScale = 16
+		a.Roughness = 0.7
+		a.MaxHeight = 48
+		a.MaxDepth = 20
+		a.CliffThreshold = 0.5
+	},
+	"Peninsula": func(a *fCraftMapGenArgs) {
+		a.FeatureScale = 40
+		a.Bias = 0.3
+		a.RaisedCorners = 2
+	},
+	"River": func(a *fCraftMapGenArgs) {
+		a.FeatureScale = 40
+		a.Bias = -0.1
+		a.MidPoint = 0.2
+	},
+	"Streams": func(a *fCraftMapGenArgs) {
+		a.FeatureScale = 24
+		a.Roughness = 0.6
+		a.Bias = -0.1
+		a.MidPoint = 0.1
+	},
+}
+
 func makeTemplate(name string) fCraftMapGenArgs {
-	// Defaults similar to MCGalaxy's fCraft defaults.
-	args := fCraftMapGenArgs{
+	args := defaultFCraftArgs()
+
+	if override, ok := fCraftTemplateOverrides[name]; ok {
+		override(&args)
+	}
+	if name == "Random" {
+		args.FeatureScale = 20 + rand.Intn(40)
+		args.DetailScale = 2 + rand.Intn(6)
+		args.Roughness = 0.3 + rand.Float64()*0.5
+	}
+	return args
+}
+
+func defaultFCraftArgs() fCraftMapGenArgs {
+	return fCraftMapGenArgs{
 		Seed:               0,
 		FeatureScale:       32,
 		DetailScale:        4,
@@ -75,18 +157,13 @@ func makeTemplate(name string) fCraftMapGenArgs {
 		LoweredCorners:     2,
 		Bias:               0.5,
 		MidPoint:           0.0,
-		MarbledHeightmap:   false,
-		InvertHeightmap:    false,
 		MatchWaterCoverage: true,
 		WaterCoverage:      0.5,
 		MaxHeight:          24,
 		MaxDepth:           12,
-		MaxHeightVariation: 0,
-		MaxDepthVariation:  0,
 		AddWater:           true,
 		AddBeaches:         true,
 		AddTrees:           true,
-		AddSnow:            false,
 		SnowAltitude:       64,
 		SnowTransition:     8,
 		CliffSmoothing:     true,
@@ -96,88 +173,6 @@ func makeTemplate(name string) fCraftMapGenArgs {
 		TreeSpacingMin:     6,
 		TreeSpacingMax:     12,
 	}
-
-	switch name {
-	case "Archipelago":
-		args.FeatureScale = 16
-		args.DetailScale = 4
-		args.Roughness = 0.6
-		args.Bias = 0.4
-		args.MidPoint = 0.5
-	case "Atoll":
-		args.FeatureScale = 32
-		args.DetailScale = 4
-		args.Roughness = 0.5
-		args.Bias = 0.6
-		args.MidPoint = 0.0
-		args.RaisedCorners = 4
-	case "Bay":
-		args.FeatureScale = 48
-		args.DetailScale = 4
-		args.Roughness = 0.5
-		args.Bias = 0.3
-		args.MidPoint = 0.0
-		args.LoweredCorners = 2
-	case "Dunes":
-		args.FeatureScale = 16
-		args.DetailScale = 2
-		args.Roughness = 0.8
-		args.Bias = 0.3
-		args.CliffThreshold = 0.6
-	case "Hills":
-		args.FeatureScale = 32
-		args.DetailScale = 4
-		args.Roughness = 0.5
-		args.MaxHeight = 16
-	case "Ice":
-		args.FeatureScale = 32
-		args.DetailScale = 4
-		args.Roughness = 0.4
-		args.Bias = 0.4
-		args.AddSnow = true
-	case "Island2":
-		args.FeatureScale = 24
-		args.DetailScale = 4
-		args.Roughness = 0.5
-		args.Bias = 0.5
-		args.RaisedCorners = 4
-	case "Lake":
-		args.FeatureScale = 48
-		args.DetailScale = 4
-		args.Roughness = 0.4
-		args.Bias = -0.2
-		args.MidPoint = 0.5
-	case "Mountains2":
-		args.FeatureScale = 16
-		args.DetailScale = 4
-		args.Roughness = 0.7
-		args.MaxHeight = 48
-		args.MaxDepth = 20
-		args.CliffThreshold = 0.5
-	case "Peninsula":
-		args.FeatureScale = 40
-		args.DetailScale = 4
-		args.Roughness = 0.5
-		args.Bias = 0.3
-		args.RaisedCorners = 2
-	case "River":
-		args.FeatureScale = 40
-		args.DetailScale = 4
-		args.Roughness = 0.5
-		args.Bias = -0.1
-		args.MidPoint = 0.2
-	case "Streams":
-		args.FeatureScale = 24
-		args.DetailScale = 4
-		args.Roughness = 0.6
-		args.Bias = -0.1
-		args.MidPoint = 0.1
-	case "Random":
-		args.FeatureScale = 20 + rand.Intn(40)
-		args.DetailScale = 2 + rand.Intn(6)
-		args.Roughness = 0.3 + rand.Float64()*0.5
-	}
-	return args
 }
 
 func genFCraftTemplate(args *Args, lvl *Level, template string) error {

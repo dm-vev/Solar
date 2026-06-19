@@ -4,135 +4,145 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
 	"github.com/solar-mc/solar/internal/world"
 )
 
-func (s *session) commandContext() command.Context {
-	position, yaw, pitch := s.currentLocation()
+// SessionBackend exposes the session operations that command adapters need.
+// This interface decouples the protocol session from the command layer:
+// the command package depends only on its own interfaces, and the adapter
+// implementation lives in the app package.
+type SessionBackend interface {
+	CurrentUsername() string
+	CurrentLocation() (world.Spawn, byte, byte)
+	IsOperator() bool
 
-	return command.Context{
-		Username: s.currentUsername(),
-		Position: command.Position{
-			X: position.X,
-			Y: position.Y,
-			Z: position.Z,
-		},
-		Yaw:         yaw,
-		Pitch:       pitch,
-		Authority:   sessionAuthority{s},
-		World:       sessionWorld{s},
-		Persistence: sessionPersistence{s},
-		Moderation:  sessionModeration{s},
-		Players:     sessionDirectory{s},
-	}
+	ApplyBlockChange(x, y, z int, blockID byte, echo bool) error
+	TeleportSelf(x, y, z int, yaw, pitch byte) bool
+	SetSpawn(spawn world.Spawn) bool
+	GenerateWorld(name, theme string, width, height, length int, seed string) bool
+	SaveState() bool
+	PersistPlayerPolicy() bool
+
+	KickPlayer(name, reason string) bool
+	BanPlayer(name, reason string) bool
+	UnbanPlayer(name string) bool
+	WhitelistEnabled() bool
+	WhitelistAdd(name string) bool
+	WhitelistRemove(name string) bool
+	SetWhitelistEnabled(enabled bool) bool
+
+	OnlineNames() []string
+	WhitelistNames() []string
 }
 
-type sessionAuthority struct{ session *session }
+// --- SessionBackend implementation on *session ---
 
-func (a sessionAuthority) CanAdmin() bool {
-	if a.session.players == nil {
+func (s *session) CurrentUsername() string {
+	return s.currentUsername()
+}
+
+func (s *session) CurrentLocation() (world.Spawn, byte, byte) {
+	return s.currentLocation()
+}
+
+func (s *session) IsOperator() bool {
+	if s.players == nil {
 		return false
 	}
-	return a.session.players.IsOperator(a.session.currentUsername())
+	return s.players.IsOperator(s.currentUsername())
 }
 
-type sessionWorld struct{ session *session }
-
-func (w sessionWorld) SetBlock(x, y, z int, blockID byte) bool {
-	return w.session.applyBlockChange(x, y, z, blockID, true) == nil
+func (s *session) ApplyBlockChange(x, y, z int, blockID byte, echo bool) error {
+	return s.applyBlockChange(x, y, z, blockID, echo)
 }
 
-func (w sessionWorld) MovePlayer(x, y, z int, yaw, pitch byte) bool {
-	return w.session.teleportSelf(x, y, z, yaw, pitch)
+func (s *session) TeleportSelf(x, y, z int, yaw, pitch byte) bool {
+	return s.teleportSelf(x, y, z, yaw, pitch)
 }
 
-func (w sessionWorld) SetSpawn(x, y, z int, yaw, pitch byte) bool {
-	if w.session.worlds == nil {
+func (s *session) SetSpawn(spawn world.Spawn) bool {
+	if s.worlds == nil {
 		return false
 	}
-	w.session.worlds.SetSpawn(world.Spawn{X: x, Y: y, Z: z, Yaw: yaw, Pitch: pitch})
+	s.worlds.SetSpawn(spawn)
 	return true
 }
 
-func (w sessionWorld) GenerateWorld(name, theme string, width, height, length int, seed string) bool {
-	if w.session.worlds == nil {
+func (s *session) GenerateWorld(name, theme string, width, height, length int, seed string) bool {
+	return s.generateWorld(name, theme, width, height, length, seed)
+}
+
+func (s *session) SaveState() bool {
+	return s.saveState()
+}
+
+func (s *session) PersistPlayerPolicy() bool {
+	return s.persistPlayerPolicy()
+}
+
+func (s *session) KickPlayer(name, reason string) bool {
+	return s.kickPlayer(name, reason)
+}
+
+func (s *session) BanPlayer(name, reason string) bool {
+	return s.banPlayer(name, reason)
+}
+
+func (s *session) UnbanPlayer(name string) bool {
+	return s.unbanPlayer(name)
+}
+
+func (s *session) WhitelistEnabled() bool {
+	if s.players == nil {
 		return false
 	}
-	return w.session.generateWorld(name, theme, width, height, length, seed)
+	return s.players.WhitelistEnabled()
 }
 
-type sessionPersistence struct{ session *session }
-
-func (p sessionPersistence) SaveState() bool {
-	return p.session.saveState()
-}
-
-type sessionModeration struct{ session *session }
-
-func (m sessionModeration) KickPlayer(name, reason string) bool {
-	return m.session.kickPlayer(name, reason)
-}
-
-func (m sessionModeration) BanPlayer(name, reason string) bool {
-	return m.session.banPlayer(name, reason)
-}
-
-func (m sessionModeration) UnbanPlayer(name string) bool {
-	return m.session.unbanPlayer(name)
-}
-
-func (m sessionModeration) WhitelistEnabled() bool {
-	if m.session.players == nil {
+func (s *session) WhitelistAdd(name string) bool {
+	if s.players == nil {
 		return false
 	}
-	return m.session.players.WhitelistEnabled()
-}
-
-func (m sessionModeration) SetWhitelistEnabled(enabled bool) bool {
-	if m.session.players == nil {
-		return false
-	}
-	changed := m.session.players.SetWhitelistEnabled(enabled)
-	_ = m.session.persistPlayerPolicy()
+	changed := s.players.WhitelistAdd(name)
+	s.persistPlayerPolicy()
 	return changed
 }
 
-func (m sessionModeration) WhitelistAdd(name string) bool {
-	if m.session.players == nil {
+func (s *session) WhitelistRemove(name string) bool {
+	if s.players == nil {
 		return false
 	}
-	changed := m.session.players.WhitelistAdd(name)
-	_ = m.session.persistPlayerPolicy()
+	changed := s.players.WhitelistRemove(name)
+	s.persistPlayerPolicy()
 	return changed
 }
 
-func (m sessionModeration) WhitelistRemove(name string) bool {
-	if m.session.players == nil {
+func (s *session) SetWhitelistEnabled(enabled bool) bool {
+	if s.players == nil {
 		return false
 	}
-	changed := m.session.players.WhitelistRemove(name)
-	_ = m.session.persistPlayerPolicy()
+	changed := s.players.SetWhitelistEnabled(enabled)
+	s.persistPlayerPolicy()
 	return changed
 }
 
-type sessionDirectory struct{ session *session }
-
-func (d sessionDirectory) ListPlayers() []string {
-	if d.session.players == nil {
+func (s *session) OnlineNames() []string {
+	if s.players == nil {
 		return nil
 	}
-	return d.session.players.OnlineNames()
+	return s.players.OnlineNames()
 }
 
-func (d sessionDirectory) ListWhitelisted() []string {
-	if d.session.players == nil {
+func (s *session) WhitelistNames() []string {
+	if s.players == nil {
 		return nil
 	}
-	return d.session.players.WhitelistNames()
+	return s.players.WhitelistNames()
 }
+
+// --- Internal session methods (not part of SessionBackend) ---
 
 func (s *session) currentLocation() (world.Spawn, byte, byte) {
 	entityID := s.currentEntityID()
@@ -240,7 +250,7 @@ func (s *session) banPlayer(name, reason string) bool {
 		reason = fmt.Sprintf("banned by %s", s.currentUsername())
 	}
 	changed := s.players.Ban(name, reason)
-	_ = s.persistPlayerPolicy()
+	s.persistPlayerPolicy()
 	if s.room != nil {
 		if target, ok := s.room.FindByName(name); ok {
 			target.disconnect(reason)
@@ -254,7 +264,7 @@ func (s *session) unbanPlayer(name string) bool {
 		return false
 	}
 	changed := s.players.Unban(name)
-	_ = s.persistPlayerPolicy()
+	s.persistPlayerPolicy()
 	return changed
 }
 
@@ -283,8 +293,6 @@ func (s *session) generateWorld(name, theme string, width, height, length int, s
 	w := world.FromGeneratorLevel(lvl)
 	s.worlds.SetCurrent(w)
 
-	// Send the new level to the issuer; other players currently keep their
-	// existing level stream until they reconnect.
 	if err := s.sendLevel(w); err != nil {
 		s.logger.Debug("send generated level", "error", err)
 		return false

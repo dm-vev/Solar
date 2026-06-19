@@ -8,7 +8,6 @@ const (
 	opcodeHandshake            = wire.OpcodeHandshake
 	opcodePing                 = wire.OpcodePing
 	opcodeLevelInitialize      = wire.OpcodeLevelInitialize
-	opcodeLevelBegin           = wire.OpcodeLevelInitialize
 	opcodeLevelData            = wire.OpcodeLevelData
 	opcodeLevelFinalize        = wire.OpcodeLevelFinalize
 	opcodeSetBlockClient       = wire.OpcodeSetBlockClient
@@ -33,6 +32,3 @@ const (
 	eyeHeight   = wire.EyeHeight
 	maxChunkLen = wire.MaxChunkLen
 )
-
-// selfEntityID is retained for backward compatibility.
-const selfEntityID = selfID

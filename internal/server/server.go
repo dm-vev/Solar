@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
+	"net/http/pprof"
 	"sync"
 	"time"
 
@@ -147,11 +147,11 @@ func (s *Server) runDebugServer(ctx context.Context) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprintf(w, `{"status":"ok","players":%d,"entities":%d}`, s.players.Count(), s.entities.Count())
 	})
-	mux.HandleFunc("/debug/pprof/", http.DefaultServeMux.ServeHTTP)
-	mux.HandleFunc("/debug/pprof/cmdline", http.DefaultServeMux.ServeHTTP)
-	mux.HandleFunc("/debug/pprof/profile", http.DefaultServeMux.ServeHTTP)
-	mux.HandleFunc("/debug/pprof/symbol", http.DefaultServeMux.ServeHTTP)
-	mux.HandleFunc("/debug/pprof/trace", http.DefaultServeMux.ServeHTTP)
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	srv := &http.Server{
 		Addr:    s.pprofAddr,

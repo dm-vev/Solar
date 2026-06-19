@@ -1,0 +1,115 @@
+package app
+
+import (
+	"github.com/solar-mc/solar/internal/command"
+	"github.com/solar-mc/solar/internal/protocol/classic"
+	"github.com/solar-mc/solar/internal/world"
+)
+
+// sessionAuthority implements command.Authority.
+type sessionAuthority struct {
+	backend classic.SessionBackend
+}
+
+func (a sessionAuthority) CanAdmin() bool {
+	return a.backend.IsOperator()
+}
+
+// sessionWorld implements command.WorldService.
+type sessionWorld struct {
+	backend classic.SessionBackend
+}
+
+func (w sessionWorld) SetBlock(x, y, z int, blockID byte) bool {
+	return w.backend.ApplyBlockChange(x, y, z, blockID, true) == nil
+}
+
+func (w sessionWorld) MovePlayer(x, y, z int, yaw, pitch byte) bool {
+	return w.backend.TeleportSelf(x, y, z, yaw, pitch)
+}
+
+func (w sessionWorld) SetSpawn(x, y, z int, yaw, pitch byte) bool {
+	return w.backend.SetSpawn(world.Spawn{X: x, Y: y, Z: z, Yaw: yaw, Pitch: pitch})
+}
+
+func (w sessionWorld) GenerateWorld(name, theme string, width, height, length int, seed string) bool {
+	return w.backend.GenerateWorld(name, theme, width, height, length, seed)
+}
+
+// sessionPersistence implements command.PersistenceService.
+type sessionPersistence struct {
+	backend classic.SessionBackend
+}
+
+func (p sessionPersistence) SaveState() bool {
+	return p.backend.SaveState()
+}
+
+// sessionModeration implements command.ModerationService.
+type sessionModeration struct {
+	backend classic.SessionBackend
+}
+
+func (m sessionModeration) KickPlayer(name, reason string) bool {
+	return m.backend.KickPlayer(name, reason)
+}
+
+func (m sessionModeration) BanPlayer(name, reason string) bool {
+	return m.backend.BanPlayer(name, reason)
+}
+
+func (m sessionModeration) UnbanPlayer(name string) bool {
+	return m.backend.UnbanPlayer(name)
+}
+
+func (m sessionModeration) WhitelistEnabled() bool {
+	return m.backend.WhitelistEnabled()
+}
+
+func (m sessionModeration) SetWhitelistEnabled(enabled bool) bool {
+	return m.backend.SetWhitelistEnabled(enabled)
+}
+
+func (m sessionModeration) WhitelistAdd(name string) bool {
+	return m.backend.WhitelistAdd(name)
+}
+
+func (m sessionModeration) WhitelistRemove(name string) bool {
+	return m.backend.WhitelistRemove(name)
+}
+
+// sessionDirectory implements command.PlayerDirectory.
+type sessionDirectory struct {
+	backend classic.SessionBackend
+}
+
+func (d sessionDirectory) ListPlayers() []string {
+	return d.backend.OnlineNames()
+}
+
+func (d sessionDirectory) ListWhitelisted() []string {
+	return d.backend.WhitelistNames()
+}
+
+// buildCommandContext assembles a command.Context from a SessionBackend.
+// This function is injected into the codec via SetCommandContextBuilder,
+// keeping the protocol layer decoupled from the command adapter types.
+func buildCommandContext(backend classic.SessionBackend) command.Context {
+	position, yaw, pitch := backend.CurrentLocation()
+
+	return command.Context{
+		Username: backend.CurrentUsername(),
+		Position: command.Position{
+			X: position.X,
+			Y: position.Y,
+			Z: position.Z,
+		},
+		Yaw:         yaw,
+		Pitch:       pitch,
+		Authority:   sessionAuthority{backend},
+		World:       sessionWorld{backend},
+		Persistence: sessionPersistence{backend},
+		Moderation:  sessionModeration{backend},
+		Players:     sessionDirectory{backend},
+	}
+}

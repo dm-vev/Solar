@@ -203,62 +203,82 @@ func whitelistCommand(ctx Context, args []string) (string, bool) {
 
 	switch strings.ToLower(args[0]) {
 	case "on":
-		if ctx.Moderation == nil {
-			return "whitelist is unavailable", true
-		}
-		if !ctx.Moderation.SetWhitelistEnabled(true) {
-			return "whitelist already enabled", true
-		}
-		return "whitelist enabled", true
+		return whitelistOn(ctx)
 	case "off":
-		if ctx.Moderation == nil {
-			return "whitelist is unavailable", true
-		}
-		if !ctx.Moderation.SetWhitelistEnabled(false) {
-			return "whitelist already disabled", true
-		}
-		return "whitelist disabled", true
+		return whitelistOff(ctx)
 	case "add":
-		if ctx.Moderation == nil {
-			return "whitelist is unavailable", true
-		}
-		if len(args) != 2 {
-			return "usage: /whitelist add name", true
-		}
-		if strings.TrimSpace(args[1]) == "" {
-			return "invalid name", true
-		}
-		if !ctx.Moderation.WhitelistAdd(args[1]) {
-			return fmt.Sprintf("player already whitelisted: %s", args[1]), true
-		}
-		return fmt.Sprintf("whitelisted %s", args[1]), true
+		return whitelistAddCmd(ctx, args)
 	case "remove":
-		if ctx.Moderation == nil {
-			return "whitelist is unavailable", true
-		}
-		if len(args) != 2 {
-			return "usage: /whitelist remove name", true
-		}
-		if strings.TrimSpace(args[1]) == "" {
-			return "invalid name", true
-		}
-		if !ctx.Moderation.WhitelistRemove(args[1]) {
-			return fmt.Sprintf("player not whitelisted: %s", args[1]), true
-		}
-		return fmt.Sprintf("removed %s from whitelist", args[1]), true
+		return whitelistRemoveCmd(ctx, args)
 	case "list":
-		if ctx.Players == nil {
-			return "whitelist is unavailable", true
-		}
-		names := ctx.Players.ListWhitelisted()
-		if len(names) == 0 {
-			return "whitelist: none", true
-		}
-		sort.Strings(names)
-		return "whitelist: " + strings.Join(names, ", "), true
+		return whitelistList(ctx)
 	default:
 		return "usage: /whitelist [on|off|add|remove|list]", true
 	}
+}
+
+func whitelistOn(ctx Context) (string, bool) {
+	if ctx.Moderation == nil {
+		return "whitelist is unavailable", true
+	}
+	if !ctx.Moderation.SetWhitelistEnabled(true) {
+		return "whitelist already enabled", true
+	}
+	return "whitelist enabled", true
+}
+
+func whitelistOff(ctx Context) (string, bool) {
+	if ctx.Moderation == nil {
+		return "whitelist is unavailable", true
+	}
+	if !ctx.Moderation.SetWhitelistEnabled(false) {
+		return "whitelist already disabled", true
+	}
+	return "whitelist disabled", true
+}
+
+func whitelistAddCmd(ctx Context, args []string) (string, bool) {
+	if ctx.Moderation == nil {
+		return "whitelist is unavailable", true
+	}
+	if len(args) != 2 {
+		return "usage: /whitelist add name", true
+	}
+	if strings.TrimSpace(args[1]) == "" {
+		return "invalid name", true
+	}
+	if !ctx.Moderation.WhitelistAdd(args[1]) {
+		return fmt.Sprintf("player already whitelisted: %s", args[1]), true
+	}
+	return fmt.Sprintf("whitelisted %s", args[1]), true
+}
+
+func whitelistRemoveCmd(ctx Context, args []string) (string, bool) {
+	if ctx.Moderation == nil {
+		return "whitelist is unavailable", true
+	}
+	if len(args) != 2 {
+		return "usage: /whitelist remove name", true
+	}
+	if strings.TrimSpace(args[1]) == "" {
+		return "invalid name", true
+	}
+	if !ctx.Moderation.WhitelistRemove(args[1]) {
+		return fmt.Sprintf("player not whitelisted: %s", args[1]), true
+	}
+	return fmt.Sprintf("removed %s from whitelist", args[1]), true
+}
+
+func whitelistList(ctx Context) (string, bool) {
+	if ctx.Players == nil {
+		return "whitelist is unavailable", true
+	}
+	names := ctx.Players.ListWhitelisted()
+	if len(names) == 0 {
+		return "whitelist: none", true
+	}
+	sort.Strings(names)
+	return "whitelist: " + strings.Join(names, ", "), true
 }
 
 func playersCommand(ctx Context, _ []string) (string, bool) {

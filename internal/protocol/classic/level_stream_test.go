@@ -29,8 +29,8 @@ func readLevelStream(t *testing.T, client net.Conn, fastMap bool) levelStreamRes
 	if _, err := io.ReadFull(client, result.Begin); err != nil {
 		t.Fatalf("read level begin: %v", err)
 	}
-	if result.Begin[0] != opcodeLevelBegin {
-		t.Fatalf("level begin opcode = %d, want %d", result.Begin[0], opcodeLevelBegin)
+	if result.Begin[0] != opcodeLevelInitialize {
+		t.Fatalf("level begin opcode = %d, want %d", result.Begin[0], opcodeLevelInitialize)
 	}
 
 	var compressed bytes.Buffer

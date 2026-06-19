@@ -121,96 +121,138 @@ func encodeLevel(level Level) ([]byte, error) {
 func decodeLevel(data []byte) (Level, error) {
 	reader := bytes.NewReader(data)
 
-	magic := make([]byte, len(fileMagic))
-	if _, err := io.ReadFull(reader, magic); err != nil {
-		return Level{}, fmt.Errorf("read magic: %w", err)
+	if err := readMagic(reader); err != nil {
+		return Level{}, err
 	}
-	if string(magic) != fileMagic {
-		return Level{}, fmt.Errorf("invalid magic %q", magic)
+	if err := readVersion(reader); err != nil {
+		return Level{}, err
 	}
 
-	version, err := reader.ReadByte()
+	name, err := readLevelName(reader)
 	if err != nil {
-		return Level{}, fmt.Errorf("read version: %w", err)
-	}
-	if version != fileVersion {
-		return Level{}, fmt.Errorf("unsupported version %d", version)
+		return Level{}, err
 	}
 
-	nameLen, err := readUint16(reader)
+	dims, err := readDimensions(reader)
 	if err != nil {
 		return Level{}, err
-	}
-	name := make([]byte, nameLen)
-	if _, err := io.ReadFull(reader, name); err != nil {
-		return Level{}, fmt.Errorf("read name: %w", err)
 	}
 
-	width, err := readUint16(reader)
+	spawn, err := readSpawn(reader)
 	if err != nil {
 		return Level{}, err
 	}
-	height, err := readUint16(reader)
+
+	blocks, err := readBlocks(reader, dims)
 	if err != nil {
 		return Level{}, err
-	}
-	length, err := readUint16(reader)
-	if err != nil {
-		return Level{}, err
-	}
-	spawnX, err := readInt32(reader)
-	if err != nil {
-		return Level{}, err
-	}
-	spawnY, err := readInt32(reader)
-	if err != nil {
-		return Level{}, err
-	}
-	spawnZ, err := readInt32(reader)
-	if err != nil {
-		return Level{}, err
-	}
-	yaw, err := reader.ReadByte()
-	if err != nil {
-		return Level{}, fmt.Errorf("read yaw: %w", err)
-	}
-	pitch, err := reader.ReadByte()
-	if err != nil {
-		return Level{}, fmt.Errorf("read pitch: %w", err)
-	}
-	blockLen, err := readUint32(reader)
-	if err != nil {
-		return Level{}, err
-	}
-	volume := int64(width) * int64(height) * int64(length)
-	if volume < 1 || volume > maxBlocks {
-		return Level{}, fmt.Errorf("world volume %d exceeds limit %d", volume, maxBlocks)
-	}
-	if int64(blockLen) != volume {
-		return Level{}, fmt.Errorf("block length %d does not match volume %d", blockLen, volume)
-	}
-	if int64(blockLen) > int64(reader.Len()) {
-		return Level{}, fmt.Errorf("block length %d exceeds remaining data %d", blockLen, reader.Len())
-	}
-	blocks := make([]byte, blockLen)
-	if _, err := io.ReadFull(reader, blocks); err != nil {
-		return Level{}, fmt.Errorf("read blocks: %w", err)
 	}
 
 	return Level{
-		Name:   string(name),
-		Width:  int(width),
-		Height: int(height),
-		Length: int(length),
+		Name:   name,
+		Width:  dims[0],
+		Height: dims[1],
+		Length: dims[2],
 		Blocks: blocks,
-		Spawn: Spawn{
-			X:     int(spawnX),
-			Y:     int(spawnY),
-			Z:     int(spawnZ),
-			Yaw:   yaw,
-			Pitch: pitch,
-		},
+		Spawn:  spawn,
 	}, nil
+}
+
+func readMagic(reader *bytes.Reader) error {
+	magic := make([]byte, len(fileMagic))
+	if _, err := io.ReadFull(reader, magic); err != nil {
+		return fmt.Errorf("read magic: %w", err)
+	}
+	if string(magic) != fileMagic {
+		return fmt.Errorf("invalid magic %q", magic)
+	}
+	return nil
+}
+
+func readVersion(reader *bytes.Reader) error {
+	version, err := reader.ReadByte()
+	if err != nil {
+		return fmt.Errorf("read version: %w", err)
+	}
+	if version != fileVersion {
+		return fmt.Errorf("unsupported version %d", version)
+	}
+	return nil
+}
+
+func readLevelName(reader *bytes.Reader) (string, error) {
+	nameLen, err := readUint16(reader)
+	if err != nil {
+		return "", err
+	}
+	name := make([]byte, nameLen)
+	if _, err := io.ReadFull(reader, name); err != nil {
+		return "", fmt.Errorf("read name: %w", err)
+	}
+	return string(name), nil
+}
+
+func readDimensions(reader *bytes.Reader) ([3]int, error) {
+	width, err := readUint16(reader)
+	if err != nil {
+		return [3]int{}, err
+	}
+	height, err := readUint16(reader)
+	if err != nil {
+		return [3]int{}, err
+	}
+	length, err := readUint16(reader)
+	if err != nil {
+		return [3]int{}, err
+	}
+	return [3]int{int(width), int(height), int(length)}, nil
+}
+
+func readSpawn(reader *bytes.Reader) (Spawn, error) {
+	x, err := readInt32(reader)
+	if err != nil {
+		return Spawn{}, err
+	}
+	y, err := readInt32(reader)
+	if err != nil {
+		return Spawn{}, err
+	}
+	z, err := readInt32(reader)
+	if err != nil {
+		return Spawn{}, err
+	}
+	yaw, err := reader.ReadByte()
+	if err != nil {
+		return Spawn{}, fmt.Errorf("read yaw: %w", err)
+	}
+	pitch, err := reader.ReadByte()
+	if err != nil {
+		return Spawn{}, fmt.Errorf("read pitch: %w", err)
+	}
+	return Spawn{X: int(x), Y: int(y), Z: int(z), Yaw: yaw, Pitch: pitch}, nil
+}
+
+func readBlocks(reader *bytes.Reader, dims [3]int) ([]byte, error) {
+	blockLen, err := readUint32(reader)
+	if err != nil {
+		return nil, err
+	}
+	width, height, length := dims[0], dims[1], dims[2]
+	volume := int64(width) * int64(height) * int64(length)
+	if volume < 1 || volume > maxBlocks {
+		return nil, fmt.Errorf("world volume %d exceeds limit %d", volume, maxBlocks)
+	}
+	if int64(blockLen) != volume {
+		return nil, fmt.Errorf("block length %d does not match volume %d", blockLen, volume)
+	}
+	if int64(blockLen) > int64(reader.Len()) {
+		return nil, fmt.Errorf("block length %d exceeds remaining data %d", blockLen, reader.Len())
+	}
+	blocks := make([]byte, blockLen)
+	if _, err := io.ReadFull(reader, blocks); err != nil {
+		return nil, fmt.Errorf("read blocks: %w", err)
+	}
+	return blocks, nil
 }
 
 func readUint16(reader *bytes.Reader) (uint16, error) {
