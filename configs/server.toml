@@ -90,3 +90,11 @@ format = "text"
 # ponytail: Go plugin package requires same Go version + deps as the server binary.
 enabled = false
 dir = "plugins"
+
+[lua]
+# Load Lua scripts (*.lua) from this directory (relative to data_dir).
+# Requires the server to be built with -tags=lua (gopher-lua dependency).
+# Without -tags=lua this section is ignored and scripts are not loaded.
+# Each .lua file becomes a plugin; see plugins/example.lua for the API.
+enabled = false
+dir = "lua"

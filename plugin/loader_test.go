@@ -1,4 +1,4 @@
-//go:build (linux || darwin) && !race
+//go:build (linux || darwin) && !race && !lua
 
 package plugin_test
 

@@ -35,6 +35,7 @@ type Config struct {
 	Debug            DebugConfig    `toml:"debug"`
 	Log              LogConfig      `toml:"log"`
 	Plugins          PluginsConfig  `toml:"plugins"`
+	Lua              LuaConfig      `toml:"lua"`
 }
 
 // NetworkConfig controls per-session TCP I/O tuning.
@@ -114,6 +115,14 @@ type PluginsConfig struct {
 	Dir     string `toml:"dir"`
 }
 
+// LuaConfig controls Lua script loading via gopher-lua.
+// Requires the server binary to be built with -tags=lua.
+// Without the tag, LoadLuaScripts is a no-op and this config is ignored.
+type LuaConfig struct {
+	Enabled bool   `toml:"enabled"`
+	Dir     string `toml:"dir"`
+}
+
 // Load returns bootstrap config and ensures base directories exist.
 func Load(path string) (Config, error) {
 	cfg := Config{
@@ -177,6 +186,10 @@ func Load(path string) (Config, error) {
 		Plugins: PluginsConfig{
 			Enabled: false,
 			Dir:     "plugins",
+		},
+		Lua: LuaConfig{
+			Enabled: false,
+			Dir:     "lua",
 		},
 	}
 

@@ -86,6 +86,15 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 		}
 	}
 
+	// Load Lua scripts. Requires -tags=lua at build time; without it
+	// LoadLuaScripts is a no-op that logs a warning.
+	if cfg.Lua.Enabled {
+		luaDir := filepath.Join(cfg.DataDir, cfg.Lua.Dir)
+		if err := plugin.LoadLuaScripts(luaDir, logger); err != nil {
+			logger.Error("lua script load failed", "dir", luaDir, "error", err)
+		}
+	}
+
 	// Load plugins: create the server API handle and enable all registered plugins.
 	pluginSrv := server.NewPluginServer(codec, worlds, commands, srv)
 	if err := plugin.LoadAll(pluginSrv, logger); err != nil {
