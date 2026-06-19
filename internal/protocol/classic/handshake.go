@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/solar-mc/solar/internal/entity"
-	"github.com/solar-mc/solar/internal/world"
 )
 
 func (s *session) handleHandshake() error {
@@ -42,14 +41,14 @@ func (s *session) handleHandshake() error {
 			old.disconnect("reconnected from another client")
 		}
 	}
-	level := s.worlds.Current()
+	spawn := s.worlds.Spawn()
 	entityID := uint32(0)
 	tracked := false
 	if s.entities != nil {
 		id, ok := s.entities.Add(username, entity.Position{
-			X: level.Spawn.X,
-			Y: level.Spawn.Y,
-			Z: level.Spawn.Z,
+			X: spawn.X,
+			Y: spawn.Y,
+			Z: spawn.Z,
 		})
 		if ok {
 			entityID = id
@@ -69,7 +68,7 @@ func (s *session) handleHandshake() error {
 	if err := s.writePacket(encodeMotd(version, s.serverName, s.motd)); err != nil {
 		return err
 	}
-	if err := s.sendLevel(level); err != nil {
+	if err := s.sendLevel(s.currentSupportsFastMap()); err != nil {
 		return err
 	}
 	s.markLoggedIn()
@@ -107,15 +106,18 @@ func encodeMotd(version byte, serverName, motd string) []byte {
 	return packet
 }
 
-func (s *session) sendLevel(level world.Level) error {
-	if err := s.writePacket(encodeLevelBegin(level.Volume(), s.currentSupportsFastMap())); err != nil {
-		return err
-	}
-
-	chunks, err := encodeLevelDataPackets(level, s.currentSupportsFastMap())
+func (s *session) sendLevel(fastMap bool) error {
+	stream, err := s.worlds.LevelStream(fastMap)
 	if err != nil {
 		return err
 	}
+	level := stream.Level
+
+	if err := s.writePacket(encodeLevelBegin(level.Volume(), fastMap)); err != nil {
+		return err
+	}
+
+	chunks := encodeLevelDataPackets(stream)
 	for _, chunk := range chunks {
 		if err := s.writePacket(chunk); err != nil {
 			return err

@@ -321,7 +321,7 @@ func (s *session) generateWorld(name, theme string, width, height, length int, s
 	w := world.FromGeneratorLevel(lvl)
 	s.worlds.SetCurrent(w)
 
-	if err := s.sendLevel(w); err != nil {
+	if err := s.sendLevel(s.currentSupportsFastMap()); err != nil {
 		s.logger.Debug("send generated level", "error", err)
 		return false
 	}

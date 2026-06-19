@@ -1,11 +1,35 @@
 package world
 
 import (
+	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
 
 	"github.com/solar-mc/solar/internal/generator"
+)
+
+var (
+	gzipWriterPool = sync.Pool{
+		New: func() any {
+			if w, err := gzip.NewWriterLevel(io.Discard, gzip.BestSpeed); err == nil {
+				return w
+			}
+			return gzip.NewWriter(io.Discard)
+		},
+	}
+	flateWriterPool = sync.Pool{
+		New: func() any {
+			if w, err := flate.NewWriter(io.Discard, flate.BestSpeed); err == nil {
+				return w
+			}
+			w, _ := flate.NewWriter(io.Discard, flate.DefaultCompression)
+			return w
+		},
+	}
 )
 
 // FromGeneratorLevel converts a generator.Level to a world.Level.
@@ -58,11 +82,28 @@ func (l Level) Volume() int {
 	return l.Width * l.Height * l.Length
 }
 
+// LevelStream holds a snapshot of the world plus a pre-compressed payload
+// for sending to clients. The payload is gzip or raw flate data depending on
+// the client's FastMap support.
+type LevelStream struct {
+	Level   Level
+	Payload []byte
+	FastMap bool
+}
+
 // Manager owns the current world snapshot.
 type Manager struct {
-	mu    sync.RWMutex
-	level Level
-	ticks atomic.Uint64
+	mu         sync.RWMutex
+	level      Level
+	ticks      atomic.Uint64
+	generation uint64
+	cache      levelCache
+}
+
+type levelCache struct {
+	generation uint64
+	gzipData   []byte
+	flateData  []byte
 }
 
 // NewManager creates the world manager with a single bootstrap world.
@@ -94,6 +135,7 @@ func (m *Manager) SetCurrent(level Level) {
 	level = normalizeLevel(level)
 	m.mu.Lock()
 	m.level = level
+	m.generation++
 	m.mu.Unlock()
 }
 
@@ -122,6 +164,7 @@ func (m *Manager) SetBlock(x, y, z int, block byte) bool {
 	}
 
 	m.level.Blocks[packIndex(m.level, x, y, z)] = block
+	m.generation++
 	return true
 }
 
@@ -129,7 +172,96 @@ func (m *Manager) SetBlock(x, y, z int, block byte) bool {
 func (m *Manager) SetSpawn(spawn Spawn) {
 	m.mu.Lock()
 	m.level.Spawn = spawn
+	m.generation++
 	m.mu.Unlock()
+}
+
+// LevelStream returns a consistent snapshot of the level with a pre-compressed
+// payload suitable for streaming to clients. The compressed payload is cached and
+// reused until the world is modified.
+func (m *Manager) LevelStream(fastMap bool) (LevelStream, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.cache.generation != m.generation {
+		m.cache.generation = m.generation
+		m.cache.gzipData = nil
+		m.cache.flateData = nil
+	}
+
+	payload, err := m.cachedPayload(fastMap)
+	if err != nil {
+		return LevelStream{}, err
+	}
+
+	return LevelStream{
+		Level:   m.level,
+		Payload: append([]byte(nil), payload...),
+		FastMap: fastMap,
+	}, nil
+}
+
+// cachedPayload returns the cached payload for the requested format, compressing
+// it on demand if necessary.
+func (m *Manager) cachedPayload(fastMap bool) ([]byte, error) {
+	if fastMap {
+		if len(m.cache.flateData) > 0 {
+			return m.cache.flateData, nil
+		}
+		payload, err := compressLevel(m.level, true)
+		if err != nil {
+			return nil, err
+		}
+		m.cache.flateData = payload
+		return payload, nil
+	}
+
+	if len(m.cache.gzipData) > 0 {
+		return m.cache.gzipData, nil
+	}
+	payload, err := compressLevel(m.level, false)
+	if err != nil {
+		return nil, err
+	}
+	m.cache.gzipData = payload
+	return payload, nil
+}
+
+func compressLevel(level Level, fastMap bool) ([]byte, error) {
+	var buf bytes.Buffer
+	if fastMap {
+		w := flateWriterPool.Get().(*flate.Writer)
+		w.Reset(&buf)
+		defer flateWriterPool.Put(w)
+		if err := writeLevelPayload(w, level); err != nil {
+			return nil, err
+		}
+	} else {
+		w := gzipWriterPool.Get().(*gzip.Writer)
+		w.Reset(&buf)
+		defer gzipWriterPool.Put(w)
+		if err := writeLevelPayload(w, level); err != nil {
+			return nil, err
+		}
+	}
+	return buf.Bytes(), nil
+}
+
+func writeLevelPayload(writer io.WriteCloser, level Level) error {
+	defer writer.Close()
+
+	header := make([]byte, 4)
+	header[0] = byte(level.Volume() >> 24)
+	header[1] = byte(level.Volume() >> 16)
+	header[2] = byte(level.Volume() >> 8)
+	header[3] = byte(level.Volume())
+	if _, err := writer.Write(header); err != nil {
+		return fmt.Errorf("write map header: %w", err)
+	}
+	if _, err := writer.Write(level.Blocks); err != nil {
+		return fmt.Errorf("write map blocks: %w", err)
+	}
+	return writer.Close()
 }
 
 // BlockAt returns the block at the given coordinates.
