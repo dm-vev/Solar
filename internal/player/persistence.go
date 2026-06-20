@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -160,10 +161,7 @@ func (p *Policy) snapshot() policySnapshot {
 		snapshot.Operators = append(snapshot.Operators, name)
 	}
 	if len(p.props) > 0 {
-		snapshot.PlayerProps = make(map[string]PlayerProps, len(p.props))
-		for name, props := range p.props {
-			snapshot.PlayerProps[name] = props
-		}
+		snapshot.PlayerProps = maps.Clone(p.props)
 	}
 	sort.Slice(snapshot.Bans, func(i, j int) bool {
 		return strings.TrimSpace(snapshot.Bans[i].Name) < strings.TrimSpace(snapshot.Bans[j].Name)
