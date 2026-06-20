@@ -293,6 +293,13 @@
 # ─── command.fill ───
 "command.fill.usage" = "usage: /fill <block>"
 
+# ─── command.copy ───
+"command.copy.usage" = "usage: /copy [air]"
+
+# ─── command.paste ───
+"command.paste.usage" = "usage: /paste [air]"
+"command.paste.empty" = "&7Nothing to paste — use /copy first"
+
 [ru]
 # ─── general ───
 "general.muted" = "&cВы в муте."
@@ -539,3 +546,6 @@
 "command.line.usage" = "использование: /line <блок>"
 "command.sphere.usage" = "использование: /sphere <блок> [hollow] [радиус]"
 "command.fill.usage" = "использование: /fill <блок>"
+"command.copy.usage" = "использование: /copy [air]"
+"command.paste.usage" = "использование: /paste [air]"
+"command.paste.empty" = "&7Нечего вставлять — используйте /copy сначала"

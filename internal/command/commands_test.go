@@ -346,6 +346,9 @@ func (stubDraw) StartSelection(markCount int, callback func([][3]int)) bool { re
 func (stubDraw) GetBlockAt(x, y, z int) (byte, bool)                        { return 0, true }
 func (stubDraw) PlaceBlock(x, y, z int, block byte) bool                    { return true }
 func (stubDraw) LevelDims() (int, int, int)                                 { return 128, 64, 128 }
+func (stubDraw) CopyRegion(min, max [3]int) bool                            { return true }
+func (stubDraw) HasClipboard() bool                                         { return false }
+func (stubDraw) PasteAt(origin [3]int, pasteAir bool) int                   { return 0 }
 
 type stubDirectory struct {
 	names       []string

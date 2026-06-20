@@ -50,6 +50,9 @@ type SessionBackend interface {
 	GetBlockAt(x, y, z int) (byte, bool)
 	PlaceBlock(x, y, z int, block byte) bool
 	LevelDims() (width, height, length int)
+	CopyRegion(min, max [3]int) bool
+	HasClipboard() bool
+	PasteAt(origin [3]int, pasteAir bool) int
 
 	KickPlayer(name, reason string) bool
 	BanPlayer(name, reason string) bool

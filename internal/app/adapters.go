@@ -218,6 +218,15 @@ func (s sessionDraw) PlaceBlock(x, y, z int, block byte) bool {
 func (s sessionDraw) LevelDims() (int, int, int) {
 	return s.backend.LevelDims()
 }
+func (s sessionDraw) CopyRegion(min, max [3]int) bool {
+	return s.backend.CopyRegion(min, max)
+}
+func (s sessionDraw) HasClipboard() bool {
+	return s.backend.HasClipboard()
+}
+func (s sessionDraw) PasteAt(origin [3]int, pasteAir bool) int {
+	return s.backend.PasteAt(origin, pasteAir)
+}
 
 // ─── BlockDB adapter ───
 

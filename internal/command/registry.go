@@ -57,6 +57,12 @@ type DrawService interface {
 	GetBlockAt(x, y, z int) (byte, bool)
 	PlaceBlock(x, y, z int, block byte) bool
 	LevelDims() (width, height, length int)
+	// CopyRegion captures blocks from min to max into the player's clipboard.
+	CopyRegion(min, max [3]int) bool
+	// HasClipboard reports whether the player has a copied region.
+	HasClipboard() bool
+	// PasteAt replays the clipboard at the given origin. Returns false if no clipboard.
+	PasteAt(origin [3]int, pasteAir bool) int
 }
 
 // PersistenceService persists runtime state.
@@ -265,6 +271,8 @@ func NewRegistry() *Registry {
 	registry.Register("line", lineCommand)
 	registry.Register("sphere", sphereCommand)
 	registry.Register("fill", fillCommand)
+	registry.Register("copy", copyCommand)
+	registry.Register("paste", pasteCommand)
 	return registry
 }
 

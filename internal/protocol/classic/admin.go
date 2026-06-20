@@ -29,6 +29,7 @@ import (
 	"github.com/solar-mc/solar/internal/blockdb"
 	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
+	"github.com/solar-mc/solar/internal/drawing"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
 	"github.com/solar-mc/solar/internal/world"
@@ -211,6 +212,46 @@ func (s *session) LevelDims() (width, height, length int) {
 	}
 	lvl := s.worlds.Current()
 	return lvl.Width, lvl.Height, lvl.Length
+}
+
+func (s *session) CopyRegion(min, max [3]int) bool {
+	if s.worlds == nil {
+		return false
+	}
+	w := max[0] - min[0] + 1
+	h := max[1] - min[1] + 1
+	l := max[2] - min[2] + 1
+	if w < 1 || h < 1 || l < 1 {
+		return false
+	}
+	cs := drawing.NewCopyState(w, h, l)
+	for y := 0; y < h; y++ {
+		for z := 0; z < l; z++ {
+			for x := 0; x < w; x++ {
+				b, _ := s.worlds.BlockAt(min[0]+x, min[1]+y, min[2]+z)
+				cs.Set(x, y, z, b)
+			}
+		}
+	}
+	s.clipboard = cs
+	return true
+}
+
+func (s *session) HasClipboard() bool {
+	return s.clipboard != nil
+}
+
+func (s *session) PasteAt(origin [3]int, pasteAir bool) int {
+	if s.clipboard == nil {
+		return 0
+	}
+	count := 0
+	s.clipboard.Paste(origin[0], origin[1], origin[2], pasteAir, func(x, y, z int, block byte) {
+		if s.PlaceBlock(x, y, z, block) {
+			count++
+		}
+	})
+	return count
 }
 
 func (s *session) GenerateWorld(name, theme string, width, height, length int, seed string) bool {

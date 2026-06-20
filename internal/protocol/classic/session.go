@@ -31,6 +31,7 @@ import (
 	"github.com/solar-mc/solar/internal/blockdb"
 	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
+	"github.com/solar-mc/solar/internal/drawing"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/i18n"
 	"github.com/solar-mc/solar/internal/player"
@@ -118,6 +119,9 @@ type session struct {
 	// When non-nil, block placements are intercepted as marks instead
 	// of being applied to the world.
 	markState *markSelection
+
+	// clipboard holds the last /copy region for /paste.
+	clipboard *drawing.CopyState
 }
 
 // markSelection tracks a multi-click block selection for drawing commands.

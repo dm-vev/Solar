@@ -410,6 +410,9 @@ func (m testModeration) StartSelection(markCount int, callback func([][3]int)) b
 func (m testModeration) GetBlockAt(x, y, z int) (byte, bool)                        { return 0, true }
 func (m testModeration) PlaceBlock(x, y, z int, block byte) bool                    { return true }
 func (m testModeration) LevelDims() (int, int, int)                                 { return 128, 64, 128 }
+func (m testModeration) CopyRegion(min, max [3]int) bool                            { return true }
+func (m testModeration) HasClipboard() bool                                         { return false }
+func (m testModeration) PasteAt(origin [3]int, pasteAir bool) int                   { return 0 }
 
 func (m testModeration) PlayerDBLookup(name string) *playerdb.PlayerEntry {
 	return m.backend.PlayerDBLookup(name)
