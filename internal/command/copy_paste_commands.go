@@ -7,14 +7,12 @@
 
 package command
 
-// copyCommand — /copy [air]
+// copyCommand — /copy
 // Captures a cuboid region into the player's clipboard.
 func copyCommand(ctx Context, args []string) (string, bool) {
 	if ctx.Draw == nil {
 		return ctx.tr("command.draw.unavailable"), true
 	}
-	pasteAir := len(args) > 0 && args[0] == "air"
-	_ = pasteAir // /copy captures everything; air flag affects /paste
 
 	ctx.Draw.StartSelection(2, func(marks [][3]int) {
 		min, max := marks[0], marks[1]
@@ -42,10 +40,10 @@ func pasteCommand(ctx Context, args []string) (string, bool) {
 		return ctx.tr("command.paste.empty"), true
 	}
 	pasteAir := len(args) > 0 && args[0] == "air"
+	_ = pasteAir
 
 	ctx.Draw.StartSelection(1, func(marks [][3]int) {
-		count := ctx.Draw.PasteAt(marks[0], pasteAir)
-		_ = count
+		ctx.Draw.PasteAt(marks[0], pasteAir)
 	})
 	return ctx.tr("command.draw.select1"), true
 }

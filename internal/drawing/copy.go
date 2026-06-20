@@ -14,7 +14,6 @@ type CopyState struct {
 	Height int
 	Length int
 	Blocks []byte // Width*Height*Length, indexed as x + width*(z + length*y)
-	Origin [3]int // which corner was clicked first (for alignment)
 }
 
 // NewCopyState creates a clipboard for the given dimensions.
