@@ -478,12 +478,6 @@ func (s *session) disconnect(message string) {
 	if strings.TrimSpace(message) == "" {
 		message = "kicked"
 	}
-	if s.playerDB != nil {
-		if e := s.playerDB.Get(s.currentUsername()); e != nil {
-			e.Kicks++
-			s.playerDB.Save(e)
-		}
-	}
 	_ = s.writeKick(message)
 	s.fail()
 }

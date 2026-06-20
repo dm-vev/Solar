@@ -422,14 +422,11 @@ func (s *session) cleanup() {
 		s.players.SetProps(s.currentUsername(), props)
 	}
 
-	// Update PlayerDB with playtime and save.
-	if s.playerDB != nil && s.loginTime.IsZero() == false {
-		username := s.currentUsername()
-		e := s.playerDB.Get(username)
-		if e != nil {
+	// Update PlayerDB with playtime.
+	if s.playerDB != nil && !s.loginTime.IsZero() {
+		if e := s.playerDB.Get(s.currentUsername()); e != nil {
 			e.TotalTime += time.Since(s.loginTime)
 			s.playerDB.Save(e)
-			_ = s.playerDB.Flush()
 		}
 	}
 
@@ -472,7 +469,15 @@ func (s *session) Teleport(x, y, z int, yaw, pitch byte) bool {
 	return s.teleportSelf(x, y, z, yaw, pitch)
 }
 
-func (s *session) Kick(reason string) { s.disconnect(reason) }
+func (s *session) Kick(reason string) {
+	if s.playerDB != nil {
+		if e := s.playerDB.Get(s.currentUsername()); e != nil {
+			e.Kicks++
+			s.playerDB.Save(e)
+		}
+	}
+	s.disconnect(reason)
+}
 
 func (s *session) Position() (int, int, int) {
 	eid := s.currentEntityID()
@@ -545,44 +550,43 @@ func (c *Codec) BroadcastPacketToLevel(mgr *world.Manager, packet []byte) {
 	})
 }
 
-// BroadcastAddEntity builds and broadcasts an add-entity packet to players on mgr's level.
+// BroadcastAddEntity broadcasts an add-entity packet to all players.
 func (c *Codec) BroadcastAddEntity(id byte, name string, x, y, z int, yaw, pitch byte) {
 	c.BroadcastPacket(encodeAddEntity(id, name, entity.Position{X: x, Y: y, Z: z}, yaw, pitch))
 }
 
-// BroadcastAddEntityToLevel sends an add-entity packet only to players on mgr's level.
-func (c *Codec) BroadcastAddEntityToLevel(mgr *world.Manager, id byte, name string, x, y, z int, yaw, pitch byte) {
-	c.BroadcastPacketToLevel(mgr, encodeAddEntity(id, name, entity.Position{X: x, Y: y, Z: z}, yaw, pitch))
-}
-
-// BroadcastRemoveEntity builds and broadcasts a remove-entity packet to players on mgr's level.
+// BroadcastRemoveEntity broadcasts a remove-entity packet to all players.
 func (c *Codec) BroadcastRemoveEntity(id byte) {
 	c.BroadcastPacket(encodeRemoveEntity(id))
 }
 
-// BroadcastRemoveEntityToLevel sends a remove-entity packet only to players on mgr's level.
-func (c *Codec) BroadcastRemoveEntityToLevel(mgr *world.Manager, id byte) {
-	c.BroadcastPacketToLevel(mgr, encodeRemoveEntity(id))
-}
-
-// BroadcastEntityTeleport builds and broadcasts an entity-teleport packet to all players.
+// BroadcastEntityTeleport broadcasts an entity-teleport packet to all players.
 func (c *Codec) BroadcastEntityTeleport(id byte, x, y, z int, yaw, pitch byte) {
 	c.BroadcastPacket(encodeEntityTeleport(id, entity.Position{X: x, Y: y, Z: z}, yaw, pitch))
 }
 
-// BroadcastEntityTeleportToLevel sends an entity-teleport packet only to players on mgr's level.
-func (c *Codec) BroadcastEntityTeleportToLevel(mgr *world.Manager, id byte, x, y, z int, yaw, pitch byte) {
-	c.BroadcastPacketToLevel(mgr, encodeEntityTeleport(id, entity.Position{X: x, Y: y, Z: z}, yaw, pitch))
-}
-
-// BroadcastChangeModel builds and broadcasts a change-model packet to all players.
+// BroadcastChangeModel broadcasts a change-model packet to all players.
 func (c *Codec) BroadcastChangeModel(entityID byte, model string) {
 	c.BroadcastPacket(encodeChangeModel(entityID, model))
 }
 
-// BroadcastChangeModelToLevel sends a change-model packet only to players on mgr's level.
-func (c *Codec) BroadcastChangeModelToLevel(mgr *world.Manager, entityID byte, model string) {
-	c.BroadcastPacketToLevel(mgr, encodeChangeModel(entityID, model))
+// EncodeAddEntity returns an add-entity packet. Exported for callers
+// that need to batch or route packets themselves (e.g. per-level).
+func (c *Codec) EncodeAddEntity(id byte, name string, x, y, z int, yaw, pitch byte) []byte {
+	return encodeAddEntity(id, name, entity.Position{X: x, Y: y, Z: z}, yaw, pitch)
+}
+
+// EncodeRemoveEntity returns a remove-entity packet.
+func (c *Codec) EncodeRemoveEntity(id byte) []byte { return encodeRemoveEntity(id) }
+
+// EncodeEntityTeleport returns an entity-teleport packet.
+func (c *Codec) EncodeEntityTeleport(id byte, x, y, z int, yaw, pitch byte) []byte {
+	return encodeEntityTeleport(id, entity.Position{X: x, Y: y, Z: z}, yaw, pitch)
+}
+
+// EncodeChangeModel returns a change-model packet.
+func (c *Codec) EncodeChangeModel(entityID byte, model string) []byte {
+	return encodeChangeModel(entityID, model)
 }
 
 // ChangeMap sends a different level to the player and switches their active

@@ -875,14 +875,15 @@ func (e *entityManager) Spawn(info plugin.EntityInfo) byte {
 	}
 	e.slots[slot] = entitySlot{internalID: id, info: info}
 	mgr := e.codec.MainWorldManager()
-	e.codec.BroadcastAddEntityToLevel(mgr, slot, info.Name, info.X, info.Y, info.Z, info.Yaw, info.Pitch)
+	e.codec.BroadcastPacketToLevel(mgr,
+		e.codec.EncodeAddEntity(slot, info.Name, info.X, info.Y, info.Z, info.Yaw, info.Pitch))
 	if info.Model != "" && info.Model != "humanoid" {
 		if plugin.OnSendingModel.HasHandlers() {
 			m := info.Model
 			plugin.OnSendingModel.Fire(plugin.SendingModelData{Model: &m})
 			info.Model = m
 		}
-		e.codec.BroadcastChangeModelToLevel(mgr, slot, info.Model)
+		e.codec.BroadcastPacketToLevel(mgr, e.codec.EncodeChangeModel(slot, info.Model))
 	}
 	if plugin.OnEntitySpawned.HasHandlers() {
 		name := info.Name
@@ -903,7 +904,7 @@ func (e *entityManager) Despawn(entityID byte) bool {
 	e.mu.Unlock()
 	e.entities.Remove(slot.internalID)
 	mgr := e.codec.MainWorldManager()
-	e.codec.BroadcastRemoveEntityToLevel(mgr, entityID)
+	e.codec.BroadcastPacketToLevel(mgr, e.codec.EncodeRemoveEntity(entityID))
 	if plugin.OnEntityDespawned.HasHandlers() {
 		plugin.OnEntityDespawned.Fire(plugin.EntityDespawnedData{EntityID: entityID})
 	}
@@ -925,7 +926,7 @@ func (e *entityManager) Teleport(entityID byte, x, y, z int, yaw, pitch byte) bo
 		return false
 	}
 	mgr := e.codec.MainWorldManager()
-	e.codec.BroadcastEntityTeleportToLevel(mgr, entityID, x, y, z, yaw, pitch)
+	e.codec.BroadcastPacketToLevel(mgr, e.codec.EncodeEntityTeleport(entityID, x, y, z, yaw, pitch))
 	return true
 }
 
