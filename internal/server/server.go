@@ -152,6 +152,27 @@ func (s *Server) Run(ctx context.Context) error {
 		}()
 	}
 
+	// Start ClassiCube heartbeat if enabled.
+	if s.cfg.Heartbeat.Enabled {
+		port := 25565
+		if host, p, err := net.SplitHostPort(s.cfg.ListenAddress); err == nil {
+			if p != "" {
+				if _, err := fmt.Sscanf(p, "%d", &port); err != nil {
+					_ = host
+				}
+			}
+		}
+		StartHeartbeat(ctx, HeartbeatConfig{
+			Port:        port,
+			MaxPlayers:  s.cfg.MaxPlayers,
+			Name:        s.cfg.Name,
+			Public:      s.cfg.Heartbeat.Public,
+			Software:    "Solar",
+			OnlineCount: func() int { return s.players.Count() },
+		}, s.logger, nil)
+		s.logger.Info("heartbeat started", "public", s.cfg.Heartbeat.Public)
+	}
+
 	tickCtx, stopTicks := context.WithCancel(ctx)
 
 	var tickWG sync.WaitGroup

@@ -105,3 +105,9 @@ dir = "lua"
 default = "en"
 # Path to the language TOML file.
 file = "configs/language.toml"
+
+[heartbeat]
+# Publish the server to the ClassiCube.net server list.
+# Requires port 25565 to be publicly accessible.
+enabled = false
+public = false

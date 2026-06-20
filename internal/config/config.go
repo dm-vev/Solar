@@ -15,28 +15,29 @@ import (
 
 // Config holds the server bootstrap settings.
 type Config struct {
-	ListenAddress    string         `toml:"listen"`
-	DataDir          string         `toml:"data_dir"`
-	Workers          int            `toml:"workers"`
-	MaxPlayers       int            `toml:"max_players"`
-	ConnectRate      int            `toml:"connect_rate"`
-	Autosave         time.Duration  `toml:"autosave_interval"`
-	DefaultGenerator string         `toml:"default_generator"`
-	Name             string         `toml:"server_name"`
-	MOTD             string         `toml:"motd"`
-	Operators        []string       `toml:"operators"`
-	Network          NetworkConfig  `toml:"network"`
-	Simulation       SimConfig      `toml:"simulation"`
-	World            WorldConfig    `toml:"world"`
-	Storage          StorageConfig  `toml:"storage"`
-	Commands         CommandsConfig `toml:"commands"`
-	Player           PlayerConfig   `toml:"player"`
-	CPE              CPEConfig      `toml:"cpe"`
-	Debug            DebugConfig    `toml:"debug"`
-	Log              LogConfig      `toml:"log"`
-	Plugins          PluginsConfig  `toml:"plugins"`
-	Lua              LuaConfig      `toml:"lua"`
-	Language         LanguageConfig `toml:"language"`
+	ListenAddress    string          `toml:"listen"`
+	DataDir          string          `toml:"data_dir"`
+	Workers          int             `toml:"workers"`
+	MaxPlayers       int             `toml:"max_players"`
+	ConnectRate      int             `toml:"connect_rate"`
+	Autosave         time.Duration   `toml:"autosave_interval"`
+	DefaultGenerator string          `toml:"default_generator"`
+	Name             string          `toml:"server_name"`
+	MOTD             string          `toml:"motd"`
+	Operators        []string        `toml:"operators"`
+	Network          NetworkConfig   `toml:"network"`
+	Simulation       SimConfig       `toml:"simulation"`
+	World            WorldConfig     `toml:"world"`
+	Storage          StorageConfig   `toml:"storage"`
+	Commands         CommandsConfig  `toml:"commands"`
+	Player           PlayerConfig    `toml:"player"`
+	CPE              CPEConfig       `toml:"cpe"`
+	Debug            DebugConfig     `toml:"debug"`
+	Heartbeat        HeartbeatConfig `toml:"heartbeat"`
+	Log              LogConfig       `toml:"log"`
+	Plugins          PluginsConfig   `toml:"plugins"`
+	Lua              LuaConfig       `toml:"lua"`
+	Language         LanguageConfig  `toml:"language"`
 }
 
 // NetworkConfig controls per-session TCP I/O tuning.
@@ -67,6 +68,12 @@ type WorldConfig struct {
 type DebugConfig struct {
 	PprofAddress         string        `toml:"pprof_address"`
 	PprofShutdownTimeout time.Duration `toml:"pprof_shutdown_timeout"`
+}
+
+// HeartbeatConfig controls the ClassiCube.net server list heartbeat.
+type HeartbeatConfig struct {
+	Enabled bool `toml:"enabled"`
+	Public  bool `toml:"public"`
 }
 
 // LogConfig controls structured logging output.
@@ -164,6 +171,10 @@ func Load(path string) (Config, error) {
 		Debug: DebugConfig{
 			PprofAddress:         "",
 			PprofShutdownTimeout: 5 * time.Second,
+		},
+		Heartbeat: HeartbeatConfig{
+			Enabled: false,
+			Public:  false,
 		},
 		Log: LogConfig{
 			Level:  "info",
