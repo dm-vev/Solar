@@ -16,28 +16,29 @@ import (
 
 // Block IDs (matching Minecraft Classic / MCGalaxy).
 const (
-	Air        byte = 0
-	Stone      byte = 1
-	Grass      byte = 2
-	Dirt       byte = 3
-	Water      byte = 8
-	StillWater byte = 9
-	Lava       byte = 10
-	StillLava  byte = 11
-	Sand       byte = 12
-	Gravel     byte = 13
-	Log        byte = 17
-	Leaves     byte = 18
-	Sponge     byte = 19
-	Glass      byte = 20
-	Fire       byte = 54
-	FastLava   byte = 112
-	FloatWood  byte = 110
-	LavaSponge byte = 109
-	TNTSmall   byte = 182
-	TNTBig     byte = 183
-	TNTNuke    byte = 186
-	Invalid    byte = 255
+	Air          byte = 0
+	Stone        byte = 1
+	Grass        byte = 2
+	Dirt         byte = 3
+	Water        byte = 8
+	StillWater   byte = 9
+	Lava         byte = 10
+	StillLava    byte = 11
+	Sand         byte = 12
+	Gravel       byte = 13
+	Log          byte = 17
+	Leaves       byte = 18
+	Sponge       byte = 19
+	Glass        byte = 20
+	Fire         byte = 54
+	FastLava     byte = 112
+	FloatWood    byte = 110
+	LavaSponge   byte = 109
+	TNTSmall     byte = 182
+	TNTBig       byte = 183
+	TNTExplosion byte = 184
+	TNTNuke      byte = 186
+	Invalid      byte = 255
 )
 
 // Physics modes.
@@ -618,29 +619,51 @@ const (
 	Wood    byte = 5
 )
 
-// ─── TNT explosion ───
+// ─── TNT explosion (ported from MCGalaxy TntPhysics) ───
 
 func (e *Engine) doTNT(c *checkEntry, x, y, z int, block byte, adv bool) {
+	// MCGalaxy: physics < 3 → just remove TNT (no explosion).
+	// physics >= 3 → fuse delay (5 ticks) before explosion.
+	// physics >= 2 (advanced) → explode immediately via MakeExplosion.
+	// Solar: adv = mode >= 2. We explode immediately in advanced mode.
 	if !adv {
+		e.setBlock(e.posToInt(x, y, z), Air)
 		c.data = removeFlag
 		return
 	}
-	radius := 2 // small TNT
+
+	power := 0 // SmallTNT
 	switch block {
 	case TNTBig:
-		radius = 3
+		power = 1
 	case TNTNuke:
-		radius = 6
+		power = 4
 	}
-	// Explode: destroy blocks in radius, chain to other TNT.
-	for dy := -radius; dy <= radius; dy++ {
-		for dz := -radius; dz <= radius; dz++ {
-			for dx := -radius; dx <= radius; dx++ {
-				dist := dx*dx + dy*dy + dz*dz
-				if dist > radius*radius {
-					continue
-				}
-				idx := e.posToInt(x+dx, y+dy, z+dz)
+	e.makeExplosion(x, y, z, power)
+	c.data = removeFlag
+}
+
+// makeExplosion mirrors MCGalaxy's MakeExplosion + Explode:
+// 3 layered passes with increasing radius and decreasing probability.
+func (e *Engine) makeExplosion(x, y, z, size int) {
+	// Set center to TNT_Explosion (visual block 184).
+	centerIdx := e.posToInt(x, y, z)
+	if centerIdx >= 0 {
+		e.setBlock(centerIdx, TNTExplosion)
+	}
+	// 3 layers: always destroy, 70% destroy, 30% destroy.
+	e.explodeLayer(x, y, z, size+1, -1)
+	e.explodeLayer(x, y, z, size+2, 7)
+	e.explodeLayer(x, y, z, size+3, 3)
+}
+
+// explodeLayer destroys blocks in a cube of the given radius.
+// prob < 0 means always destroy. Otherwise prob/10 chance per block.
+func (e *Engine) explodeLayer(cx, cy, cz, size, prob int) {
+	for x := cx - size; x <= cx+size; x++ {
+		for y := cy - size; y <= cy+size; y++ {
+			for z := cz - size; z <= cz+size; z++ {
+				idx := e.posToInt(x, y, z)
 				if idx < 0 {
 					continue
 				}
@@ -648,27 +671,37 @@ func (e *Engine) doTNT(c *checkEntry, x, y, z int, block byte, adv bool) {
 				if b == Invalid || b == Air {
 					continue
 				}
-				// Chain reaction: other TNT blocks explode too.
-				if IsTNTBlock(b) {
+				doDestroy := prob < 0 || e.rng.Intn(10) < prob
+				if !doDestroy {
+					continue
+				}
+				// Chain reaction: TNT blocks get converted to TNT_Small.
+				if b == TNTSmall || b == TNTBig || b == TNTNuke {
 					e.queueCheck(idx)
 					continue
 				}
-				// 80% chance to destroy, 20% to leave (visual debris).
-				if e.rng.Intn(10) < 8 {
+				// 3 outcomes (matching MCGalaxy):
+				// 40% → TNT_Explosion (visual)
+				// 40% → Air (destroyed)
+				// 20% → Air (was Drop+Dissipate, simplified to Air)
+				mode := e.rng.Intn(10) + 1
+				switch {
+				case mode <= 4:
+					e.setBlock(idx, TNTExplosion)
+				case mode <= 8:
+					e.setBlock(idx, Air)
+				default:
 					e.setBlock(idx, Air)
 				}
 			}
 		}
 	}
-	// Remove the TNT block itself.
-	e.setBlock(e.posToInt(x, y, z), Air)
-	c.data = removeFlag
 }
 
 // IsTNTBlock checks if a block is TNT (exported for physics dispatch).
 func IsTNTBlock(b byte) bool {
 	switch b {
-	case 182, 183, 186: // TNTSmall, TNTBig, TNTNuke
+	case TNTSmall, TNTBig, TNTNuke:
 		return true
 	}
 	return false
