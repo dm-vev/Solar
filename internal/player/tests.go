@@ -1,6 +1,44 @@
 package player
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestPolicyBanWhitelistAndOperators(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry()
+	if allowed, reason := registry.CanJoin("alice"); !allowed || reason != "" {
+		t.Fatalf("CanJoin alice = %v %q", allowed, reason)
+	}
+	if !registry.Ban("alice", "bad") {
+		t.Fatal("Ban alice returned false")
+	}
+	if allowed, reason := registry.CanJoin("ALICE"); allowed || reason != "bad" {
+		t.Fatalf("banned CanJoin alice = %v %q", allowed, reason)
+	}
+	if !registry.Unban("alice") {
+		t.Fatal("Unban alice returned false")
+	}
+	registry.SetWhitelistEnabled(true)
+	if allowed, reason := registry.CanJoin("bob"); allowed || reason != "server is whitelisted" {
+		t.Fatalf("whitelist CanJoin bob = %v %q", allowed, reason)
+	}
+	if !registry.WhitelistAdd("bob") {
+		t.Fatal("WhitelistAdd bob returned false")
+	}
+	if allowed, reason := registry.CanJoin("BOB"); !allowed || reason != "" {
+		t.Fatalf("whitelisted CanJoin bob = %v %q", allowed, reason)
+	}
+	if !registry.AddOperators("root") {
+		t.Fatal("AddOperators root returned false")
+	}
+	if allowed, reason := registry.CanJoin("root"); !allowed || reason != "" {
+		t.Fatalf("operator CanJoin root = %v %q", allowed, reason)
+	}
+}
 
 func TestPolicyBanAndUnban(t *testing.T) {
 	t.Parallel()
@@ -179,5 +217,41 @@ func TestRegistryAddEmptyName(t *testing.T) {
 	}
 	if r.Count() != 0 {
 		t.Fatalf("Count = %d, want 0", r.Count())
+	}
+}
+
+func TestPolicyRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry()
+	registry.Ban("Alice", "griefing")
+	registry.WhitelistAdd("Bob")
+	registry.AddOperators("Root")
+	registry.SetWhitelistEnabled(true)
+
+	path := filepath.Join(t.TempDir(), "policy.json")
+	if err := registry.SavePolicy(path); err != nil {
+		t.Fatalf("SavePolicy returned error: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("saved policy missing: %v", err)
+	}
+
+	reloaded := NewRegistry()
+	if err := reloaded.LoadPolicy(path); err != nil {
+		t.Fatalf("LoadPolicy returned error: %v", err)
+	}
+
+	if allowed, reason := reloaded.CanJoin("Alice"); allowed || reason != "griefing" {
+		t.Fatalf("ban did not survive reload: allowed=%v reason=%q", allowed, reason)
+	}
+	if allowed, reason := reloaded.CanJoin("Bob"); !allowed || reason != "" {
+		t.Fatalf("whitelist entry did not survive reload: allowed=%v reason=%q", allowed, reason)
+	}
+	if allowed, reason := reloaded.CanJoin("Root"); !allowed || reason != "" {
+		t.Fatalf("operator entry did not survive reload: allowed=%v reason=%q", allowed, reason)
+	}
+	if allowed, reason := reloaded.CanJoin("Charlie"); allowed || reason != "server is whitelisted" {
+		t.Fatalf("whitelist enforcement did not survive reload: allowed=%v reason=%q", allowed, reason)
 	}
 }
