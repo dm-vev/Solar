@@ -65,6 +65,12 @@ type Codec struct {
 	i18n                *i18n.I18n
 	blockDBForLevel     func(levelName string) plugin.BlockDB
 	nameConv            *blockdb.NameConverter
+	gotoLevel           func(p plugin.Player, name string) bool
+	mainLevelName       func() string
+	loadLevel           func(name string) bool
+	unloadLevel         func(name string) bool
+	listLoadedLevels    func() []string
+	listLevelFiles      func() []string
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -212,6 +218,23 @@ func (c *Codec) SetNameConverter(nc *blockdb.NameConverter) {
 	c.nameConv = nc
 }
 
+// SetLevelCallbacks wires multi-level operations from the server.
+func (c *Codec) SetLevelCallbacks(
+	gotoFn func(plugin.Player, string) bool,
+	mainFn func() string,
+	loadFn func(string) bool,
+	unloadFn func(string) bool,
+	listLoaded func() []string,
+	listFiles func() []string,
+) {
+	c.gotoLevel = gotoFn
+	c.mainLevelName = mainFn
+	c.loadLevel = loadFn
+	c.unloadLevel = unloadFn
+	c.listLoadedLevels = listLoaded
+	c.listLevelFiles = listFiles
+}
+
 // I18nGet returns a message in the server's default language.
 func (c *Codec) I18nGet(key string, args ...any) string {
 	if c.i18n != nil {
@@ -266,6 +289,12 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		i18n:                c.i18n,
 		blockDBForLevel:     c.blockDBForLevel,
 		nameConv:            c.nameConv,
+		gotoLevel:           c.gotoLevel,
+		mainLevelName:       c.mainLevelName,
+		loadLevel:           c.loadLevel,
+		unloadLevel:         c.unloadLevel,
+		listLoadedLevels:    c.listLoadedLevels,
+		listLevelFiles:      c.listLevelFiles,
 		color:               "&e",
 		model:               "humanoid",
 		allowBuild:          true,
@@ -340,6 +369,12 @@ type session struct {
 	playerDBID          int32
 	blockDBForLevel     func(levelName string) plugin.BlockDB
 	nameConv            *blockdb.NameConverter
+	gotoLevel           func(p plugin.Player, name string) bool
+	mainLevelName       func() string
+	loadLevel           func(name string) bool
+	unloadLevel         func(name string) bool
+	listLoadedLevels    func() []string
+	listLevelFiles      func() []string
 
 	// ponytail: plugin.Player stub state, guarded by stateMu
 	color      string

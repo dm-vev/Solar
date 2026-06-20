@@ -141,6 +141,7 @@ func buildCommandContext(backend classic.SessionBackend) command.Context {
 		Players:     sessionDirectory{backend},
 		BlockDefs:   sessionBlockDefs{backend},
 		BlockDB:     sessionBlockDB{backend},
+		Levels:      sessionLevels{backend},
 		Tr:          backend.Translate,
 	}
 }
@@ -175,4 +176,44 @@ func (s sessionBlockDB) Clear() error {
 
 func (s sessionBlockDB) RevertBlock(x, y, z int, block byte) bool {
 	return s.backend.BlockDBRevertBlock(x, y, z, block)
+}
+
+// ─── LevelService adapter ───
+
+type sessionLevels struct{ backend classic.SessionBackend }
+
+func (s sessionLevels) Goto(name string) bool {
+	return s.backend.GotoLevel(name)
+}
+
+func (s sessionLevels) MainLevel() string {
+	return s.backend.MainLevelName()
+}
+
+func (s sessionLevels) LoadLevel(name string) bool {
+	return s.backend.LoadLevel(name)
+}
+
+func (s sessionLevels) UnloadLevel(name string) bool {
+	return s.backend.UnloadLevel(name)
+}
+
+func (s sessionLevels) ReloadLevel() bool {
+	return s.backend.ReloadCurrentLevel()
+}
+
+func (s sessionLevels) ListLevels() []string {
+	return s.backend.ListLoadedLevels()
+}
+
+func (s sessionLevels) ListLevelFiles() []string {
+	return s.backend.ListLevelFiles()
+}
+
+func (s sessionLevels) PhysicsMode() int {
+	return s.backend.CurrentPhysicsMode()
+}
+
+func (s sessionLevels) SetPhysicsMode(mode int) {
+	s.backend.SetCurrentPhysicsMode(mode)
 }

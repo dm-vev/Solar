@@ -71,22 +71,35 @@ type BlockDBEntry struct {
 
 // BlockDBService exposes block change history for the player's current level.
 type BlockDBService interface {
-	// ChangesAt returns the history of changes at the given coordinates.
 	ChangesAt(x, y, z int) []BlockDBEntry
-	// ChangesBy returns changes by the named player in the time window,
-	// newest first. If since is zero, returns all. maxResults limits (0=all).
 	ChangesBy(playerName string, since time.Time, maxResults int) []BlockDBEntry
-	// Count returns the total number of recorded changes.
 	Count() int64
-	// Enabled reports whether recording is active.
 	Enabled() bool
-	// SetEnabled toggles recording.
 	SetEnabled(bool)
-	// Clear deletes all recorded history.
 	Clear() error
-	// RevertBlock restores the old block at the given coordinates,
-	// broadcasting the change to all players on the level.
 	RevertBlock(x, y, z int, block byte) bool
+}
+
+// LevelService exposes multi-level operations for commands.
+type LevelService interface {
+	// Goto teleports the player to the named level. Returns false if not found.
+	Goto(levelName string) bool
+	// MainLevel returns the name of the main level.
+	MainLevel() string
+	// LoadLevel loads a level from disk. Returns false on error.
+	LoadLevel(name string) bool
+	// UnloadLevel unloads a level (not the main). Returns false if players online or not found.
+	UnloadLevel(name string) bool
+	// ReloadLevel reloads the player's current level from disk.
+	ReloadLevel() bool
+	// ListLevels returns loaded level names.
+	ListLevels() []string
+	// ListLevelFiles returns level file names on disk.
+	ListLevelFiles() []string
+	// PhysicsMode returns the current physics mode for the player's level.
+	PhysicsMode() int
+	// SetPhysicsMode sets the physics mode for the player's level.
+	SetPhysicsMode(mode int)
 }
 
 // Context carries command execution state.
@@ -102,6 +115,7 @@ type Context struct {
 	Players     PlayerDirectory
 	BlockDefs   BlockDefService
 	BlockDB     BlockDBService
+	Levels      LevelService
 	Tr          func(string, ...any) string
 }
 
@@ -130,7 +144,7 @@ func NewRegistry() *Registry {
 		handlers: make(map[string]Handler),
 		admin:    make(map[string]struct{}),
 	}
-	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb", "blockdb"} {
+	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb", "blockdb", "load", "unload", "reload", "physics"} {
 		registry.admin[cmd] = struct{}{}
 	}
 	registry.Register("help", helpCommand(registry))
@@ -152,6 +166,13 @@ func NewRegistry() *Registry {
 	registry.Register("b", aboutCommand)
 	registry.Register("undo", undoCommand)
 	registry.Register("blockdb", blockDBCommand)
+	registry.Register("goto", gotoCommand)
+	registry.Register("main", mainCommand)
+	registry.Register("load", loadCommand)
+	registry.Register("unload", unloadCommand)
+	registry.Register("reload", reloadCommand)
+	registry.Register("levels", levelsCommand)
+	registry.Register("physics", physicsCommand)
 	return registry
 }
 

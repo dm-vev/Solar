@@ -259,6 +259,29 @@ func (p *pluginServer) flushAllBlockDBs() {
 	}
 }
 
+// ─── Level callback helpers for codec ───
+
+func (p *pluginServer) MainLevelName() string {
+	return p.multiMgr.MainName()
+}
+
+func (p *pluginServer) LoadLevelByName(name string) bool {
+	_, err := p.Levels().Load(name)
+	return err == nil
+}
+
+func (p *pluginServer) UnloadLevelByName(name string) bool {
+	return p.Levels().Unload(name)
+}
+
+func (p *pluginServer) ListLoadedLevels() []string {
+	return p.multiMgr.Names()
+}
+
+func (p *pluginServer) ListLevelFiles() []string {
+	return p.Levels().ListFiles()
+}
+
 // pluginConfig implements plugin.Config by reading/writing the server's live
 // config. Most setters mutate cfg in place; SetName also syncs the codec's
 // advertised server name, and operators/whitelist delegate to the player

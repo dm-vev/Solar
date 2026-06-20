@@ -130,6 +130,40 @@
 "command.blockdb.clear_failed" = "failed to clear blockdb: %v"
 "command.blockdb.stats" = "blockdb: %d entries, recording: %s"
 
+# ─── command.level (shared) ───
+"command.level.unavailable" = "level management is unavailable"
+
+# ─── command.goto ───
+"command.goto.usage" = "usage: /goto <level>"
+"command.goto.not_found" = "level not found: %s"
+"command.goto.done" = "teleported to %s"
+
+# ─── command.main ───
+# (uses command.goto.done)
+
+# ─── command.load ───
+"command.load.usage" = "usage: /load <name>"
+"command.load.failed" = "failed to load level %s"
+"command.load.done" = "loaded level %s"
+
+# ─── command.unload ───
+"command.unload.usage" = "usage: /unload <name>"
+"command.unload.main" = "cannot unload the main level"
+"command.unload.failed" = "cannot unload %s (not found or players online)"
+"command.unload.done" = "unloaded level %s"
+
+# ─── command.reload ───
+"command.reload.failed" = "failed to reload level"
+"command.reload.done" = "level reloaded"
+
+# ─── command.levels ───
+"command.levels.list" = "&aLoaded: %s&nFiles: %s"
+
+# ─── command.physics ───
+"command.physics.usage" = "usage: /physics [0|1|2|3] (0=off, 1=basic, 2=advanced, 3=custom)"
+"command.physics.current" = "physics mode: %d"
+"command.physics.set" = "physics mode set to %d"
+
 [ru]
 # ─── general ───
 "general.muted" = "&cВы в муте."
@@ -256,3 +290,34 @@
 "command.blockdb.cleared" = "история blockdb очищена"
 "command.blockdb.clear_failed" = "ошибка очистки blockdb: %v"
 "command.blockdb.stats" = "blockdb: %d записей, запись: %s"
+
+# ─── command.level (shared) ───
+"command.level.unavailable" = "управление уровнями недоступно"
+
+# ─── command.goto ───
+"command.goto.usage" = "использование: /goto <уровень>"
+"command.goto.not_found" = "уровень не найден: %s"
+"command.goto.done" = "телепортирован на %s"
+
+# ─── command.load ───
+"command.load.usage" = "использование: /load <имя>"
+"command.load.failed" = "не удалось загрузить уровень %s"
+"command.load.done" = "загружен уровень %s"
+
+# ─── command.unload ───
+"command.unload.usage" = "использование: /unload <имя>"
+"command.unload.main" = "нельзя выгрузить основной уровень"
+"command.unload.failed" = "нельзя выгрузить %s (не найден или есть игроки)"
+"command.unload.done" = "выгружен уровень %s"
+
+# ─── command.reload ───
+"command.reload.failed" = "не удалось перезагрузить уровень"
+"command.reload.done" = "уровень перезагружен"
+
+# ─── command.levels ───
+"command.levels.list" = "&aЗагружены: %s&nФайлы: %s"
+
+# ─── command.physics ───
+"command.physics.usage" = "использование: /physics [0|1|2|3] (0=выкл, 1=базовый, 2=продвинутый, 3=кастом)"
+"command.physics.current" = "режим физики: %d"
+"command.physics.set" = "режим физики установлен на %d"

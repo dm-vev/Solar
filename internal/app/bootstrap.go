@@ -113,6 +113,14 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	codec.SetPlayerDatabase(pluginSrv.PlayerDB())
 	codec.SetBlockDBLookup(pluginSrv.BlockDB)
 	codec.SetNameConverter(blockdb.NewNameConverter())
+	codec.SetLevelCallbacks(
+		pluginSrv.ChangeMap,
+		pluginSrv.MainLevelName,
+		pluginSrv.LoadLevelByName,
+		pluginSrv.UnloadLevelByName,
+		pluginSrv.ListLoadedLevels,
+		pluginSrv.ListLevelFiles,
+	)
 	if err := plugin.LoadAll(pluginSrv, logger); err != nil {
 		logger.Error("plugin load failed", "error", err)
 	}

@@ -54,6 +54,16 @@ type SessionBackend interface {
 	BlockDBSetEnabled(bool)
 	BlockDBClear() error
 	BlockDBRevertBlock(x, y, z int, block byte) bool
+
+	GotoLevel(name string) bool
+	MainLevelName() string
+	LoadLevel(name string) bool
+	UnloadLevel(name string) bool
+	ReloadCurrentLevel() bool
+	ListLoadedLevels() []string
+	ListLevelFiles() []string
+	CurrentPhysicsMode() int
+	SetCurrentPhysicsMode(mode int)
 }
 
 // --- SessionBackend implementation on *session ---
@@ -464,10 +474,71 @@ func convertEntries(entries []plugin.BlockEntry, nc *blockdb.NameConverter) []co
 			NewBlock: e.NewBlock,
 			Flags:    uint16(e.Flags),
 		}
-		// ponytail: NameConverter is in-memory only; no reverse lookup.
-		// PlayerID→name resolution needs a bidirectional map for real names.
-		// For now, store the ID as a string placeholder.
 		out[i].PlayerName = fmt.Sprintf("ID:%d", e.PlayerID)
 	}
 	return out
+}
+
+// ─── LevelService methods ───
+
+func (s *session) GotoLevel(name string) bool {
+	if s.gotoLevel == nil {
+		return false
+	}
+	return s.gotoLevel(s, name)
+}
+
+func (s *session) MainLevelName() string {
+	if s.mainLevelName != nil {
+		return s.mainLevelName()
+	}
+	return ""
+}
+
+func (s *session) LoadLevel(name string) bool {
+	if s.loadLevel == nil {
+		return false
+	}
+	return s.loadLevel(name)
+}
+
+func (s *session) UnloadLevel(name string) bool {
+	if s.unloadLevel == nil {
+		return false
+	}
+	return s.unloadLevel(name)
+}
+
+func (s *session) ReloadCurrentLevel() bool {
+	if s.worlds == nil {
+		return false
+	}
+	worldPath := s.worldPath
+	if worldPath == "" {
+		return false
+	}
+	return s.worlds.Load(worldPath) == nil
+}
+
+func (s *session) ListLoadedLevels() []string {
+	if s.listLoadedLevels == nil {
+		return nil
+	}
+	return s.listLoadedLevels()
+}
+
+func (s *session) ListLevelFiles() []string {
+	if s.listLevelFiles == nil {
+		return nil
+	}
+	return s.listLevelFiles()
+}
+
+func (s *session) CurrentPhysicsMode() int {
+	// ponytail: physics mode is on pluginServer, not session. Return 0 for now.
+	return 0
+}
+
+func (s *session) SetCurrentPhysicsMode(mode int) {
+	// ponytail: physics mode is on pluginServer, not session. No-op for now.
 }
