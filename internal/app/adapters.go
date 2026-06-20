@@ -173,6 +173,8 @@ func buildCommandContext(backend classic.SessionBackend) command.Context {
 		LevelEnv:    sessionLevelEnv{backend},
 		PlayerDB:    sessionPlayerDB{backend},
 		ServerInfo:  sessionSrvInfo{backend},
+		RankLevel:   func() int { return backend.PlayerRank() },
+		Ranks:       sessionRanks{backend},
 		Tr:          backend.Translate,
 	}
 }
@@ -356,3 +358,34 @@ func (s sessionSrvInfo) OnlineCount() int      { return s.backend.OnlinePlayerCo
 func (s sessionSrvInfo) MaxPlayers() int       { return s.backend.MaxPlayersCount() }
 func (s sessionSrvInfo) LevelCount() int       { return s.backend.LoadedLevelCount() }
 func (s sessionSrvInfo) Uptime() time.Duration { return s.backend.ServerUptime() }
+
+// ─── RankService adapter ───
+
+type sessionRanks struct{ backend classic.SessionBackend }
+
+func (s sessionRanks) Get(name string) *command.RankInfo {
+	r := s.backend.RankGet(name)
+	if r == nil {
+		return nil
+	}
+	return &command.RankInfo{Name: r.Name, Permission: r.Permission, Color: r.Color, DrawLimit: r.DrawLimit, Prefix: r.Prefix}
+}
+func (s sessionRanks) GetByPerm(perm int) *command.RankInfo {
+	r := s.backend.RankGetByPerm(perm)
+	if r == nil {
+		return nil
+	}
+	return &command.RankInfo{Name: r.Name, Permission: r.Permission, Color: r.Color, DrawLimit: r.DrawLimit, Prefix: r.Prefix}
+}
+func (s sessionRanks) All() []command.RankInfo {
+	raw := s.backend.RankAll()
+	out := make([]command.RankInfo, len(raw))
+	for i, r := range raw {
+		out[i] = command.RankInfo{Name: r.Name, Permission: r.Permission, Color: r.Color, DrawLimit: r.DrawLimit, Prefix: r.Prefix}
+	}
+	return out
+}
+func (s sessionRanks) GetPlayerRank(name string) int { return s.backend.PlayerRank() }
+func (s sessionRanks) SetPlayerRank(name string, perm int) bool {
+	return s.backend.RankSetPlayer(name, perm)
+}

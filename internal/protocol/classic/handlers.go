@@ -226,7 +226,7 @@ func (s *session) handleMessage() error {
 		r := s.spamChecker.CheckChat(s.currentUsername())
 		if r.Exceeded {
 			s.handleSpamResult(r)
-			if r.Action == player.ActionKick {
+			if r.Action == player.SpamActionKick {
 				return nil
 			}
 			s.Message(s.Tr("player.chat_exceeded", r.Count, r.Max))
@@ -291,13 +291,13 @@ func (s *session) handleMessage() error {
 }
 
 // handleSpamResult applies the configured action when a rate limit is exceeded.
-func (s *session) handleSpamResult(r player.Result) {
+func (s *session) handleSpamResult(r player.SpamResult) {
 	switch r.Action {
-	case player.ActionKick:
+	case player.SpamActionKick:
 		s.disconnect(s.Tr("player.kick"))
-	case player.ActionMute:
+	case player.SpamActionMute:
 		s.Message(s.Tr("player.muted"))
-	case player.ActionWarn:
+	case player.SpamActionWarn:
 		s.Message(s.Tr("player.warn", r.Count, r.Max))
 	}
 }
@@ -312,7 +312,7 @@ func (s *session) handleCommand(line string) error {
 		r := s.spamChecker.CheckCommand(s.currentUsername())
 		if r.Exceeded {
 			s.handleSpamResult(r)
-			if r.Action == player.ActionKick {
+			if r.Action == player.SpamActionKick {
 				return nil
 			}
 			s.Message(s.Tr("player.cmd_exceeded", r.Count, r.Max))

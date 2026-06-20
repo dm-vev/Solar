@@ -20,6 +20,7 @@ import (
 
 	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
+	"github.com/solar-mc/solar/internal/ranks"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin/playerdb"
 )
@@ -59,6 +60,12 @@ type SessionBackend interface {
 	CommitBatch()
 	UndoBatch() []command.UndoChange
 	RedoBatch() []command.UndoChange
+
+	PlayerRank() int
+	RankGet(name string) *ranks.Rank
+	RankGetByPerm(perm int) *ranks.Rank
+	RankAll() []*ranks.Rank
+	RankSetPlayer(name string, perm int) bool
 
 	KickPlayer(name, reason string) bool
 	BanPlayer(name, reason string) bool

@@ -118,6 +118,18 @@ func IsOperator(perm int) bool {
 	return perm >= PermOperator
 }
 
+// GetPlayerRank returns the permission level for a player name.
+// Default is PermGuest if the player has no rank assigned.
+func (r *Registry) GetPlayerRank(name string) int {
+	return PermGuest // ponytail: rank stored in PlayerDB.Data["rank"], wired later
+}
+
+// SetPlayerRank sets the permission level for a player name.
+// ponytail: persists to PlayerDB.Data["rank"] when wired.
+func (r *Registry) SetPlayerRank(name string, perm int) bool {
+	return true // stub — actual persistence wired in adapters
+}
+
 func lower(s string) string {
 	out := make([]byte, len(s))
 	for i := range s {

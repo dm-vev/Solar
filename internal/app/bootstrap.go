@@ -15,6 +15,7 @@ import (
 	"github.com/solar-mc/solar/internal/network"
 	"github.com/solar-mc/solar/internal/player"
 	"github.com/solar-mc/solar/internal/protocol/classic"
+	"github.com/solar-mc/solar/internal/ranks"
 	"github.com/solar-mc/solar/internal/server"
 	"github.com/solar-mc/solar/internal/storage"
 	"github.com/solar-mc/solar/internal/worker"
@@ -29,7 +30,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	store := storage.NewLocalStore(cfg.DataDir)
 	store.Configure(cfg.Storage.WorldsDir, cfg.Storage.PlayersDir, cfg.Storage.PolicyFile, cfg.Storage.WorldFileExt)
 	commands := command.NewRegistry()
-	commands.SetAdminCommands(cfg.Commands.AdminCommands)
+	// Per-command rank requirements are set in NewRegistry via RegisterWithRank.
 	worlds := world.NewManager()
 	players := player.NewRegistry()
 	players.SetWhitelistEnabled(cfg.Player.WhitelistEnabled)
@@ -126,7 +127,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 		}
 	})
 	codec.SetMaxPlayers(cfg.MaxPlayers)
-	codec.SetSpamChecker(player.New(player.Config{
+	codec.SetSpamChecker(player.NewChecker(player.SpamConfig{
 		Enabled:      cfg.AntiSpam.Enabled,
 		ChatMax:      cfg.AntiSpam.ChatMax,
 		ChatWindow:   cfg.AntiSpam.ChatWindow,
@@ -134,9 +135,12 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 		BlockWindow:  cfg.AntiSpam.BlockWindow,
 		CmdMax:       cfg.AntiSpam.CmdMax,
 		CmdWindow:    cfg.AntiSpam.CmdWindow,
-		Action:       player.Action(cfg.AntiSpam.Action),
+		Action:       player.SpamAction(cfg.AntiSpam.Action),
 		MuteDuration: cfg.AntiSpam.MuteDuration,
 	}))
+
+	rankRegistry := ranks.NewRegistry()
+	codec.SetRankRegistry(rankRegistry)
 	if err := plugin.LoadAll(pluginSrv, logger); err != nil {
 		logger.Error("plugin load failed", "error", err)
 	}

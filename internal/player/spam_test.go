@@ -6,11 +6,11 @@ import (
 )
 
 func TestChatNotExceeded(t *testing.T) {
-	c := New(Config{
+	c := NewChecker(SpamConfig{
 		Enabled:    true,
 		ChatMax:    5,
 		ChatWindow: 3 * time.Second,
-		Action:     ActionKick,
+		Action:     SpamActionKick,
 	})
 	for i := 0; i < 5; i++ {
 		r := c.CheckChat("alice")
@@ -21,11 +21,11 @@ func TestChatNotExceeded(t *testing.T) {
 }
 
 func TestChatExceeded(t *testing.T) {
-	c := New(Config{
+	c := NewChecker(SpamConfig{
 		Enabled:    true,
 		ChatMax:    3,
 		ChatWindow: 3 * time.Second,
-		Action:     ActionKick,
+		Action:     SpamActionKick,
 	})
 	for i := 0; i < 3; i++ {
 		c.CheckChat("bob")
@@ -34,23 +34,23 @@ func TestChatExceeded(t *testing.T) {
 	if !r.Exceeded {
 		t.Fatal("should exceed after 4 messages")
 	}
-	if r.Action != ActionKick {
+	if r.Action != SpamActionKick {
 		t.Fatalf("action = %s, want kick", r.Action)
 	}
 }
 
 func TestMuteAction(t *testing.T) {
-	c := New(Config{
+	c := NewChecker(SpamConfig{
 		Enabled:      true,
 		ChatMax:      2,
 		ChatWindow:   3 * time.Second,
-		Action:       ActionMute,
+		Action:       SpamActionMute,
 		MuteDuration: 1 * time.Hour,
 	})
 	c.CheckChat("carol")
 	c.CheckChat("carol")
 	r := c.CheckChat("carol")
-	if !r.Exceeded || r.Action != ActionMute {
+	if !r.Exceeded || r.Action != SpamActionMute {
 		t.Fatalf("should mute, got %+v", r)
 	}
 	if !c.IsMuted("carol") {
@@ -59,11 +59,11 @@ func TestMuteAction(t *testing.T) {
 }
 
 func TestWindowExpiry(t *testing.T) {
-	c := New(Config{
+	c := NewChecker(SpamConfig{
 		Enabled:    true,
 		ChatMax:    2,
 		ChatWindow: 50 * time.Millisecond,
-		Action:     ActionKick,
+		Action:     SpamActionKick,
 	})
 	c.CheckChat("dave")
 	c.CheckChat("dave")
@@ -75,7 +75,7 @@ func TestWindowExpiry(t *testing.T) {
 }
 
 func TestDisabled(t *testing.T) {
-	c := New(Config{Enabled: false, ChatMax: 1, ChatWindow: 1 * time.Second})
+	c := NewChecker(SpamConfig{Enabled: false, ChatMax: 1, ChatWindow: 1 * time.Second})
 	r := c.CheckChat("eve")
 	if r.Exceeded {
 		t.Fatal("should never exceed when disabled")
@@ -83,33 +83,33 @@ func TestDisabled(t *testing.T) {
 }
 
 func TestBlockAndCommand(t *testing.T) {
-	c := New(Config{
+	c := NewChecker(SpamConfig{
 		Enabled:     true,
 		BlockMax:    2,
 		BlockWindow: 3 * time.Second,
 		CmdMax:      1,
 		CmdWindow:   3 * time.Second,
-		Action:      ActionWarn,
+		Action:      SpamActionWarn,
 	})
 	c.CheckBlock("frank")
 	c.CheckBlock("frank")
 	r := c.CheckBlock("frank")
-	if !r.Exceeded || r.Category != CatBlock {
+	if !r.Exceeded || r.Category != SpamCatBlock {
 		t.Fatalf("block should exceed, got %+v", r)
 	}
 	c.CheckCommand("frank")
 	r = c.CheckCommand("frank")
-	if !r.Exceeded || r.Category != CatCommand {
+	if !r.Exceeded || r.Category != SpamCatCommand {
 		t.Fatalf("command should exceed, got %+v", r)
 	}
 }
 
 func TestReset(t *testing.T) {
-	c := New(Config{
+	c := NewChecker(SpamConfig{
 		Enabled:      true,
 		ChatMax:      1,
 		ChatWindow:   3 * time.Second,
-		Action:       ActionMute,
+		Action:       SpamActionMute,
 		MuteDuration: 1 * time.Hour,
 	})
 	c.CheckChat("grace")

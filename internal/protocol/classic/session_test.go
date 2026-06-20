@@ -15,6 +15,7 @@ import (
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/player"
+	"github.com/solar-mc/solar/internal/ranks"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin/playerdb"
@@ -417,11 +418,16 @@ func (m testModeration) PasteAt(origin [3]int, pasteAir bool) int               
 func (m testModeration) SetSpecialBlock(x, y, z int, entry command.SpecialBlockEntry) bool {
 	return true
 }
-func (m testModeration) BeginBatch()                             {}
-func (m testModeration) RecordChange(x, y, z int, old, new byte) {}
-func (m testModeration) CommitBatch()                            {}
-func (m testModeration) UndoBatch() []command.UndoChange         { return nil }
-func (m testModeration) RedoBatch() []command.UndoChange         { return nil }
+func (m testModeration) BeginBatch()                              {}
+func (m testModeration) RecordChange(x, y, z int, old, new byte)  {}
+func (m testModeration) CommitBatch()                             {}
+func (m testModeration) UndoBatch() []command.UndoChange          { return nil }
+func (m testModeration) RedoBatch() []command.UndoChange          { return nil }
+func (m testModeration) PlayerRank() int                          { return 80 }
+func (m testModeration) RankGet(name string) *ranks.Rank          { return nil }
+func (m testModeration) RankGetByPerm(perm int) *ranks.Rank       { return nil }
+func (m testModeration) RankAll() []*ranks.Rank                   { return nil }
+func (m testModeration) RankSetPlayer(name string, perm int) bool { return true }
 
 func (m testModeration) PlayerDBLookup(name string) *playerdb.PlayerEntry {
 	return m.backend.PlayerDBLookup(name)

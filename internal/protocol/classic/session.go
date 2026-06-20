@@ -33,6 +33,7 @@ import (
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/i18n"
 	"github.com/solar-mc/solar/internal/player"
+	"github.com/solar-mc/solar/internal/ranks"
 	sess "github.com/solar-mc/solar/internal/session"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
@@ -123,9 +124,10 @@ type session struct {
 
 	// specialBlocks holds per-level interactive blocks (doors, portals, MBs).
 	specialBlocks *blocks.SpecialRegistry
-	spamChecker   *player.Checker
+	spamChecker   *player.SpamChecker
 	undoStack     *player.UndoStack
 	batchChanges  []player.BlockChange
+	rankRegistry  *ranks.Registry
 }
 
 // markSelection tracks a multi-click block selection for drawing commands.

@@ -23,6 +23,7 @@ import (
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/i18n"
 	"github.com/solar-mc/solar/internal/player"
+	"github.com/solar-mc/solar/internal/ranks"
 	sess "github.com/solar-mc/solar/internal/session"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
@@ -79,7 +80,8 @@ type Codec struct {
 	listLevelFiles      func() []string
 	queuePhysics        func(x, y, z int)
 	maxPlayers          int
-	spamChecker         *player.Checker
+	spamChecker         *player.SpamChecker
+	rankRegistry        *ranks.Registry
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -255,8 +257,13 @@ func (c *Codec) SetMaxPlayers(n int) {
 }
 
 // SetSpamChecker configures the anti-spam rate limiter.
-func (c *Codec) SetSpamChecker(sc *player.Checker) {
+func (c *Codec) SetSpamChecker(sc *player.SpamChecker) {
 	c.spamChecker = sc
+}
+
+// SetRankRegistry configures the rank hierarchy for permission checks.
+func (c *Codec) SetRankRegistry(rr *ranks.Registry) {
+	c.rankRegistry = rr
 }
 
 // StartTime records when the server started, for uptime calculation.
@@ -333,6 +340,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		allowBuild:          true,
 		specialBlocks:       blocks.NewSpecialRegistry(),
 		spamChecker:         c.spamChecker,
+		rankRegistry:        c.rankRegistry,
 		undoStack:           player.NewUndoStack(200),
 	}
 

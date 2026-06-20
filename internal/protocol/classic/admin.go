@@ -31,6 +31,7 @@ import (
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
 	"github.com/solar-mc/solar/internal/player"
+	"github.com/solar-mc/solar/internal/ranks"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
 	"github.com/solar-mc/solar/plugin/playerdb"
@@ -317,6 +318,43 @@ func (s *session) RedoBatch() []command.UndoChange {
 		out[i] = command.UndoChange{X: c.X, Y: c.Y, Z: c.Z, Old: c.Old, New: c.New}
 	}
 	return out
+}
+
+// ─── Rank methods ───
+
+func (s *session) PlayerRank() int {
+	if s.rankRegistry == nil {
+		return ranks.PermGuest
+	}
+	return s.rankRegistry.GetPlayerRank(s.currentUsername())
+}
+
+func (s *session) RankGet(name string) *ranks.Rank {
+	if s.rankRegistry == nil {
+		return nil
+	}
+	return s.rankRegistry.Get(name)
+}
+
+func (s *session) RankGetByPerm(perm int) *ranks.Rank {
+	if s.rankRegistry == nil {
+		return nil
+	}
+	return s.rankRegistry.GetByPerm(perm)
+}
+
+func (s *session) RankAll() []*ranks.Rank {
+	if s.rankRegistry == nil {
+		return nil
+	}
+	return s.rankRegistry.All()
+}
+
+func (s *session) RankSetPlayer(name string, perm int) bool {
+	if s.rankRegistry == nil {
+		return false
+	}
+	return s.rankRegistry.SetPlayerRank(name, perm)
 }
 
 func (s *session) GenerateWorld(name, theme string, width, height, length int, seed string) bool {

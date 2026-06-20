@@ -309,6 +309,9 @@
 "command.setrank.not_found" = "unknown rank: %s"
 "command.setrank.failed" = "failed to set rank for %s"
 "command.setrank.done" = "&aSet %s to rank %s"
+"command.setrank.self" = "&cYou cannot change your own rank"
+"command.setrank.banned" = "&cUse /ban instead of setting rank to banned"
+"command.setrank.too_high" = "&cYou cannot set a rank equal to or higher than your own"
 
 # ─── command.rankinfo ───
 "command.rankinfo.none" = "&7%s has no rank"
@@ -589,6 +592,9 @@
 "command.setrank.not_found" = "неизвестный ранг: %s"
 "command.setrank.failed" = "не удалось установить ранг для %s"
 "command.setrank.done" = "&aУстановлен ранг %s для %s"
+"command.setrank.self" = "&cНельзя изменить свой собственный ранг"
+"command.setrank.banned" = "&cИспользуйте /ban вместо установки ранга banned"
+"command.setrank.too_high" = "&cНельзя установить ранг равный или выше своего"
 "command.rankinfo.none" = "&7%s не имеет ранга"
 "command.rankinfo.result" = "&a%s &7имеет ранг &e%s &7(уровень %d)"
 "command.copy.usage" = "использование: /copy [air]"

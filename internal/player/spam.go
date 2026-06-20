@@ -16,26 +16,26 @@ import (
 	"time"
 )
 
-// Category identifies which rate limit was exceeded.
-type Category int
+// SpamSpamCategory identifies which rate limit was exceeded.
+type SpamSpamCategory int
 
 const (
-	CatChat Category = iota
-	CatBlock
-	CatCommand
+	SpamCatChat SpamSpamCategory = iota
+	SpamCatBlock
+	SpamCatCommand
 )
 
-// Action is the response when a rate limit is exceeded.
-type Action string
+// SpamAction is the response when a rate limit is exceeded.
+type SpamAction string
 
 const (
-	ActionKick Action = "kick"
-	ActionMute Action = "mute"
-	ActionWarn Action = "warn"
+	SpamActionKick SpamAction = "kick"
+	SpamActionMute SpamAction = "mute"
+	SpamActionWarn SpamAction = "warn"
 )
 
-// Config holds the anti-spam configuration.
-type Config struct {
+// SpamConfig holds the anti-spam configuration.
+type SpamConfig struct {
 	Enabled      bool
 	ChatMax      int
 	ChatWindow   time.Duration
@@ -43,14 +43,14 @@ type Config struct {
 	BlockWindow  time.Duration
 	CmdMax       int
 	CmdWindow    time.Duration
-	Action       Action
+	Action       SpamAction
 	MuteDuration time.Duration
 }
 
-// Checker tracks per-player rate limits.
-type Checker struct {
+// SpamChecker tracks per-player rate limits.
+type SpamChecker struct {
 	mu      sync.Mutex
-	config  Config
+	config  SpamConfig
 	players map[string]*playerState
 }
 
@@ -63,42 +63,42 @@ type playerState struct {
 }
 
 // New creates a SpamChecker with the given configuration.
-func New(cfg Config) *Checker {
-	return &Checker{
+func NewChecker(cfg SpamConfig) *SpamChecker {
+	return &SpamChecker{
 		config:  cfg,
 		players: make(map[string]*playerState),
 	}
 }
 
-// Result holds the outcome of a rate check.
-type Result struct {
+// SpamResult holds the outcome of a rate check.
+type SpamResult struct {
 	Exceeded bool
-	Category Category
-	Action   Action
+	Category SpamSpamCategory
+	Action   SpamAction
 	Count    int
 	Max      int
 }
 
 // CheckChat records a chat message and returns whether the rate limit
 // was exceeded.
-func (c *Checker) CheckChat(name string) Result {
-	return c.check(name, CatChat, c.config.ChatMax, c.config.ChatWindow)
+func (c *SpamChecker) CheckChat(name string) SpamResult {
+	return c.check(name, SpamCatChat, c.config.ChatMax, c.config.ChatWindow)
 }
 
 // CheckBlock records a block change and returns whether the rate limit
 // was exceeded.
-func (c *Checker) CheckBlock(name string) Result {
-	return c.check(name, CatBlock, c.config.BlockMax, c.config.BlockWindow)
+func (c *SpamChecker) CheckBlock(name string) SpamResult {
+	return c.check(name, SpamCatBlock, c.config.BlockMax, c.config.BlockWindow)
 }
 
 // CheckCommand records a command and returns whether the rate limit
 // was exceeded.
-func (c *Checker) CheckCommand(name string) Result {
-	return c.check(name, CatCommand, c.config.CmdMax, c.config.CmdWindow)
+func (c *SpamChecker) CheckCommand(name string) SpamResult {
+	return c.check(name, SpamCatCommand, c.config.CmdMax, c.config.CmdWindow)
 }
 
 // IsMuted reports whether the player is currently muted by anti-spam.
-func (c *Checker) IsMuted(name string) bool {
+func (c *SpamChecker) IsMuted(name string) bool {
 	name = strings.ToLower(name)
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -113,16 +113,16 @@ func (c *Checker) IsMuted(name string) bool {
 }
 
 // Reset clears all state for a player (called on disconnect).
-func (c *Checker) Reset(name string) {
+func (c *SpamChecker) Reset(name string) {
 	name = strings.ToLower(name)
 	c.mu.Lock()
 	delete(c.players, name)
 	c.mu.Unlock()
 }
 
-func (c *Checker) check(name string, cat Category, max int, window time.Duration) Result {
+func (c *SpamChecker) check(name string, cat SpamSpamCategory, max int, window time.Duration) SpamResult {
 	if !c.config.Enabled || max <= 0 || window <= 0 {
-		return Result{Exceeded: false}
+		return SpamResult{Exceeded: false}
 	}
 
 	name = strings.ToLower(name)
@@ -138,11 +138,11 @@ func (c *Checker) check(name string, cat Category, max int, window time.Duration
 	now := time.Now()
 	var times *[]time.Time
 	switch cat {
-	case CatChat:
+	case SpamCatChat:
 		times = &ps.chatTimes
-	case CatBlock:
+	case SpamCatBlock:
 		times = &ps.blockTimes
-	case CatCommand:
+	case SpamCatCommand:
 		times = &ps.cmdTimes
 	}
 
@@ -161,19 +161,19 @@ func (c *Checker) check(name string, cat Category, max int, window time.Duration
 	count := len(*times)
 
 	if count <= max {
-		return Result{Exceeded: false, Count: count, Max: max}
+		return SpamResult{Exceeded: false, Count: count, Max: max}
 	}
 
 	// Exceeded — apply action.
 	switch c.config.Action {
-	case ActionMute:
+	case SpamActionMute:
 		ps.muted = true
 		ps.mutedUntil = now.Add(c.config.MuteDuration)
-	case ActionWarn:
+	case SpamActionWarn:
 		// Warning only — no state change needed.
 	}
 
-	return Result{
+	return SpamResult{
 		Exceeded: true,
 		Category: cat,
 		Action:   c.config.Action,

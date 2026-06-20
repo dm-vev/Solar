@@ -11,6 +11,10 @@ import (
 )
 
 // setRankCommand — /setrank <name> <rank>
+// Safety checks (matching MCGalaxy):
+//   - Cannot rank yourself
+//   - Cannot set rank to >= your own rank
+//   - Cannot set to banned rank (use /ban instead)
 func setRankCommand(ctx Context, args []string) (string, bool) {
 	if ctx.Ranks == nil {
 		return ctx.tr("command.rank.unavailable"), true
@@ -21,9 +25,28 @@ func setRankCommand(ctx Context, args []string) (string, bool) {
 	playerName := args[0]
 	rankName := strings.ToLower(args[1])
 
+	// Cannot rank yourself.
+	if strings.EqualFold(playerName, ctx.Username) {
+		return ctx.tr("command.setrank.self"), true
+	}
+
 	rank := ctx.Ranks.Get(rankName)
 	if rank == nil {
 		return ctx.tr("command.setrank.not_found", rankName), true
+	}
+
+	// Cannot set to banned rank.
+	if rank.Permission < 0 {
+		return ctx.tr("command.setrank.banned"), true
+	}
+
+	// Cannot set to rank >= your own.
+	myRank := 0
+	if ctx.RankLevel != nil {
+		myRank = ctx.RankLevel()
+	}
+	if rank.Permission >= myRank {
+		return ctx.tr("command.setrank.too_high"), true
 	}
 
 	if !ctx.Ranks.SetPlayerRank(playerName, rank.Permission) {
