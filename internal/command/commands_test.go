@@ -285,13 +285,19 @@ type stubModeration struct {
 	banned  bool
 }
 
-func (m stubModeration) KickPlayer(_, _ string) bool     { return true }
-func (m stubModeration) BanPlayer(_, _ string) bool      { return m.banned }
-func (m stubModeration) UnbanPlayer(_ string) bool       { return true }
-func (m stubModeration) WhitelistEnabled() bool          { return m.enabled }
-func (m stubModeration) SetWhitelistEnabled(_ bool) bool { return true }
-func (m stubModeration) WhitelistAdd(_ string) bool      { return true }
-func (m stubModeration) WhitelistRemove(_ string) bool   { return true }
+func (m stubModeration) KickPlayer(_, _ string) bool      { return true }
+func (m stubModeration) BanPlayer(_, _ string) bool       { return m.banned }
+func (m stubModeration) UnbanPlayer(_ string) bool        { return true }
+func (m stubModeration) WhitelistEnabled() bool           { return m.enabled }
+func (m stubModeration) SetWhitelistEnabled(_ bool) bool  { return true }
+func (m stubModeration) WhitelistAdd(_ string) bool       { return true }
+func (m stubModeration) WhitelistRemove(_ string) bool    { return true }
+func (m stubModeration) MutePlayer(_ string) bool         { return true }
+func (m stubModeration) UnmutePlayer(_ string) bool       { return true }
+func (m stubModeration) FreezePlayer(_ string) bool       { return true }
+func (m stubModeration) UnfreezePlayer(_ string) bool     { return true }
+func (m stubModeration) ToggleAFK(_ string) (bool, bool)  { return true, true }
+func (m stubModeration) ToggleHide(_ string) (bool, bool) { return true, true }
 
 type stubDirectory struct {
 	names       []string

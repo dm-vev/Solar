@@ -388,8 +388,14 @@ func (m testModeration) WhitelistEnabled() bool             { return m.backend.W
 func (m testModeration) SetWhitelistEnabled(enabled bool) bool {
 	return m.backend.SetWhitelistEnabled(enabled)
 }
-func (m testModeration) WhitelistAdd(name string) bool    { return m.backend.WhitelistAdd(name) }
-func (m testModeration) WhitelistRemove(name string) bool { return m.backend.WhitelistRemove(name) }
+func (m testModeration) WhitelistAdd(name string) bool       { return m.backend.WhitelistAdd(name) }
+func (m testModeration) WhitelistRemove(name string) bool    { return m.backend.WhitelistRemove(name) }
+func (m testModeration) MutePlayer(name string) bool         { return m.backend.MutePlayer(name) }
+func (m testModeration) UnmutePlayer(name string) bool       { return m.backend.UnmutePlayer(name) }
+func (m testModeration) FreezePlayer(name string) bool       { return m.backend.FreezePlayer(name) }
+func (m testModeration) UnfreezePlayer(name string) bool     { return m.backend.UnfreezePlayer(name) }
+func (m testModeration) ToggleAFK(name string) (bool, bool)  { return m.backend.ToggleAFK(name) }
+func (m testModeration) ToggleHide(name string) (bool, bool) { return m.backend.ToggleHide(name) }
 
 type testDirectory struct{ backend SessionBackend }
 

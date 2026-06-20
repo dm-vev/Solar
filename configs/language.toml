@@ -177,6 +177,34 @@
 "command.map.info.weather" = "&aWeather: &7%s"
 "command.map.info.motd" = "&aMOTD: &7%s"
 
+# ─── command.moderation (shared) ───
+"command.moderation.unavailable" = "moderation is unavailable"
+"command.moderation.player_not_found" = "player not found or offline: %s"
+
+# ─── command.mute ───
+"command.mute.usage" = "usage: /mute <name>"
+"command.mute.done" = "&emuted %s"
+
+# ─── command.unmute ───
+"command.unmute.usage" = "usage: /unmute <name>"
+"command.unmute.done" = "&eunmuted %s"
+
+# ─── command.freeze ───
+"command.freeze.usage" = "usage: /freeze <name>"
+"command.freeze.done" = "&bfrozen %s"
+
+# ─── command.unfreeze ───
+"command.unfreeze.usage" = "usage: /unfreeze <name>"
+"command.unfreeze.done" = "&bunfrozen %s"
+
+# ─── command.afk ───
+"command.afk.on" = "&7You are now AFK"
+"command.afk.off" = "&7You are no longer AFK"
+
+# ─── command.hide ───
+"command.hide.on" = "&7You are now hidden"
+"command.hide.off" = "&7You are no longer hidden"
+
 [ru]
 # ─── general ───
 "general.muted" = "&cВы в муте."
@@ -347,3 +375,19 @@
 "command.map.motd.set" = "MOTD уровня обновлён"
 "command.map.info.weather" = "&aПогода: &7%s"
 "command.map.info.motd" = "&aMOTD: &7%s"
+
+# ─── command.moderation (shared) ───
+"command.moderation.unavailable" = "модерация недоступна"
+"command.moderation.player_not_found" = "игрок не найден или не в сети: %s"
+"command.mute.usage" = "использование: /mute <имя>"
+"command.mute.done" = "&eв муте: %s"
+"command.unmute.usage" = "использование: /unmute <имя>"
+"command.unmute.done" = "&eразмучен: %s"
+"command.freeze.usage" = "использование: /freeze <имя>"
+"command.freeze.done" = "&bзаморожен: %s"
+"command.unfreeze.usage" = "использование: /unfreeze <имя>"
+"command.unfreeze.done" = "&bразморожен: %s"
+"command.afk.on" = "&7Вы теперь AFK"
+"command.afk.off" = "&7Вы больше не AFK"
+"command.hide.on" = "&7Вы теперь скрыты"
+"command.hide.off" = "&7Вы больше не скрыты"

@@ -42,6 +42,12 @@ type ModerationService interface {
 	SetWhitelistEnabled(enabled bool) bool
 	WhitelistAdd(name string) bool
 	WhitelistRemove(name string) bool
+	MutePlayer(name string) bool
+	UnmutePlayer(name string) bool
+	FreezePlayer(name string) bool
+	UnfreezePlayer(name string) bool
+	ToggleAFK(name string) (afk bool, ok bool)
+	ToggleHide(name string) (hidden bool, ok bool)
 }
 
 // PlayerDirectory exposes player listings.
@@ -153,7 +159,7 @@ func NewRegistry() *Registry {
 		handlers: make(map[string]Handler),
 		admin:    make(map[string]struct{}),
 	}
-	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb", "blockdb", "load", "unload", "reload", "physics", "map"} {
+	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb", "blockdb", "load", "unload", "reload", "physics", "map", "mute", "unmute", "freeze", "unfreeze"} {
 		registry.admin[cmd] = struct{}{}
 	}
 	registry.Register("help", helpCommand(registry))
@@ -183,6 +189,12 @@ func NewRegistry() *Registry {
 	registry.Register("levels", levelsCommand)
 	registry.Register("physics", physicsCommand)
 	registry.Register("map", mapCommand)
+	registry.Register("mute", muteCommand)
+	registry.Register("unmute", unmuteCommand)
+	registry.Register("freeze", freezeCommand)
+	registry.Register("unfreeze", unfreezeCommand)
+	registry.Register("afk", afkCommand)
+	registry.Register("hide", hideCommand)
 	return registry
 }
 

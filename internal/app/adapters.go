@@ -81,6 +81,30 @@ func (m sessionModeration) WhitelistRemove(name string) bool {
 	return m.backend.WhitelistRemove(name)
 }
 
+func (m sessionModeration) MutePlayer(name string) bool {
+	return m.backend.MutePlayer(name)
+}
+
+func (m sessionModeration) UnmutePlayer(name string) bool {
+	return m.backend.UnmutePlayer(name)
+}
+
+func (m sessionModeration) FreezePlayer(name string) bool {
+	return m.backend.FreezePlayer(name)
+}
+
+func (m sessionModeration) UnfreezePlayer(name string) bool {
+	return m.backend.UnfreezePlayer(name)
+}
+
+func (m sessionModeration) ToggleAFK(name string) (bool, bool) {
+	return m.backend.ToggleAFK(name)
+}
+
+func (m sessionModeration) ToggleHide(name string) (bool, bool) {
+	return m.backend.ToggleHide(name)
+}
+
 // sessionDirectory implements command.PlayerDirectory.
 type sessionDirectory struct {
 	backend classic.SessionBackend

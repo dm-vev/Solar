@@ -38,6 +38,13 @@ type SessionBackend interface {
 	WhitelistRemove(name string) bool
 	SetWhitelistEnabled(enabled bool) bool
 
+	MutePlayer(name string) bool
+	UnmutePlayer(name string) bool
+	FreezePlayer(name string) bool
+	UnfreezePlayer(name string) bool
+	ToggleAFK(name string) (afk bool, ok bool)
+	ToggleHide(name string) (hidden bool, ok bool)
+
 	OnlineNames() []string
 	WhitelistNames() []string
 
@@ -175,6 +182,80 @@ func (s *session) SetWhitelistEnabled(enabled bool) bool {
 		return false
 	}
 	return changed
+}
+
+func (s *session) MutePlayer(name string) bool {
+	if s.room == nil {
+		return false
+	}
+	target, ok := s.room.FindByName(name)
+	if !ok {
+		return false
+	}
+	target.SetMuted(true)
+	return true
+}
+
+func (s *session) UnmutePlayer(name string) bool {
+	if s.room == nil {
+		return false
+	}
+	target, ok := s.room.FindByName(name)
+	if !ok {
+		return false
+	}
+	target.SetMuted(false)
+	return true
+}
+
+func (s *session) FreezePlayer(name string) bool {
+	if s.room == nil {
+		return false
+	}
+	target, ok := s.room.FindByName(name)
+	if !ok {
+		return false
+	}
+	target.SetFrozen(true)
+	return true
+}
+
+func (s *session) UnfreezePlayer(name string) bool {
+	if s.room == nil {
+		return false
+	}
+	target, ok := s.room.FindByName(name)
+	if !ok {
+		return false
+	}
+	target.SetFrozen(false)
+	return true
+}
+
+func (s *session) ToggleAFK(name string) (bool, bool) {
+	if s.room == nil {
+		return false, false
+	}
+	target, ok := s.room.FindByName(name)
+	if !ok {
+		return false, false
+	}
+	newAfk := !target.IsAfk()
+	target.SetAfk(newAfk)
+	return newAfk, true
+}
+
+func (s *session) ToggleHide(name string) (bool, bool) {
+	if s.room == nil {
+		return false, false
+	}
+	target, ok := s.room.FindByName(name)
+	if !ok {
+		return false, false
+	}
+	newHidden := !target.IsHidden()
+	target.SetHidden(newHidden)
+	return newHidden, true
 }
 
 func (s *session) OnlineNames() []string {
