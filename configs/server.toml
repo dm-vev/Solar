@@ -111,3 +111,19 @@ file = "configs/language.toml"
 # Requires port 25565 to be publicly accessible.
 enabled = false
 public = false
+
+[antispam]
+# Anti-spam protection: rate limiting for chat, blocks, and commands.
+# When a player exceeds the max count in the time window, the configured
+# action is triggered (kick, mute, or warn).
+enabled = false
+chat_max = 5
+chat_window = "3s"
+block_max = 200
+block_window = "2s"
+cmd_max = 10
+cmd_window = "5s"
+# Action: "kick", "mute", or "warn"
+action = "kick"
+# How long to mute when action = "mute"
+mute_duration = "60s"

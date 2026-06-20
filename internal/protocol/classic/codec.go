@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/solar-mc/solar/internal/antispam"
 	"github.com/solar-mc/solar/internal/blockdb"
 	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
@@ -81,6 +82,7 @@ type Codec struct {
 	listLevelFiles      func() []string
 	queuePhysics        func(x, y, z int)
 	maxPlayers          int
+	spamChecker         *antispam.Checker
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -255,6 +257,11 @@ func (c *Codec) SetMaxPlayers(n int) {
 	c.maxPlayers = n
 }
 
+// SetSpamChecker configures the anti-spam rate limiter.
+func (c *Codec) SetSpamChecker(sc *antispam.Checker) {
+	c.spamChecker = sc
+}
+
 // StartTime records when the server started, for uptime calculation.
 var StartTime time.Time
 
@@ -328,6 +335,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		model:               "humanoid",
 		allowBuild:          true,
 		specialBlocks:       specialblocks.NewRegistry(),
+		spamChecker:         c.spamChecker,
 	}
 
 	if c.tcpNoDelay {

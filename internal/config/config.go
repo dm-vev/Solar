@@ -34,6 +34,7 @@ type Config struct {
 	CPE              CPEConfig       `toml:"cpe"`
 	Debug            DebugConfig     `toml:"debug"`
 	Heartbeat        HeartbeatConfig `toml:"heartbeat"`
+	AntiSpam         AntiSpamConfig  `toml:"antispam"`
 	Log              LogConfig       `toml:"log"`
 	Plugins          PluginsConfig   `toml:"plugins"`
 	Lua              LuaConfig       `toml:"lua"`
@@ -74,6 +75,24 @@ type DebugConfig struct {
 type HeartbeatConfig struct {
 	Enabled bool `toml:"enabled"`
 	Public  bool `toml:"public"`
+}
+
+// AntiSpamConfig controls anti-spam protection (chat, blocks, commands).
+type AntiSpamConfig struct {
+	Enabled bool `toml:"enabled"`
+	// Chat: max messages in the time window before action.
+	ChatMax    int           `toml:"chat_max"`
+	ChatWindow time.Duration `toml:"chat_window"`
+	// Blocks: max block changes in the time window.
+	BlockMax    int           `toml:"block_max"`
+	BlockWindow time.Duration `toml:"block_window"`
+	// Commands: max commands in the time window.
+	CmdMax    int           `toml:"cmd_max"`
+	CmdWindow time.Duration `toml:"cmd_window"`
+	// Action: "kick", "mute", or "warn". Kick reason uses i18n.
+	Action string `toml:"action"`
+	// MuteDuration: how long to mute when action=mute.
+	MuteDuration time.Duration `toml:"mute_duration"`
 }
 
 // LogConfig controls structured logging output.
@@ -175,6 +194,17 @@ func Load(path string) (Config, error) {
 		Heartbeat: HeartbeatConfig{
 			Enabled: false,
 			Public:  false,
+		},
+		AntiSpam: AntiSpamConfig{
+			Enabled:      false,
+			ChatMax:      5,
+			ChatWindow:   3 * time.Second,
+			BlockMax:     200,
+			BlockWindow:  2 * time.Second,
+			CmdMax:       10,
+			CmdWindow:    5 * time.Second,
+			Action:       "kick",
+			MuteDuration: 60 * time.Second,
 		},
 		Log: LogConfig{
 			Level:  "info",

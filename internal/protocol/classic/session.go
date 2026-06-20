@@ -28,6 +28,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/solar-mc/solar/internal/antispam"
 	"github.com/solar-mc/solar/internal/blockdb"
 	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
@@ -126,6 +127,7 @@ type session struct {
 
 	// specialBlocks holds per-level interactive blocks (doors, portals, MBs).
 	specialBlocks *specialblocks.Registry
+	spamChecker   *antispam.Checker
 }
 
 // markSelection tracks a multi-click block selection for drawing commands.
@@ -230,6 +232,11 @@ func (s *session) run() error {
 }
 
 func (s *session) cleanup() {
+	// Reset anti-spam state.
+	if s.spamChecker != nil {
+		s.spamChecker.Reset(s.currentUsername())
+	}
+
 	// Save player props before disconnecting.
 	if s.players != nil {
 		s.stateMu.RLock()

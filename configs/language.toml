@@ -306,6 +306,13 @@
 # ─── command.portal ───
 "command.portal.usage" = "usage: /portal <x> <y> <z> [level]"
 
+# ─── antispam ───
+"antispam.kick" = "&cKicked for spamming"
+"antispam.muted" = "&cYou are muted for spamming"
+"antispam.warn" = "&cSlow down! %d/%d actions"
+"antispam.chat_exceeded" = "&cChat rate limit: %d/%d messages"
+"antispam.cmd_exceeded" = "&cCommand rate limit: %d/%d commands"
+
 [ru]
 # ─── general ───
 "general.muted" = "&cВы в муте."
@@ -557,3 +564,10 @@
 "command.paste.empty" = "&7Нечего вставлять — используйте /copy сначала"
 "command.mb.usage" = "использование: /mb <сообщение>"
 "command.portal.usage" = "использование: /portal <x> <y> <z> [уровень]"
+
+# ─── antispam ───
+"antispam.kick" = "&cКикнут за спам"
+"antispam.muted" = "&cВы в муте за спам"
+"antispam.warn" = "&cПомедленнее! %d/%d действий"
+"antispam.chat_exceeded" = "&cЛимит чата: %d/%d сообщений"
+"antispam.cmd_exceeded" = "&cЛимит команд: %d/%d команд"

@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/solar-mc/solar/internal/antispam"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/specialblocks"
@@ -216,6 +217,23 @@ func (s *session) handleMessage() error {
 		return nil
 	}
 
+	// Anti-spam chat check.
+	if s.spamChecker != nil {
+		if s.spamChecker.IsMuted(s.currentUsername()) {
+			s.Message(s.Tr("antispam.muted"))
+			return nil
+		}
+		r := s.spamChecker.CheckChat(s.currentUsername())
+		if r.Exceeded {
+			s.handleSpamResult(r)
+			if r.Action == "kick" {
+				return nil
+			}
+			s.Message(s.Tr("antispam.chat_exceeded", r.Count, r.Max))
+			return nil
+		}
+	}
+
 	// Track message count in PlayerDB.
 	if s.playerDB != nil {
 		if e := s.playerDB.Get(s.currentUsername()); e != nil {
@@ -272,9 +290,34 @@ func (s *session) handleMessage() error {
 	return nil
 }
 
+// handleSpamResult applies the configured action when a rate limit is exceeded.
+func (s *session) handleSpamResult(r antispam.Result) {
+	switch r.Action {
+	case antispam.ActionKick:
+		s.disconnect(s.Tr("antispam.kick"))
+	case antispam.ActionMute:
+		s.Message(s.Tr("antispam.muted"))
+	case antispam.ActionWarn:
+		s.Message(s.Tr("antispam.warn", r.Count, r.Max))
+	}
+}
+
 func (s *session) handleCommand(line string) error {
 	if s.commands == nil {
 		return nil
+	}
+
+	// Anti-spam command check.
+	if s.spamChecker != nil {
+		r := s.spamChecker.CheckCommand(s.currentUsername())
+		if r.Exceeded {
+			s.handleSpamResult(r)
+			if r.Action == "kick" {
+				return nil
+			}
+			s.Message(s.Tr("antispam.cmd_exceeded", r.Count, r.Max))
+			return nil
+		}
 	}
 
 	if plugin.OnPlayerCommand.HasHandlers() {
@@ -416,6 +459,18 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 		// Remove special block entry if overwriting one.
 		if !placing || !specialblocks.IsSpecialBlock(blockID) {
 			s.specialBlocks.Remove(x, y, z)
+		}
+	}
+
+	// Anti-spam block check.
+	if s.spamChecker != nil && placing {
+		r := s.spamChecker.CheckBlock(s.currentUsername())
+		if r.Exceeded {
+			s.handleSpamResult(r)
+			if r.Action == "kick" {
+				return nil
+			}
+			return nil // silently drop block change
 		}
 	}
 

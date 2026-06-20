@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/solar-mc/solar/internal/antispam"
 	"github.com/solar-mc/solar/internal/blockdb"
 	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
@@ -127,6 +128,17 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 		}
 	})
 	codec.SetMaxPlayers(cfg.MaxPlayers)
+	codec.SetSpamChecker(antispam.New(antispam.Config{
+		Enabled:      cfg.AntiSpam.Enabled,
+		ChatMax:      cfg.AntiSpam.ChatMax,
+		ChatWindow:   cfg.AntiSpam.ChatWindow,
+		BlockMax:     cfg.AntiSpam.BlockMax,
+		BlockWindow:  cfg.AntiSpam.BlockWindow,
+		CmdMax:       cfg.AntiSpam.CmdMax,
+		CmdWindow:    cfg.AntiSpam.CmdWindow,
+		Action:       antispam.Action(cfg.AntiSpam.Action),
+		MuteDuration: cfg.AntiSpam.MuteDuration,
+	}))
 	if err := plugin.LoadAll(pluginSrv, logger); err != nil {
 		logger.Error("plugin load failed", "error", err)
 	}
