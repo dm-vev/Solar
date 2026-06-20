@@ -240,7 +240,16 @@ func (s *session) handleMessage() error {
 	if err := s.writePacket(packet); err != nil {
 		return err
 	}
-	s.broadcastToPeers(packet)
+	// Broadcast to peers, respecting ignore lists.
+	s.room.ForEachPeerExcept(s.currentEntityID(), func(peer *session) {
+		if peer.CurrentWorldManager() != s.CurrentWorldManager() {
+			return
+		}
+		if peer.isIgnoring(s.currentUsername()) {
+			return
+		}
+		_ = peer.writePacketNoCopy(packet)
+	})
 	return nil
 }
 

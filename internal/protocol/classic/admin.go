@@ -159,6 +159,13 @@ func (s *session) IgnorePlayer(name string) (bool, bool) {
 	return s.ignoredPlayers[key], true
 }
 
+func (s *session) isIgnoring(name string) bool {
+	if s.ignoredPlayers == nil {
+		return false
+	}
+	return s.ignoredPlayers[strings.ToLower(name)]
+}
+
 func (s *session) GenerateWorld(name, theme string, width, height, length int, seed string) bool {
 	return s.generateWorld(name, theme, width, height, length, seed)
 }
@@ -353,6 +360,7 @@ func (s *session) currentLocation() (world.Spawn, byte, byte) {
 }
 
 func (s *session) teleportSelf(x, y, z int, yaw, pitch byte) bool {
+	s.saveLastPos()
 	entityID := s.currentEntityID()
 	if s.entities == nil || entityID == 0 {
 		return false
