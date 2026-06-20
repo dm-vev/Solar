@@ -3,6 +3,7 @@ package command
 import (
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/solar-mc/solar/internal/blockdef"
 )
@@ -58,6 +59,36 @@ type BlockDefService interface {
 	FreeBlockID() byte
 }
 
+// BlockDBEntry is a single block change record.
+type BlockDBEntry struct {
+	PlayerName string
+	Time       time.Time
+	X, Y, Z    int
+	OldBlock   byte
+	NewBlock   byte
+	Flags      uint16
+}
+
+// BlockDBService exposes block change history for the player's current level.
+type BlockDBService interface {
+	// ChangesAt returns the history of changes at the given coordinates.
+	ChangesAt(x, y, z int) []BlockDBEntry
+	// ChangesBy returns changes by the named player in the time window,
+	// newest first. If since is zero, returns all. maxResults limits (0=all).
+	ChangesBy(playerName string, since time.Time, maxResults int) []BlockDBEntry
+	// Count returns the total number of recorded changes.
+	Count() int64
+	// Enabled reports whether recording is active.
+	Enabled() bool
+	// SetEnabled toggles recording.
+	SetEnabled(bool)
+	// Clear deletes all recorded history.
+	Clear() error
+	// RevertBlock restores the old block at the given coordinates,
+	// broadcasting the change to all players on the level.
+	RevertBlock(x, y, z int, block byte) bool
+}
+
 // Context carries command execution state.
 type Context struct {
 	Username    string
@@ -70,6 +101,7 @@ type Context struct {
 	Moderation  ModerationService
 	Players     PlayerDirectory
 	BlockDefs   BlockDefService
+	BlockDB     BlockDBService
 	Tr          func(string, ...any) string
 }
 
@@ -98,7 +130,7 @@ func NewRegistry() *Registry {
 		handlers: make(map[string]Handler),
 		admin:    make(map[string]struct{}),
 	}
-	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb"} {
+	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb", "blockdb"} {
 		registry.admin[cmd] = struct{}{}
 	}
 	registry.Register("help", helpCommand(registry))
@@ -116,6 +148,10 @@ func NewRegistry() *Registry {
 	registry.Register("newlvl", newLevelCommand)
 	registry.Register("gb", globalBlockCommand)
 	registry.Register("lb", levelBlockCommand)
+	registry.Register("about", aboutCommand)
+	registry.Register("b", aboutCommand)
+	registry.Register("undo", undoCommand)
+	registry.Register("blockdb", blockDBCommand)
 	return registry
 }
 

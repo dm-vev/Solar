@@ -1,6 +1,8 @@
 package app
 
 import (
+	"time"
+
 	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/protocol/classic"
@@ -138,6 +140,39 @@ func buildCommandContext(backend classic.SessionBackend) command.Context {
 		Moderation:  sessionModeration{backend},
 		Players:     sessionDirectory{backend},
 		BlockDefs:   sessionBlockDefs{backend},
+		BlockDB:     sessionBlockDB{backend},
 		Tr:          backend.Translate,
 	}
+}
+
+// ─── BlockDB adapter ───
+
+type sessionBlockDB struct{ backend classic.SessionBackend }
+
+func (s sessionBlockDB) ChangesAt(x, y, z int) []command.BlockDBEntry {
+	return s.backend.BlockDBChangesAt(x, y, z)
+}
+
+func (s sessionBlockDB) ChangesBy(playerName string, since time.Time, max int) []command.BlockDBEntry {
+	return s.backend.BlockDBChangesBy(playerName, since, max)
+}
+
+func (s sessionBlockDB) Count() int64 {
+	return s.backend.BlockDBCount()
+}
+
+func (s sessionBlockDB) Enabled() bool {
+	return s.backend.BlockDBEnabled()
+}
+
+func (s sessionBlockDB) SetEnabled(enabled bool) {
+	s.backend.BlockDBSetEnabled(enabled)
+}
+
+func (s sessionBlockDB) Clear() error {
+	return s.backend.BlockDBClear()
+}
+
+func (s sessionBlockDB) RevertBlock(x, y, z int, block byte) bool {
+	return s.backend.BlockDBRevertBlock(x, y, z, block)
 }

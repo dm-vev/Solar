@@ -2,11 +2,15 @@ package classic
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/solar-mc/solar/internal/blockdb"
 	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
 	"github.com/solar-mc/solar/internal/world"
+	"github.com/solar-mc/solar/plugin"
 )
 
 // SessionBackend exposes the session operations that command adapters need.
@@ -42,6 +46,14 @@ type SessionBackend interface {
 	GetBlockDef(id byte) (blockdef.BlockDefinition, bool)
 	ListBlockDefs() []blockdef.BlockDefinition
 	FreeBlockID() byte
+
+	BlockDBChangesAt(x, y, z int) []command.BlockDBEntry
+	BlockDBChangesBy(playerName string, since time.Time, max int) []command.BlockDBEntry
+	BlockDBCount() int64
+	BlockDBEnabled() bool
+	BlockDBSetEnabled(bool)
+	BlockDBClear() error
+	BlockDBRevertBlock(x, y, z int, block byte) bool
 }
 
 // --- SessionBackend implementation on *session ---
@@ -384,4 +396,78 @@ func (s *session) FreeBlockID() byte {
 		return 0
 	}
 	return s.blockDefs.FreeID()
+}
+
+// ─── BlockDB methods ───
+
+func (s *session) BlockDBChangesAt(x, y, z int) []command.BlockDBEntry {
+	if s.blockDB == nil {
+		return nil
+	}
+	entries := s.blockDB.ChangesAt(x, y, z)
+	return convertEntries(entries, s.nameConv)
+}
+
+func (s *session) BlockDBChangesBy(playerName string, since time.Time, max int) []command.BlockDBEntry {
+	if s.blockDB == nil {
+		return nil
+	}
+	var pid int32
+	if s.nameConv != nil {
+		pid = s.nameConv.Get(playerName)
+	}
+	entries := s.blockDB.ChangesBy(pid, since, time.Time{}, max)
+	return convertEntries(entries, s.nameConv)
+}
+
+func (s *session) BlockDBCount() int64 {
+	if s.blockDB == nil {
+		return 0
+	}
+	return s.blockDB.Count()
+}
+
+func (s *session) BlockDBEnabled() bool {
+	if s.blockDB == nil {
+		return false
+	}
+	return s.blockDB.Enabled()
+}
+
+func (s *session) BlockDBSetEnabled(enabled bool) {
+	if s.blockDB != nil {
+		s.blockDB.SetEnabled(enabled)
+	}
+}
+
+func (s *session) BlockDBClear() error {
+	if s.blockDB == nil {
+		return fmt.Errorf("blockdb not available")
+	}
+	return s.blockDB.Clear()
+}
+
+func (s *session) BlockDBRevertBlock(x, y, z int, block byte) bool {
+	return s.applyBlockChange(x, y, z, block, true) == nil
+}
+
+func convertEntries(entries []plugin.BlockEntry, nc *blockdb.NameConverter) []command.BlockDBEntry {
+	if len(entries) == 0 {
+		return nil
+	}
+	out := make([]command.BlockDBEntry, len(entries))
+	for i, e := range entries {
+		out[i] = command.BlockDBEntry{
+			Time: e.Time,
+			X:    e.X, Y: e.Y, Z: e.Z,
+			OldBlock: e.OldBlock,
+			NewBlock: e.NewBlock,
+			Flags:    uint16(e.Flags),
+		}
+		// ponytail: NameConverter is in-memory only; no reverse lookup.
+		// PlayerID→name resolution needs a bidirectional map for real names.
+		// For now, store the ID as a string placeholder.
+		out[i].PlayerName = fmt.Sprintf("ID:%d", e.PlayerID)
+	}
+	return out
 }

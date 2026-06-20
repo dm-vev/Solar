@@ -110,6 +110,26 @@
 "command.shared.unknown" = "unknown command: /%s"
 "command.shared.player_not_found" = "player not found: %s"
 
+# ─── command.about ───
+"command.about.usage" = "usage: /about [x y z]"
+"command.about.unavailable" = "blockdb is not available on this level"
+"command.about.none" = "no block changes at %d %d %d"
+
+# ─── command.undo ───
+"command.undo.unavailable" = "blockdb is not available on this level"
+"command.undo.invalid_duration" = "invalid duration: %s (try 5m, 1h, 30s)"
+"command.undo.none" = "no changes to undo"
+"command.undo.done" = "undone %d block changes"
+
+# ─── command.blockdb ───
+"command.blockdb.usage" = "usage: /blockdb [enable|disable|clear|stats]"
+"command.blockdb.unavailable" = "blockdb is not available on this level"
+"command.blockdb.enabled" = "blockdb enabled for this level"
+"command.blockdb.disabled" = "blockdb disabled for this level"
+"command.blockdb.cleared" = "blockdb history cleared"
+"command.blockdb.clear_failed" = "failed to clear blockdb: %v"
+"command.blockdb.stats" = "blockdb: %d entries, recording: %s"
+
 [ru]
 # ─── general ───
 "general.muted" = "&cВы в муте."
@@ -216,3 +236,23 @@
 "command.shared.permission_denied" = "нет прав"
 "command.shared.unknown" = "неизвестная команда: /%s"
 "command.shared.player_not_found" = "игрок не найден: %s"
+
+# ─── command.about ───
+"command.about.usage" = "использование: /about [x y z]"
+"command.about.unavailable" = "blockdb недоступен на этом уровне"
+"command.about.none" = "нет изменений блока на %d %d %d"
+
+# ─── command.undo ───
+"command.undo.unavailable" = "blockdb недоступен на этом уровне"
+"command.undo.invalid_duration" = "неверная длительность: %s (примеры: 5m, 1h, 30s)"
+"command.undo.none" = "нет изменений для отмены"
+"command.undo.done" = "отменено %d изменений блоков"
+
+# ─── command.blockdb ───
+"command.blockdb.usage" = "использование: /blockdb [enable|disable|clear|stats]"
+"command.blockdb.unavailable" = "blockdb недоступен на этом уровне"
+"command.blockdb.enabled" = "blockdb включён для этого уровня"
+"command.blockdb.disabled" = "blockdb выключен для этого уровня"
+"command.blockdb.cleared" = "история blockdb очищена"
+"command.blockdb.clear_failed" = "ошибка очистки blockdb: %v"
+"command.blockdb.stats" = "blockdb: %d записей, запись: %s"
