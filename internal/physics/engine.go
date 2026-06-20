@@ -103,10 +103,6 @@ func (e *Engine) SetMode(mode int) {
 	e.mu.Unlock()
 }
 
-func (e *Engine) SetBlocks(blocks []byte) {
-	// No-op: engine uses getBlock callback, not a local slice.
-}
-
 // Queue adds a block at the given coordinates for processing next tick.
 func (e *Engine) Queue(x, y, z int) {
 	idx := e.posToInt(x, y, z)

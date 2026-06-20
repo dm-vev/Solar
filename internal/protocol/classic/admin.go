@@ -185,10 +185,7 @@ func (s *session) SetWhitelistEnabled(enabled bool) bool {
 }
 
 func (s *session) MutePlayer(name string) bool {
-	if s.room == nil {
-		return false
-	}
-	target, ok := s.room.FindByName(name)
+	target, ok := s.findTarget(name)
 	if !ok {
 		return false
 	}
@@ -197,10 +194,7 @@ func (s *session) MutePlayer(name string) bool {
 }
 
 func (s *session) UnmutePlayer(name string) bool {
-	if s.room == nil {
-		return false
-	}
-	target, ok := s.room.FindByName(name)
+	target, ok := s.findTarget(name)
 	if !ok {
 		return false
 	}
@@ -209,10 +203,7 @@ func (s *session) UnmutePlayer(name string) bool {
 }
 
 func (s *session) FreezePlayer(name string) bool {
-	if s.room == nil {
-		return false
-	}
-	target, ok := s.room.FindByName(name)
+	target, ok := s.findTarget(name)
 	if !ok {
 		return false
 	}
@@ -221,10 +212,7 @@ func (s *session) FreezePlayer(name string) bool {
 }
 
 func (s *session) UnfreezePlayer(name string) bool {
-	if s.room == nil {
-		return false
-	}
-	target, ok := s.room.FindByName(name)
+	target, ok := s.findTarget(name)
 	if !ok {
 		return false
 	}
@@ -233,10 +221,7 @@ func (s *session) UnfreezePlayer(name string) bool {
 }
 
 func (s *session) ToggleAFK(name string) (bool, bool) {
-	if s.room == nil {
-		return false, false
-	}
-	target, ok := s.room.FindByName(name)
+	target, ok := s.findTarget(name)
 	if !ok {
 		return false, false
 	}
@@ -246,16 +231,20 @@ func (s *session) ToggleAFK(name string) (bool, bool) {
 }
 
 func (s *session) ToggleHide(name string) (bool, bool) {
-	if s.room == nil {
-		return false, false
-	}
-	target, ok := s.room.FindByName(name)
+	target, ok := s.findTarget(name)
 	if !ok {
 		return false, false
 	}
 	newHidden := !target.IsHidden()
 	target.SetHidden(newHidden)
 	return newHidden, true
+}
+
+func (s *session) findTarget(name string) (*session, bool) {
+	if s.room == nil {
+		return nil, false
+	}
+	return s.room.FindByName(name)
 }
 
 func (s *session) OnlineNames() []string {

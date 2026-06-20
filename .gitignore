@@ -11,3 +11,5 @@ logs/security/
 
 # Build artifacts
 solar
+data/players/playerdb.json
+data/worlds/*.swld
