@@ -324,6 +324,21 @@ func (stubServerInfo) MaxPlayers() int       { return 128 }
 func (stubServerInfo) LevelCount() int       { return 1 }
 func (stubServerInfo) Uptime() time.Duration { return 5 * time.Minute }
 
+// stubTeleport implements TeleportService.
+type stubTeleport struct{}
+
+func (stubTeleport) SpawnPoint() (int, int, int, byte, byte) { return 0, 0, 0, 0, 0 }
+func (stubTeleport) TeleportToPlayer(name string) bool       { return true }
+func (stubTeleport) SummonPlayer(name string) bool           { return true }
+func (stubTeleport) Back() bool                              { return false }
+
+// stubChat implements ChatService.
+type stubChat struct{}
+
+func (stubChat) Me(action string)                {}
+func (stubChat) Whisper(target, msg string) bool { return true }
+func (stubChat) Ignore(name string) (bool, bool) { return true, true }
+
 type stubDirectory struct {
 	names       []string
 	whitelisted []string

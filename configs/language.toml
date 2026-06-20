@@ -246,6 +246,35 @@
 # ─── command.rules ───
 "command.rules.text" = "&e--- Server Rules ---\n&a1. &7Be respectful\n&a2. &7No griefing\n&a3. &7No spam\n&a4. &7Have fun!\n&e--------------------"
 
+# ─── command.spawn ───
+"command.spawn.done" = "&aTeleported to spawn"
+
+# ─── command.back ───
+"command.back.none" = "&7No previous position to return to"
+"command.back.done" = "&aReturned to previous position"
+
+# ─── command.tpa ───
+"command.tpa.usage" = "usage: /tpa <name>"
+"command.tpa.done" = "&aTeleported to %s"
+
+# ─── command.summon ───
+"command.summon.usage" = "usage: /summon <name>"
+"command.summon.done" = "&aSummoned %s"
+
+# ─── command.chat (shared) ───
+"command.chat.unavailable" = "chat commands are unavailable"
+
+# ─── command.me ───
+"command.me.usage" = "usage: /me <action>"
+
+# ─── command.whisper ───
+"command.whisper.usage" = "usage: /whisper <name> <message>"
+
+# ─── command.ignore ───
+"command.ignore.usage" = "usage: /ignore <name>"
+"command.ignore.on" = "&7You are now ignoring %s"
+"command.ignore.off" = "&7You are no longer ignoring %s"
+
 [ru]
 # ─── general ───
 "general.muted" = "&cВы в муте."
@@ -459,3 +488,26 @@
 "command.serverinfo.memory" = "&aПамять: &7%d МБ"
 "command.time.current" = "&aВремя сервера: &7%s"
 "command.rules.text" = "&e--- Правила сервера ---\n&a1. &7Уважайте других\n&a2. &7Без гриферства\n&a3. &7Без спама\n&a4. &7Веселитесь!\n&e-----------------------"
+
+# ─── command.spawn ───
+"command.spawn.done" = "&aТелепортирован на спавн"
+
+# ─── command.back ───
+"command.back.none" = "&7Нет предыдущей позиции для возврата"
+"command.back.done" = "&aВозвращены на предыдущую позицию"
+
+# ─── command.tpa ───
+"command.tpa.usage" = "использование: /tpa <имя>"
+"command.tpa.done" = "&aТелепортирован к %s"
+
+# ─── command.summon ───
+"command.summon.usage" = "использование: /summon <имя>"
+"command.summon.done" = "&aПризван %s"
+
+# ─── command.chat (shared) ───
+"command.chat.unavailable" = "чат-команды недоступны"
+"command.me.usage" = "использование: /me <действие>"
+"command.whisper.usage" = "использование: /whisper <имя> <сообщение>"
+"command.ignore.usage" = "использование: /ignore <имя>"
+"command.ignore.on" = "&7Вы теперь игнорируете %s"
+"command.ignore.off" = "&7Вы больше не игнорируете %s"

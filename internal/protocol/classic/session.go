@@ -105,6 +105,14 @@ type session struct {
 	afk        bool
 	allowBuild bool
 	lang       string
+
+	// lastTeleportPos tracks the position before the last teleport
+	// for /back. Updated by TeleportSelf, changeMap, and Respawn.
+	lastTeleportPos   [3]int
+	lastTeleportValid bool
+
+	// ignoredPlayers tracks chat ignores for this session.
+	ignoredPlayers map[string]bool
 }
 
 func (s *session) RoomEntityID() uint32 {

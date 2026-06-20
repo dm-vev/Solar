@@ -37,6 +37,15 @@ type SessionBackend interface {
 	SaveState() bool
 	PersistPlayerPolicy() bool
 
+	SpawnPoint() (x, y, z int, yaw, pitch byte)
+	TeleportToPlayer(name string) bool
+	SummonPlayer(name string) bool
+	BackToLastPos() bool
+
+	MeAction(action string)
+	WhisperTo(targetName, msg string) bool
+	IgnorePlayer(name string) (bool, bool)
+
 	KickPlayer(name, reason string) bool
 	BanPlayer(name, reason string) bool
 	UnbanPlayer(name string) bool

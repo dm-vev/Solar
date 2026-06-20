@@ -23,6 +23,7 @@ package classic
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/solar-mc/solar/internal/blockdb"
@@ -76,6 +77,86 @@ func (s *session) SetSpawn(spawn world.Spawn) bool {
 	}
 	s.worlds.SetSpawn(spawn)
 	return true
+}
+
+// ─── TeleportService methods ───
+
+func (s *session) SpawnPoint() (x, y, z int, yaw, pitch byte) {
+	if s.worlds == nil {
+		return 0, 0, 0, 0, 0
+	}
+	sp := s.worlds.Spawn()
+	return sp.X, sp.Y, sp.Z, sp.Yaw, sp.Pitch
+}
+
+func (s *session) TeleportToPlayer(name string) bool {
+	target, ok := s.findTarget(name)
+	if !ok {
+		return false
+	}
+	s.saveLastPos()
+	tx, ty, tz := target.Position()
+	targetYaw, targetPitch := target.Yaw(), target.Pitch()
+	return s.teleportSelf(tx, ty, tz, targetYaw, targetPitch)
+}
+
+func (s *session) SummonPlayer(name string) bool {
+	target, ok := s.findTarget(name)
+	if !ok {
+		return false
+	}
+	target.saveLastPos()
+	mx, my, mz := s.Position()
+	myaw, mpitch := s.Yaw(), s.Pitch()
+	return target.teleportSelf(mx, my, mz, myaw, mpitch)
+}
+
+func (s *session) BackToLastPos() bool {
+	if !s.lastTeleportValid {
+		return false
+	}
+	x, y, z := s.lastTeleportPos[0], s.lastTeleportPos[1], s.lastTeleportPos[2]
+	yaw, pitch := s.Yaw(), s.Pitch()
+	s.lastTeleportValid = false
+	return s.teleportSelf(x, y, z, yaw, pitch)
+}
+
+func (s *session) saveLastPos() {
+	x, y, z := s.Position()
+	s.lastTeleportPos = [3]int{x, y, z}
+	s.lastTeleportValid = true
+}
+
+// ─── ChatService methods ───
+
+func (s *session) MeAction(action string) {
+	msg := "* " + s.currentUsername() + " " + action
+	pkt := encodeMessage(selfID, msg)
+	_ = s.writePacket(pkt)
+	s.broadcastToPeers(pkt)
+}
+
+func (s *session) WhisperTo(targetName, msg string) bool {
+	target, ok := s.findTarget(targetName)
+	if !ok {
+		return false
+	}
+	target.Message("&7[whisper] &e" + s.currentUsername() + "&7: &f" + msg)
+	s.Message("&7[to " + targetName + "] &f" + msg)
+	return true
+}
+
+func (s *session) IgnorePlayer(name string) (bool, bool) {
+	if s.ignoredPlayers == nil {
+		s.ignoredPlayers = make(map[string]bool)
+	}
+	key := strings.ToLower(name)
+	_, ok := s.findTarget(name)
+	if !ok {
+		return false, false
+	}
+	s.ignoredPlayers[key] = !s.ignoredPlayers[key]
+	return s.ignoredPlayers[key], true
 }
 
 func (s *session) GenerateWorld(name, theme string, width, height, length int, seed string) bool {

@@ -161,6 +161,8 @@ func buildCommandContext(backend classic.SessionBackend) command.Context {
 		Pitch:       pitch,
 		Authority:   sessionAuthority{backend},
 		World:       sessionWorld{backend},
+		Teleport:    sessionTeleport{backend},
+		Chat:        sessionChat{backend},
 		Persistence: sessionPersistence{backend},
 		Moderation:  sessionModeration{backend},
 		Players:     sessionDirectory{backend},
@@ -173,6 +175,31 @@ func buildCommandContext(backend classic.SessionBackend) command.Context {
 		Tr:          backend.Translate,
 	}
 }
+
+// ─── TeleportService adapter ───
+
+type sessionTeleport struct{ backend classic.SessionBackend }
+
+func (s sessionTeleport) SpawnPoint() (int, int, int, byte, byte) {
+	return s.backend.SpawnPoint()
+}
+func (s sessionTeleport) TeleportToPlayer(name string) bool {
+	return s.backend.TeleportToPlayer(name)
+}
+func (s sessionTeleport) SummonPlayer(name string) bool {
+	return s.backend.SummonPlayer(name)
+}
+func (s sessionTeleport) Back() bool {
+	return s.backend.BackToLastPos()
+}
+
+// ─── ChatService adapter ───
+
+type sessionChat struct{ backend classic.SessionBackend }
+
+func (s sessionChat) Me(action string)                { s.backend.MeAction(action) }
+func (s sessionChat) Whisper(target, msg string) bool { return s.backend.WhisperTo(target, msg) }
+func (s sessionChat) Ignore(name string) (bool, bool) { return s.backend.IgnorePlayer(name) }
 
 // ─── BlockDB adapter ───
 

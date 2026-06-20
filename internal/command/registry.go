@@ -29,6 +29,28 @@ type WorldService interface {
 	GenerateWorld(name, theme string, width, height, length int, seed string) bool
 }
 
+// TeleportService exposes teleport operations for commands.
+type TeleportService interface {
+	// SpawnPoint returns the world spawn coordinates.
+	SpawnPoint() (x, y, z int, yaw, pitch byte)
+	// TeleportToPlayer teleports the caller to the named player.
+	TeleportToPlayer(name string) bool
+	// SummonPlayer teleports the named player to the caller.
+	SummonPlayer(name string) bool
+	// Back teleports the caller to their last position.
+	Back() bool
+}
+
+// ChatService exposes chat operations for commands.
+type ChatService interface {
+	// Me sends an IRC-style action message to all players.
+	Me(action string)
+	// Whisper sends a private message to the named player.
+	Whisper(targetName, msg string) bool
+	// Ignore toggles ignoring a player's chat.
+	Ignore(name string) (ignored bool, ok bool)
+}
+
 // PersistenceService persists runtime state.
 type PersistenceService interface {
 	SaveState() bool
@@ -141,6 +163,8 @@ type Context struct {
 	Pitch       byte
 	Authority   Authority
 	World       WorldService
+	Teleport    TeleportService
+	Chat        ChatService
 	Persistence PersistenceService
 	Moderation  ModerationService
 	Players     PlayerDirectory
@@ -178,7 +202,7 @@ func NewRegistry() *Registry {
 		handlers: make(map[string]Handler),
 		admin:    make(map[string]struct{}),
 	}
-	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb", "blockdb", "load", "unload", "reload", "physics", "map", "mute", "unmute", "freeze", "unfreeze"} {
+	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb", "blockdb", "load", "unload", "reload", "physics", "map", "mute", "unmute", "freeze", "unfreeze", "summon"} {
 		registry.admin[cmd] = struct{}{}
 	}
 	registry.Register("help", helpCommand(registry))
@@ -221,6 +245,13 @@ func NewRegistry() *Registry {
 	registry.Register("serverinfo", serverinfoCommand)
 	registry.Register("time", timeCommand)
 	registry.Register("rules", rulesCommand)
+	registry.Register("spawn", spawnCommand)
+	registry.Register("back", backCommand)
+	registry.Register("tpa", tpaCommand)
+	registry.Register("summon", summonCommand)
+	registry.Register("me", meCommand)
+	registry.Register("whisper", whisperCommand)
+	registry.Register("ignore", ignoreCommand)
 	return registry
 }
 

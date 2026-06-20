@@ -398,6 +398,14 @@ func (m testModeration) UnfreezePlayer(name string) bool     { return m.backend.
 func (m testModeration) ToggleAFK(name string) (bool, bool)  { return m.backend.ToggleAFK(name) }
 func (m testModeration) ToggleHide(name string) (bool, bool) { return m.backend.ToggleHide(name) }
 
+func (m testModeration) SpawnPoint() (int, int, int, byte, byte) { return 0, 0, 0, 0, 0 }
+func (m testModeration) TeleportToPlayer(name string) bool       { return true }
+func (m testModeration) SummonPlayer(name string) bool           { return true }
+func (m testModeration) BackToLastPos() bool                     { return false }
+func (m testModeration) MeAction(action string)                  {}
+func (m testModeration) WhisperTo(target, msg string) bool       { return true }
+func (m testModeration) IgnorePlayer(name string) (bool, bool)   { return true, true }
+
 func (m testModeration) PlayerDBLookup(name string) *playerdb.PlayerEntry {
 	return m.backend.PlayerDBLookup(name)
 }
