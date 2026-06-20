@@ -13,7 +13,18 @@ func makeEngine(w, h, l int) (*Engine, []byte) {
 		_ = block
 		mu.Unlock()
 	}
-	e := New(blocks, w, h, l, broadcast)
+	getBlk := func(idx int) byte {
+		if idx < 0 || idx >= len(blocks) {
+			return Invalid
+		}
+		return blocks[idx]
+	}
+	setBlk := func(idx int, block byte) {
+		if idx >= 0 && idx < len(blocks) {
+			blocks[idx] = block
+		}
+	}
+	e := New(w, h, l, getBlk, setBlk, broadcast)
 	e.SetMode(ModeAdvanced)
 	return e, blocks
 }

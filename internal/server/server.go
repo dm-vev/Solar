@@ -108,8 +108,24 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Create block physics engine for the main level.
 	lvl := s.worlds.Current()
-	s.blockPhysics = physics.New(
-		lvl.Blocks, lvl.Width, lvl.Height, lvl.Length,
+	w, h, l := lvl.Width, lvl.Height, lvl.Length
+	s.blockPhysics = physics.New(w, h, l,
+		func(idx int) byte {
+			// Convert flat index to xyz and read from world.Manager.
+			y := idx / (w * l)
+			rem := idx - y*w*l
+			z := rem / w
+			x := rem - z*w
+			b, _ := s.worlds.BlockAt(x, y, z)
+			return b
+		},
+		func(idx int, block byte) {
+			y := idx / (w * l)
+			rem := idx - y*w*l
+			z := rem / w
+			x := rem - z*w
+			s.worlds.SetBlock(x, y, z, block)
+		},
 		func(x, y, z int, block byte) {
 			s.codec.BroadcastSetBlockToLevel(s.worlds, x, y, z, block)
 		},

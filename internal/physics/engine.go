@@ -47,9 +47,10 @@ const (
 const removeFlag = 255
 
 // Engine runs block physics for a single level.
+// It accesses blocks through getBlock/setBlock callbacks so it shares
+// the same block array as the world.Manager (no copy divergence).
 type Engine struct {
 	mu        sync.Mutex
-	blocks    []byte
 	width     int
 	height    int
 	length    int
@@ -57,6 +58,8 @@ type Engine struct {
 	checks    []checkEntry
 	updates   []updateEntry
 	rng       *rand.Rand
+	getBlk    func(idx int) byte
+	setBlk    func(idx int, block byte)
 	broadcast func(x, y, z int, block byte)
 }
 
@@ -71,15 +74,18 @@ type updateEntry struct {
 }
 
 // New creates a physics engine for a level with the given dimensions.
-// broadcast is called for each block change so clients see the update.
-func New(blocks []byte, width, height, length int, broadcast func(x, y, z int, block byte)) *Engine {
+// getBlock returns the block at a flat index; setBlock stages a block
+// change (applied at end of tick). broadcast is called for each block
+// change so clients see the update.
+func New(width, height, length int, getBlk func(int) byte, setBlk func(int, byte), broadcast func(x, y, z int, block byte)) *Engine {
 	return &Engine{
-		blocks:    blocks,
 		width:     width,
 		height:    height,
 		length:    length,
-		mode:      ModeOff,
+		mode:      ModeNormal,
 		rng:       rand.New(rand.NewSource(rand.Int63())),
+		getBlk:    getBlk,
+		setBlk:    setBlk,
 		broadcast: broadcast,
 	}
 }
@@ -98,9 +104,7 @@ func (e *Engine) SetMode(mode int) {
 }
 
 func (e *Engine) SetBlocks(blocks []byte) {
-	e.mu.Lock()
-	e.blocks = blocks
-	e.mu.Unlock()
+	// No-op: engine uses getBlock callback, not a local slice.
 }
 
 // Queue adds a block at the given coordinates for processing next tick.
@@ -129,12 +133,11 @@ func (e *Engine) Tick() {
 
 	for i := range checks {
 		c := &checks[i]
-		if c.index < 0 || c.index >= len(e.blocks) {
+		if c.index < 0 {
 			continue
 		}
-		block := e.blocks[c.index]
+		block := e.getBlock(c.index)
 		e.processBlock(c, block, adv)
-		// Keep cells that aren't done for next tick.
 		if c.data != removeFlag {
 			e.checks = append(e.checks, *c)
 		}
@@ -142,18 +145,7 @@ func (e *Engine) Tick() {
 
 	// Apply updates.
 	for _, u := range e.updates {
-		if u.index < 0 || u.index >= len(e.blocks) {
-			continue
-		}
-		if e.blocks[u.index] != u.block {
-			e.blocks[u.index] = u.block
-			x, y, z := e.intToPos(u.index)
-			if e.broadcast != nil {
-				e.broadcast(x, y, z, u.block)
-			}
-			// Activate neighbours for the new block.
-			e.activateNeighbours(u.index)
-		}
+		e.applyUpdate(u)
 	}
 	e.updates = e.updates[:0]
 }
@@ -218,21 +210,35 @@ func (e *Engine) intToPos(idx int) (x, y, z int) {
 }
 
 func (e *Engine) getBlock(idx int) byte {
-	if idx < 0 || idx >= len(e.blocks) {
+	if idx < 0 {
 		return Invalid
 	}
-	return e.blocks[idx]
+	return e.getBlk(idx)
 }
 
 func (e *Engine) setBlock(idx int, block byte) {
-	if idx >= 0 && idx < len(e.blocks) {
+	if idx >= 0 {
 		e.updates = append(e.updates, updateEntry{index: idx, block: block})
 	}
 }
 
 func (e *Engine) queueCheck(idx int) {
-	if idx >= 0 && idx < len(e.blocks) {
+	if idx >= 0 {
 		e.checks = append(e.checks, checkEntry{index: idx})
+	}
+}
+
+func (e *Engine) applyUpdate(u updateEntry) {
+	if u.index < 0 {
+		return
+	}
+	if e.getBlk(u.index) != u.block {
+		e.setBlk(u.index, u.block)
+		x, y, z := e.intToPos(u.index)
+		if e.broadcast != nil {
+			e.broadcast(x, y, z, u.block)
+		}
+		e.activateNeighbours(u.index)
 	}
 }
 
