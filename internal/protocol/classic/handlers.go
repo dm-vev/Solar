@@ -226,7 +226,7 @@ func (s *session) handleMessage() error {
 		r := s.spamChecker.CheckChat(s.currentUsername())
 		if r.Exceeded {
 			s.handleSpamResult(r)
-			if r.Action == "kick" {
+			if r.Action == antispam.ActionKick {
 				return nil
 			}
 			s.Message(s.Tr("antispam.chat_exceeded", r.Count, r.Max))
@@ -312,7 +312,7 @@ func (s *session) handleCommand(line string) error {
 		r := s.spamChecker.CheckCommand(s.currentUsername())
 		if r.Exceeded {
 			s.handleSpamResult(r)
-			if r.Action == "kick" {
+			if r.Action == antispam.ActionKick {
 				return nil
 			}
 			s.Message(s.Tr("antispam.cmd_exceeded", r.Count, r.Max))
@@ -445,6 +445,21 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 		oldBlock = b
 	}
 
+	// Anti-spam block check (before SetBlock so we can reject).
+	if s.spamChecker != nil {
+		r := s.spamChecker.CheckBlock(s.currentUsername())
+		if r.Exceeded {
+			s.handleSpamResult(r)
+			// Revert the block on the client so they see it didn't work.
+			if s.worlds != nil {
+				if block, ok := s.worlds.BlockAt(x, y, z); ok {
+					s.SendBlockChange(x, y, z, block)
+				}
+			}
+			return nil
+		}
+	}
+
 	if !s.worlds.SetBlock(x, y, z, blockID) {
 		return fmt.Errorf("block position out of bounds: %d %d %d", x, y, z)
 	}
@@ -459,18 +474,6 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 		// Remove special block entry if overwriting one.
 		if !placing || !specialblocks.IsSpecialBlock(blockID) {
 			s.specialBlocks.Remove(x, y, z)
-		}
-	}
-
-	// Anti-spam block check.
-	if s.spamChecker != nil && placing {
-		r := s.spamChecker.CheckBlock(s.currentUsername())
-		if r.Exceeded {
-			s.handleSpamResult(r)
-			if r.Action == "kick" {
-				return nil
-			}
-			return nil // silently drop block change
 		}
 	}
 

@@ -11,6 +11,7 @@
 package antispam
 
 import (
+	"strings"
 	"sync"
 	"time"
 )
@@ -59,7 +60,6 @@ type playerState struct {
 	cmdTimes   []time.Time
 	muted      bool
 	mutedUntil time.Time
-	warnCount  int
 }
 
 // New creates a SpamChecker with the given configuration.
@@ -99,6 +99,7 @@ func (c *Checker) CheckCommand(name string) Result {
 
 // IsMuted reports whether the player is currently muted by anti-spam.
 func (c *Checker) IsMuted(name string) bool {
+	name = strings.ToLower(name)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ps := c.players[name]
@@ -113,6 +114,7 @@ func (c *Checker) IsMuted(name string) bool {
 
 // Reset clears all state for a player (called on disconnect).
 func (c *Checker) Reset(name string) {
+	name = strings.ToLower(name)
 	c.mu.Lock()
 	delete(c.players, name)
 	c.mu.Unlock()
@@ -123,6 +125,7 @@ func (c *Checker) check(name string, cat Category, max int, window time.Duration
 		return Result{Exceeded: false}
 	}
 
+	name = strings.ToLower(name)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -167,7 +170,7 @@ func (c *Checker) check(name string, cat Category, max int, window time.Duration
 		ps.muted = true
 		ps.mutedUntil = now.Add(c.config.MuteDuration)
 	case ActionWarn:
-		ps.warnCount++
+		// Warning only — no state change needed.
 	}
 
 	return Result{
