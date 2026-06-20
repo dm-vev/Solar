@@ -498,6 +498,15 @@ func (s *session) SupportsCPE(extName string) bool { return s.supportsExt(extNam
 
 // ─── Codec broadcast helpers for plugin API ───
 
+// KickAll sends a kick packet to every online player.
+func (c *Codec) KickAll(reason string) {
+	pkt := encodeKick(reason)
+	c.room.ForEachPeerExcept(0, func(peer *session) {
+		_ = peer.writePacket(pkt)
+		peer.fail()
+	})
+}
+
 // BroadcastMessage sends a chat message to all online players.
 func (c *Codec) BroadcastMessage(msg string) {
 	if plugin.OnChatSys.HasHandlers() {

@@ -153,10 +153,13 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	})
 
-	// Graceful shutdown: stop background goroutines first, then save.
+	// Graceful shutdown: stop background goroutines, kick all players, save.
 	stopTicks()
 	tickWG.Wait()
 	debugWG.Wait()
+
+	s.codec.BroadcastMessage("&cServer is shutting down...")
+	s.codec.KickAll("&cServer is shutting down. Please reconnect later.")
 
 	if plugin.OnShutdown.HasHandlers() {
 		plugin.OnShutdown.Fire(plugin.ShutdownData{Reason: "server stopping"})
