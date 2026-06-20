@@ -105,6 +105,7 @@ func (s *Server) saveState(worldPath, policyPath string) {
 			s.logger.Error("flush playerdb", "error", err)
 		}
 	}
+	s.flushBlockDBs()
 }
 
 // SaveStateNow persists world and player policy using the store's configured

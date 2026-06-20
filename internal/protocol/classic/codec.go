@@ -62,6 +62,7 @@ type Codec struct {
 	buildCommandContext func(SessionBackend) command.Context
 	playerDB            playerdb.PlayerDB
 	i18n                *i18n.I18n
+	blockDBForLevel     func(levelName string) plugin.BlockDB
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -197,6 +198,13 @@ func (c *Codec) SetI18n(i *i18n.I18n) {
 	c.i18n = i
 }
 
+// SetBlockDBLookup configures a function that returns the BlockDB for a
+// given level name. Called lazily when a player's session needs to record
+// a block change on their current level.
+func (c *Codec) SetBlockDBLookup(fn func(levelName string) plugin.BlockDB) {
+	c.blockDBForLevel = fn
+}
+
 // I18nGet returns a message in the server's default language.
 func (c *Codec) I18nGet(key string, args ...any) string {
 	if c.i18n != nil {
@@ -249,6 +257,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		buildCommandContext: c.buildCommandContext,
 		playerDB:            c.playerDB,
 		i18n:                c.i18n,
+		blockDBForLevel:     c.blockDBForLevel,
 		color:               "&e",
 		model:               "humanoid",
 		allowBuild:          true,
@@ -319,6 +328,9 @@ type session struct {
 	playerDB            playerdb.PlayerDB
 	loginTime           time.Time
 	i18n                *i18n.I18n
+	blockDB             plugin.BlockDB
+	playerDBID          int32
+	blockDBForLevel     func(levelName string) plugin.BlockDB
 
 	// ponytail: plugin.Player stub state, guarded by stateMu
 	color      string

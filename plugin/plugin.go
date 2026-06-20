@@ -43,6 +43,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/solar-mc/solar/plugin/blockdb"
 	"github.com/solar-mc/solar/plugin/color"
 	"github.com/solar-mc/solar/plugin/command"
 	"github.com/solar-mc/solar/plugin/config"
@@ -119,6 +120,31 @@ type PlayerDB = playerdb.PlayerDB
 
 // PlayerEntry is re-exported from plugin/playerdb.
 type PlayerEntry = playerdb.PlayerEntry
+
+// BlockDB is re-exported from plugin/blockdb.
+type BlockDB = blockdb.BlockDB
+
+// BlockEntry is re-exported from plugin/blockdb.
+type BlockEntry = blockdb.Entry
+
+// BlockFlags is re-exported from plugin/blockdb.
+type BlockFlags = blockdb.Flags
+
+// Block change flags (re-exported from plugin/blockdb).
+const (
+	BlockManualPlace = blockdb.ManualPlace
+	BlockPainted     = blockdb.Painted
+	BlockDrawn       = blockdb.Drawn
+	BlockReplaced    = blockdb.Replaced
+	BlockPasted      = blockdb.Pasted
+	BlockCut         = blockdb.Cut
+	BlockFilled      = blockdb.Filled
+	BlockRestored    = blockdb.Restored
+	BlockUndoOther   = blockdb.UndoOther
+	BlockUndoSelf    = blockdb.UndoSelf
+	BlockRedoSelf    = blockdb.RedoSelf
+	BlockFixGrass    = blockdb.FixGrass
+)
 
 // ─── Re-exported color constants ───
 

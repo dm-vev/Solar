@@ -108,7 +108,9 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 
 	// Load plugins: create the server API handle and enable all registered plugins.
 	pluginSrv := server.NewPluginServer(codec, worlds, commands, srv)
+	pluginSrv.PostInit()
 	codec.SetPlayerDatabase(pluginSrv.PlayerDB())
+	codec.SetBlockDBLookup(pluginSrv.BlockDB)
 	if err := plugin.LoadAll(pluginSrv, logger); err != nil {
 		logger.Error("plugin load failed", "error", err)
 	}

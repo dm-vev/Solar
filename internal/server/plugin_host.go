@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/solar-mc/solar/internal/blockdb"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
@@ -20,18 +21,20 @@ import (
 
 // pluginServer implements plugin.Server for the Solar server.
 type pluginServer struct {
-	codec     *classic.Codec
-	worlds    *world.Manager
-	multiMgr  *world.MultiManager
-	commands  *command.Registry
-	server    *Server
-	sched     plugin.Scheduler
-	entityMgr plugin.EntityManager
-	playerDB  plugin.PlayerDB
+	codec      *classic.Codec
+	worlds     *world.Manager
+	multiMgr   *world.MultiManager
+	commands   *command.Registry
+	server     *Server
+	sched      plugin.Scheduler
+	entityMgr  plugin.EntityManager
+	playerDB   plugin.PlayerDB
+	blockDBs   map[string]plugin.BlockDB
+	blockDBsMu sync.Mutex
 }
 
 // NewPluginServer creates a plugin.Server handle from the server's subsystems.
-func NewPluginServer(codec *classic.Codec, worlds *world.Manager, commands *command.Registry, srv *Server) plugin.Server {
+func NewPluginServer(codec *classic.Codec, worlds *world.Manager, commands *command.Registry, srv *Server) *pluginServer {
 	mm := world.NewMultiManager()
 	mm.SetMain(srv.cfg.Storage.MainWorldName, worlds, srv.worldSavePath())
 
@@ -51,7 +54,14 @@ func NewPluginServer(codec *classic.Codec, worlds *world.Manager, commands *comm
 		sched:     plugin.DefaultScheduler,
 		entityMgr: newEntityManager(codec, srv.entities),
 		playerDB:  pdb,
+		blockDBs:  make(map[string]plugin.BlockDB),
 	}
+}
+
+// PostInit wires callbacks that need the pluginServer pointer.
+// Called by bootstrap after NewPluginServer.
+func (p *pluginServer) PostInit() {
+	p.server.SetFlushBlockDBsFn(p.flushAllBlockDBs)
 }
 
 func (p *pluginServer) BroadcastMessage(msg string) {
@@ -210,6 +220,43 @@ func (p *pluginServer) Config() plugin.Config {
 
 func (p *pluginServer) PlayerDB() plugin.PlayerDB {
 	return p.playerDB
+}
+
+func (p *pluginServer) BlockDB(levelName string) plugin.BlockDB {
+	p.blockDBsMu.Lock()
+	defer p.blockDBsMu.Unlock()
+
+	key := strings.ToLower(levelName)
+	if db, ok := p.blockDBs[key]; ok {
+		return db
+	}
+	mgr := p.multiMgr.Get(levelName)
+	if mgr == nil {
+		return nil
+	}
+	lvl := mgr.Current()
+	path := p.server.store.BlockDBFile(levelName)
+	db, err := blockdb.New(path, lvl.Width, lvl.Height, lvl.Length)
+	if err != nil {
+		p.server.logger.Error("load blockdb", "level", levelName, "error", err)
+		return nil
+	}
+	p.blockDBs[key] = db
+	return db
+}
+
+func (p *pluginServer) flushAllBlockDBs() {
+	p.blockDBsMu.Lock()
+	dbs := make([]plugin.BlockDB, 0, len(p.blockDBs))
+	for _, db := range p.blockDBs {
+		dbs = append(dbs, db)
+	}
+	p.blockDBsMu.Unlock()
+	for _, db := range dbs {
+		if err := db.Flush(); err != nil {
+			p.server.logger.Error("flush blockdb", "error", err)
+		}
+	}
 }
 
 // pluginConfig implements plugin.Config by reading/writing the server's live

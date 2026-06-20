@@ -298,8 +298,26 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 		}
 	}
 
+	// Record old block before overwriting.
+	var oldBlock byte
+	if b, ok := s.worlds.BlockAt(x, y, z); ok {
+		oldBlock = b
+	}
+
 	if !s.worlds.SetBlock(x, y, z, blockID) {
 		return fmt.Errorf("block position out of bounds: %d %d %d", x, y, z)
+	}
+
+	// Record in BlockDB.
+	if s.blockDB != nil {
+		s.blockDB.Add(plugin.BlockEntry{
+			PlayerID: s.playerDBID,
+			Time:     time.Now(),
+			X:        x, Y: y, Z: z,
+			OldBlock: oldBlock,
+			NewBlock: blockID,
+			Flags:    plugin.BlockManualPlace,
+		})
 	}
 
 	// Track block stats in PlayerDB.

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/solar-mc/solar/plugin/blockdb"
 	"github.com/solar-mc/solar/plugin/command"
 	"github.com/solar-mc/solar/plugin/config"
 	"github.com/solar-mc/solar/plugin/entity"
@@ -109,4 +110,8 @@ type Server interface {
 
 	// PlayerDB returns the persistent player database for offline player data.
 	PlayerDB() playerdb.PlayerDB
+
+	// BlockDB returns the block change history for the named level,
+	// or nil if BlockDB is not enabled for that level.
+	BlockDB(levelName string) blockdb.BlockDB
 }

@@ -25,20 +25,21 @@ import (
 
 // Server wires the CLI, network, and core subsystems together.
 type Server struct {
-	cfg       config.Config
-	listener  *network.Listener
-	codec     *classic.Codec
-	worlds    *world.Manager
-	players   *player.Registry
-	entities  *entity.Manager
-	store     *storage.LocalStore
-	workers   *worker.Pool
-	logger    *slog.Logger
-	sema      chan struct{}
-	pprofAddr string
-	cancel    context.CancelFunc
-	physics   *pluginPhysics
-	playerDB  plugin.PlayerDB
+	cfg             config.Config
+	listener        *network.Listener
+	codec           *classic.Codec
+	worlds          *world.Manager
+	players         *player.Registry
+	entities        *entity.Manager
+	store           *storage.LocalStore
+	workers         *worker.Pool
+	logger          *slog.Logger
+	sema            chan struct{}
+	pprofAddr       string
+	cancel          context.CancelFunc
+	physics         *pluginPhysics
+	playerDB        plugin.PlayerDB
+	flushBlockDBsFn func()
 }
 
 // New creates the bootstrap server.
@@ -256,4 +257,14 @@ func (s *Server) runTicks(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (s *Server) flushBlockDBs() {
+	if s.flushBlockDBsFn != nil {
+		s.flushBlockDBsFn()
+	}
+}
+
+func (s *Server) SetFlushBlockDBsFn(fn func()) {
+	s.flushBlockDBsFn = fn
 }

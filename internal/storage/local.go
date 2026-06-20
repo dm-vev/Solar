@@ -57,3 +57,13 @@ func (s *LocalStore) WorldFile(name string) string {
 func (s *LocalStore) PlayerPolicyFile() string {
 	return filepath.Join(s.PlayersDir(), s.policyFile)
 }
+
+// BlockDBsDir returns the directory for per-level block change logs.
+func (s *LocalStore) BlockDBsDir() string {
+	return filepath.Join(s.root, "blockdb")
+}
+
+// BlockDBFile returns the path for a level's block change log.
+func (s *LocalStore) BlockDBFile(levelName string) string {
+	return filepath.Join(s.BlockDBsDir(), levelName+".cbdb")
+}

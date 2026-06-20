@@ -101,6 +101,11 @@ func (s *session) handleHandshake() error {
 		}
 	}
 
+	// Resolve BlockDB for the main level and player's DB ID.
+	if s.blockDBForLevel != nil && s.worlds != nil {
+		s.blockDB = s.blockDBForLevel(s.worlds.Current().Name)
+	}
+
 	if plugin.OnPlayerStartConnecting.HasHandlers() {
 		plugin.OnPlayerStartConnecting.Fire(plugin.PlayerStartConnectingData{Player: s})
 	}
@@ -276,6 +281,11 @@ func (s *session) changeMap(mgr *world.Manager) error {
 	// Re-join room — spawns entity for new level peers and vice versa.
 	s.markJoined(false)
 	s.joinRoom()
+
+	// Switch BlockDB to the new level.
+	if s.blockDBForLevel != nil {
+		s.blockDB = s.blockDBForLevel(levelName)
+	}
 
 	if s.entities != nil && entityID != 0 {
 		s.broadcastToPeers(encodeEntityTeleport(byte(entityID),
