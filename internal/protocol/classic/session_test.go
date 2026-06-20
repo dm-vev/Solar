@@ -17,6 +17,7 @@ import (
 	"github.com/solar-mc/solar/internal/player"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
+	"github.com/solar-mc/solar/plugin/playerdb"
 )
 
 func TestServeConnMatchesClassiCubeFlow(t *testing.T) {
@@ -396,6 +397,16 @@ func (m testModeration) FreezePlayer(name string) bool       { return m.backend.
 func (m testModeration) UnfreezePlayer(name string) bool     { return m.backend.UnfreezePlayer(name) }
 func (m testModeration) ToggleAFK(name string) (bool, bool)  { return m.backend.ToggleAFK(name) }
 func (m testModeration) ToggleHide(name string) (bool, bool) { return m.backend.ToggleHide(name) }
+
+func (m testModeration) PlayerDBLookup(name string) *playerdb.PlayerEntry {
+	return m.backend.PlayerDBLookup(name)
+}
+func (m testModeration) ServerName() string          { return m.backend.ServerName() }
+func (m testModeration) ServerMOTD() string          { return m.backend.ServerMOTD() }
+func (m testModeration) OnlinePlayerCount() int      { return m.backend.OnlinePlayerCount() }
+func (m testModeration) MaxPlayersCount() int        { return m.backend.MaxPlayersCount() }
+func (m testModeration) LoadedLevelCount() int       { return m.backend.LoadedLevelCount() }
+func (m testModeration) ServerUptime() time.Duration { return m.backend.ServerUptime() }
 
 type testDirectory struct{ backend SessionBackend }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/solar-mc/solar/internal/generator"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
+	"github.com/solar-mc/solar/plugin/playerdb"
 )
 
 // SessionBackend exposes the session operations that command adapters need.
@@ -78,6 +79,14 @@ type SessionBackend interface {
 	SetLevelWeather(weather int)
 	GetLevelMOTD() string
 	SetLevelMOTD(motd string)
+
+	PlayerDBLookup(name string) *playerdb.PlayerEntry
+	ServerName() string
+	ServerMOTD() string
+	OnlinePlayerCount() int
+	MaxPlayersCount() int
+	LoadedLevelCount() int
+	ServerUptime() time.Duration
 }
 
 // --- SessionBackend implementation on *session ---
@@ -245,6 +254,37 @@ func (s *session) findTarget(name string) (*session, bool) {
 		return nil, false
 	}
 	return s.room.FindByName(name)
+}
+
+// ─── Info service methods ───
+
+func (s *session) PlayerDBLookup(name string) *playerdb.PlayerEntry {
+	if s.playerDB == nil {
+		return nil
+	}
+	return s.playerDB.Get(name)
+}
+
+func (s *session) ServerName() string { return s.serverName }
+func (s *session) ServerMOTD() string { return s.motd }
+func (s *session) OnlinePlayerCount() int {
+	if s.players == nil {
+		return 0
+	}
+	return s.players.Count()
+}
+func (s *session) MaxPlayersCount() int {
+	// ponytail: not available on session; return a default.
+	return 128
+}
+func (s *session) LoadedLevelCount() int {
+	if s.listLoadedLevels == nil {
+		return 1
+	}
+	return len(s.listLoadedLevels())
+}
+func (s *session) ServerUptime() time.Duration {
+	return time.Since(s.loginTime)
 }
 
 func (s *session) OnlineNames() []string {

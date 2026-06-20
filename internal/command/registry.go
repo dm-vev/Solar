@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/plugin/playerdb"
 )
 
 // Position is a coarse world position used by chat commands.
@@ -54,6 +55,22 @@ type ModerationService interface {
 type PlayerDirectory interface {
 	ListPlayers() []string
 	ListWhitelisted() []string
+}
+
+// PlayerLookup exposes offline player data for info commands.
+type PlayerLookup interface {
+	// Lookup returns the PlayerEntry for the named player, or nil.
+	Lookup(name string) *playerdb.PlayerEntry
+}
+
+// ServerInfo exposes server-wide stats for info commands.
+type ServerInfo interface {
+	ServerName() string
+	MOTD() string
+	OnlineCount() int
+	MaxPlayers() int
+	LevelCount() int
+	Uptime() time.Duration
 }
 
 // BlockDefService exposes custom block definition operations.
@@ -131,6 +148,8 @@ type Context struct {
 	BlockDB     BlockDBService
 	Levels      LevelService
 	LevelEnv    LevelEnvService
+	PlayerDB    PlayerLookup
+	ServerInfo  ServerInfo
 	Tr          func(string, ...any) string
 }
 
@@ -195,6 +214,13 @@ func NewRegistry() *Registry {
 	registry.Register("unfreeze", unfreezeCommand)
 	registry.Register("afk", afkCommand)
 	registry.Register("hide", hideCommand)
+	registry.Register("seen", seenCommand)
+	registry.Register("whois", whoisCommand)
+	registry.Register("blocks", blocksCommand)
+	registry.Register("mapinfo", mapinfoCommand)
+	registry.Register("serverinfo", serverinfoCommand)
+	registry.Register("time", timeCommand)
+	registry.Register("rules", rulesCommand)
 	return registry
 }
 

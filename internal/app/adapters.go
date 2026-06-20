@@ -7,6 +7,7 @@ import (
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/protocol/classic"
 	"github.com/solar-mc/solar/internal/world"
+	"github.com/solar-mc/solar/plugin/playerdb"
 )
 
 // sessionAuthority implements command.Authority.
@@ -167,6 +168,8 @@ func buildCommandContext(backend classic.SessionBackend) command.Context {
 		BlockDB:     sessionBlockDB{backend},
 		Levels:      sessionLevels{backend},
 		LevelEnv:    sessionLevelEnv{backend},
+		PlayerDB:    sessionPlayerDB{backend},
+		ServerInfo:  sessionSrvInfo{backend},
 		Tr:          backend.Translate,
 	}
 }
@@ -270,3 +273,22 @@ func (s sessionLevelEnv) MOTD() string {
 func (s sessionLevelEnv) SetMOTD(motd string) {
 	s.backend.SetLevelMOTD(motd)
 }
+
+// ─── PlayerLookup adapter ───
+
+type sessionPlayerDB struct{ backend classic.SessionBackend }
+
+func (s sessionPlayerDB) Lookup(name string) *playerdb.PlayerEntry {
+	return s.backend.PlayerDBLookup(name)
+}
+
+// ─── ServerInfo adapter ───
+
+type sessionSrvInfo struct{ backend classic.SessionBackend }
+
+func (s sessionSrvInfo) ServerName() string    { return s.backend.ServerName() }
+func (s sessionSrvInfo) MOTD() string          { return s.backend.ServerMOTD() }
+func (s sessionSrvInfo) OnlineCount() int      { return s.backend.OnlinePlayerCount() }
+func (s sessionSrvInfo) MaxPlayers() int       { return s.backend.MaxPlayersCount() }
+func (s sessionSrvInfo) LevelCount() int       { return s.backend.LoadedLevelCount() }
+func (s sessionSrvInfo) Uptime() time.Duration { return s.backend.ServerUptime() }

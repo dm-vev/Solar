@@ -1,6 +1,11 @@
 package command
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/solar-mc/solar/plugin/playerdb"
+)
 
 // testTr is a no-op translator for tests: returns the key as-is.
 // This verifies commands use i18n keys, not hardcoded strings.
@@ -298,6 +303,26 @@ func (m stubModeration) FreezePlayer(_ string) bool       { return true }
 func (m stubModeration) UnfreezePlayer(_ string) bool     { return true }
 func (m stubModeration) ToggleAFK(_ string) (bool, bool)  { return true, true }
 func (m stubModeration) ToggleHide(_ string) (bool, bool) { return true, true }
+
+// stubPlayerDB implements PlayerLookup.
+type stubPlayerDB struct{}
+
+func (stubPlayerDB) Lookup(name string) *playerdb.PlayerEntry {
+	if name == "alice" {
+		return &playerdb.PlayerEntry{Name: "Alice", LoginCount: 5}
+	}
+	return nil
+}
+
+// stubServerInfo implements ServerInfo.
+type stubServerInfo struct{}
+
+func (stubServerInfo) ServerName() string    { return "TestServer" }
+func (stubServerInfo) MOTD() string          { return "Test MOTD" }
+func (stubServerInfo) OnlineCount() int      { return 1 }
+func (stubServerInfo) MaxPlayers() int       { return 128 }
+func (stubServerInfo) LevelCount() int       { return 1 }
+func (stubServerInfo) Uptime() time.Duration { return 5 * time.Minute }
 
 type stubDirectory struct {
 	names       []string

@@ -205,6 +205,47 @@
 "command.hide.on" = "&7You are now hidden"
 "command.hide.off" = "&7You are no longer hidden"
 
+# ─── command.info (shared) ───
+"command.info.unavailable" = "player info is unavailable"
+
+# ─── command.seen ───
+"command.seen.usage" = "usage: /seen <name>"
+"command.seen.never" = "%s has never joined"
+"command.seen.last" = "&a%s &7last seen &b%s &7ago"
+
+# ─── command.whois ───
+"command.whois.usage" = "usage: /whois <name>"
+"command.whois.name" = "&aPlayer: &e%s"
+"command.whois.rank" = "&aRank: &7%s"
+"command.whois.first_login" = "&aFirst login: &7%s"
+"command.whois.last_login" = "&aLast login: &7%s"
+"command.whois.playtime" = "&aPlaytime: &7%s"
+"command.whois.logins" = "&aLogins: &7%d"
+"command.whois.ip" = "&aIP: &7%s"
+"command.whois.deaths" = "&aDeaths: &7%d"
+"command.whois.blocks" = "&aBlocks: &7%d placed, %d deleted"
+
+# ─── command.blocks ───
+"command.blocks.stats" = "&a%s: &7%d placed, %d deleted"
+
+# ─── command.mapinfo ───
+"command.mapinfo.levels" = "&aLoaded levels: &7%d"
+"command.mapinfo.blockdb" = "&aBlockDB entries: &7%d"
+"command.mapinfo.weather" = "&aWeather: &7%s"
+
+# ─── command.serverinfo ───
+"command.serverinfo.name" = "&aServer: &e%s"
+"command.serverinfo.players" = "&aPlayers: &7%d/%d"
+"command.serverinfo.levels" = "&aLevels: &7%d"
+"command.serverinfo.uptime" = "&aUptime: &7%s"
+"command.serverinfo.memory" = "&aMemory: &7%d MB"
+
+# ─── command.time ───
+"command.time.current" = "&aServer time: &7%s"
+
+# ─── command.rules ───
+"command.rules.text" = "&e--- Server Rules ---\n&a1. &7Be respectful\n&a2. &7No griefing\n&a3. &7No spam\n&a4. &7Have fun!\n&e--------------------"
+
 [ru]
 # ─── general ───
 "general.muted" = "&cВы в муте."
@@ -391,3 +432,30 @@
 "command.afk.off" = "&7Вы больше не AFK"
 "command.hide.on" = "&7Вы теперь скрыты"
 "command.hide.off" = "&7Вы больше не скрыты"
+
+# ─── command.info (shared) ───
+"command.info.unavailable" = "информация об игроках недоступна"
+"command.seen.usage" = "использование: /seen <имя>"
+"command.seen.never" = "%s никогда не заходил"
+"command.seen.last" = "&a%s &7последний раз был &b%s &7назад"
+"command.whois.usage" = "использование: /whois <имя>"
+"command.whois.name" = "&aИгрок: &e%s"
+"command.whois.rank" = "&aРанг: &7%s"
+"command.whois.first_login" = "&aПервый вход: &7%s"
+"command.whois.last_login" = "&aПоследний вход: &7%s"
+"command.whois.playtime" = "&aВремя в игре: &7%s"
+"command.whois.logins" = "&aВходов: &7%d"
+"command.whois.ip" = "&aIP: &7%s"
+"command.whois.deaths" = "&aСмертей: &7%d"
+"command.whois.blocks" = "&aБлоков: &7%d поставлено, %d сломано"
+"command.blocks.stats" = "&a%s: &7%d поставлено, %d сломано"
+"command.mapinfo.levels" = "&aЗагружено уровней: &7%d"
+"command.mapinfo.blockdb" = "&aЗаписей BlockDB: &7%d"
+"command.mapinfo.weather" = "&aПогода: &7%s"
+"command.serverinfo.name" = "&aСервер: &e%s"
+"command.serverinfo.players" = "&aИгроки: &7%d/%d"
+"command.serverinfo.levels" = "&aУровней: &7%d"
+"command.serverinfo.uptime" = "&aАптайм: &7%s"
+"command.serverinfo.memory" = "&aПамять: &7%d МБ"
+"command.time.current" = "&aВремя сервера: &7%s"
+"command.rules.text" = "&e--- Правила сервера ---\n&a1. &7Уважайте других\n&a2. &7Без гриферства\n&a3. &7Без спама\n&a4. &7Веселитесь!\n&e-----------------------"
