@@ -115,6 +115,44 @@ func encodeLevel(level Level) ([]byte, error) {
 	if _, err := buf.Write(level.Blocks); err != nil {
 		return nil, fmt.Errorf("write blocks: %w", err)
 	}
+	// Env section (version 2+). Preceded by env magic so old files
+	// without it are handled gracefully.
+	buf.WriteString("ENV1")
+	binary.Write(&buf, binary.LittleEndian, level.Env.Weather)
+	binary.Write(&buf, binary.LittleEndian, level.Env.EdgeLevel)
+	binary.Write(&buf, binary.LittleEndian, level.Env.SidesLevel)
+	binary.Write(&buf, binary.LittleEndian, level.Env.CloudsLevel)
+	binary.Write(&buf, binary.LittleEndian, level.Env.MaxFog)
+	if level.Env.ExpFog {
+		buf.WriteByte(1)
+	} else {
+		buf.WriteByte(0)
+	}
+	binary.Write(&buf, binary.LittleEndian, level.Env.CloudsSpeed)
+	binary.Write(&buf, binary.LittleEndian, level.Env.WeatherSpeed)
+	binary.Write(&buf, binary.LittleEndian, level.Env.WeatherFade)
+	binary.Write(&buf, binary.LittleEndian, level.Env.SkyboxHorSpeed)
+	binary.Write(&buf, binary.LittleEndian, level.Env.SkyboxVerSpeed)
+	for i := 0; i < 5; i++ {
+		c := level.Env.Colors[i]
+		buf.WriteByte(c.R)
+		buf.WriteByte(c.G)
+		buf.WriteByte(c.B)
+		if c.Set {
+			buf.WriteByte(1)
+		} else {
+			buf.WriteByte(0)
+		}
+	}
+	buf.WriteByte(level.Env.LightingMode)
+	if level.Env.LightingLock {
+		buf.WriteByte(1)
+	} else {
+		buf.WriteByte(0)
+	}
+	// MOTD
+	binary.Write(&buf, binary.LittleEndian, uint16(len(level.Env.MOTD)))
+	buf.WriteString(level.Env.MOTD)
 	return buf.Bytes(), nil
 }
 
@@ -155,7 +193,51 @@ func decodeLevel(data []byte) (Level, error) {
 		Length: dims[2],
 		Blocks: blocks,
 		Spawn:  spawn,
+		Env:    readEnv(reader),
 	}, nil
+}
+
+// readEnv reads the ENV1 section if present, otherwise returns defaults.
+func readEnv(reader *bytes.Reader) Env {
+	env := DefaultEnv()
+	envMagic := make([]byte, 4)
+	if n, _ := reader.Read(envMagic); n < 4 {
+		return env // no env section, use defaults
+	}
+	if string(envMagic) != "ENV1" {
+		return env // unknown section, use defaults
+	}
+	var b byte
+	binary.Read(reader, binary.LittleEndian, &env.Weather)
+	binary.Read(reader, binary.LittleEndian, &env.EdgeLevel)
+	binary.Read(reader, binary.LittleEndian, &env.SidesLevel)
+	binary.Read(reader, binary.LittleEndian, &env.CloudsLevel)
+	binary.Read(reader, binary.LittleEndian, &env.MaxFog)
+	b, _ = reader.ReadByte()
+	env.ExpFog = b == 1
+	binary.Read(reader, binary.LittleEndian, &env.CloudsSpeed)
+	binary.Read(reader, binary.LittleEndian, &env.WeatherSpeed)
+	binary.Read(reader, binary.LittleEndian, &env.WeatherFade)
+	binary.Read(reader, binary.LittleEndian, &env.SkyboxHorSpeed)
+	binary.Read(reader, binary.LittleEndian, &env.SkyboxVerSpeed)
+	for i := 0; i < 5; i++ {
+		env.Colors[i].R, _ = reader.ReadByte()
+		env.Colors[i].G, _ = reader.ReadByte()
+		env.Colors[i].B, _ = reader.ReadByte()
+		b, _ = reader.ReadByte()
+		env.Colors[i].Set = b == 1
+	}
+	env.LightingMode, _ = reader.ReadByte()
+	b, _ = reader.ReadByte()
+	env.LightingLock = b == 1
+	motdLen, err := readUint16(reader)
+	if err == nil && motdLen > 0 {
+		motd := make([]byte, motdLen)
+		if _, err := io.ReadFull(reader, motd); err == nil {
+			env.MOTD = string(motd)
+		}
+	}
+	return env
 }
 
 func readMagic(reader *bytes.Reader) error {

@@ -64,6 +64,13 @@ type SessionBackend interface {
 	ListLevelFiles() []string
 	CurrentPhysicsMode() int
 	SetCurrentPhysicsMode(mode int)
+
+	GetEnvColor(slot int) (r, g, b byte, set bool)
+	SetLevelEnvColor(slot int, r, g, b byte)
+	GetWeather() int
+	SetLevelWeather(weather int)
+	GetLevelMOTD() string
+	SetLevelMOTD(motd string)
 }
 
 // --- SessionBackend implementation on *session ---
@@ -541,4 +548,61 @@ func (s *session) CurrentPhysicsMode() int {
 
 func (s *session) SetCurrentPhysicsMode(mode int) {
 	// ponytail: physics mode is on pluginServer, not session. No-op for now.
+}
+
+// ─── LevelEnvService methods ───
+
+func (s *session) GetEnvColor(slot int) (r, g, b byte, set bool) {
+	if s.worlds == nil || slot < 0 || slot >= 5 {
+		return 0, 0, 0, false
+	}
+	env := s.worlds.Current().Env
+	c := env.Colors[slot]
+	return c.R, c.G, c.B, c.Set
+}
+
+func (s *session) SetLevelEnvColor(slot int, r, g, b byte) {
+	if s.worlds == nil || slot < 0 || slot >= 5 {
+		return
+	}
+	lvl := s.worlds.Current()
+	lvl.Env.Colors[slot] = world.EnvColor{R: r, G: g, B: b, Set: true}
+	s.worlds.SetCurrent(lvl)
+	s.broadcastToPeers(encodeEnvColor(byte(slot), int16(r), int16(g), int16(b)))
+	_ = s.writePacket(encodeEnvColor(byte(slot), int16(r), int16(g), int16(b)))
+}
+
+func (s *session) GetWeather() int {
+	if s.worlds == nil {
+		return 0
+	}
+	return int(s.worlds.Current().Env.Weather)
+}
+
+func (s *session) SetLevelWeather(weather int) {
+	if s.worlds == nil {
+		return
+	}
+	lvl := s.worlds.Current()
+	lvl.Env.Weather = byte(weather)
+	s.worlds.SetCurrent(lvl)
+	pkt := encodeEnvWeatherType(byte(weather))
+	s.broadcastToPeers(pkt)
+	_ = s.writePacket(pkt)
+}
+
+func (s *session) GetLevelMOTD() string {
+	if s.worlds == nil {
+		return ""
+	}
+	return s.worlds.Current().Env.MOTD
+}
+
+func (s *session) SetLevelMOTD(motd string) {
+	if s.worlds == nil {
+		return
+	}
+	lvl := s.worlds.Current()
+	lvl.Env.MOTD = motd
+	s.worlds.SetCurrent(lvl)
 }

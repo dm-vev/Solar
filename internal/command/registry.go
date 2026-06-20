@@ -82,24 +82,32 @@ type BlockDBService interface {
 
 // LevelService exposes multi-level operations for commands.
 type LevelService interface {
-	// Goto teleports the player to the named level. Returns false if not found.
 	Goto(levelName string) bool
-	// MainLevel returns the name of the main level.
 	MainLevel() string
-	// LoadLevel loads a level from disk. Returns false on error.
 	LoadLevel(name string) bool
-	// UnloadLevel unloads a level (not the main). Returns false if players online or not found.
 	UnloadLevel(name string) bool
-	// ReloadLevel reloads the player's current level from disk.
 	ReloadLevel() bool
-	// ListLevels returns loaded level names.
 	ListLevels() []string
-	// ListLevelFiles returns level file names on disk.
 	ListLevelFiles() []string
-	// PhysicsMode returns the current physics mode for the player's level.
 	PhysicsMode() int
-	// SetPhysicsMode sets the physics mode for the player's level.
 	SetPhysicsMode(mode int)
+}
+
+// LevelEnvService exposes per-level environment properties for commands.
+type LevelEnvService interface {
+	// GetEnvColor returns the color for the given slot (0=sky, 1=cloud,
+	// 2=fog, 3=ambient, 4=diffuse). Returns r, g, b, set.
+	GetEnvColor(slot int) (r, g, b byte, set bool)
+	// SetEnvColor sets the color for the given slot.
+	SetEnvColor(slot int, r, g, b byte)
+	// Weather returns the current weather (0=sunny, 1=rain, 2=snow).
+	Weather() int
+	// SetWeather sets the weather and broadcasts to level players.
+	SetWeather(weather int)
+	// MOTD returns the per-level MOTD.
+	MOTD() string
+	// SetMOTD sets the per-level MOTD.
+	SetMOTD(motd string)
 }
 
 // Context carries command execution state.
@@ -116,6 +124,7 @@ type Context struct {
 	BlockDefs   BlockDefService
 	BlockDB     BlockDBService
 	Levels      LevelService
+	LevelEnv    LevelEnvService
 	Tr          func(string, ...any) string
 }
 
@@ -144,7 +153,7 @@ func NewRegistry() *Registry {
 		handlers: make(map[string]Handler),
 		admin:    make(map[string]struct{}),
 	}
-	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb", "blockdb", "load", "unload", "reload", "physics"} {
+	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb", "blockdb", "load", "unload", "reload", "physics", "map"} {
 		registry.admin[cmd] = struct{}{}
 	}
 	registry.Register("help", helpCommand(registry))
@@ -173,6 +182,7 @@ func NewRegistry() *Registry {
 	registry.Register("reload", reloadCommand)
 	registry.Register("levels", levelsCommand)
 	registry.Register("physics", physicsCommand)
+	registry.Register("map", mapCommand)
 	return registry
 }
 

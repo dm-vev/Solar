@@ -164,6 +164,19 @@
 "command.physics.current" = "physics mode: %d"
 "command.physics.set" = "physics mode set to %d"
 
+# ─── command.map ───
+"command.map.usage" = "usage: /map [weather|sky|cloud|fog|ambient|diffuse|motd] [value...]"
+"command.map.weather.usage" = "usage: /map weather [0|1|2] (0=sunny, 1=rain, 2=snow)"
+"command.map.weather.invalid" = "invalid weather (0, 1, or 2)"
+"command.map.weather.set" = "weather set to %d"
+"command.map.color.usage" = "usage: /map %s r g b (0-255 each)"
+"command.map.color.invalid" = "invalid %s component (0-255)"
+"command.map.color.set" = "%s color set to %d %d %d"
+"command.map.motd.usage" = "usage: /map motd <text>"
+"command.map.motd.set" = "level MOTD updated"
+"command.map.info.weather" = "&aWeather: &7%s"
+"command.map.info.motd" = "&aMOTD: &7%s"
+
 [ru]
 # ─── general ───
 "general.muted" = "&cВы в муте."
@@ -321,3 +334,16 @@
 "command.physics.usage" = "использование: /physics [0|1|2|3] (0=выкл, 1=базовый, 2=продвинутый, 3=кастом)"
 "command.physics.current" = "режим физики: %d"
 "command.physics.set" = "режим физики установлен на %d"
+
+# ─── command.map ───
+"command.map.usage" = "использование: /map [weather|sky|cloud|fog|ambient|diffuse|motd] [значение...]"
+"command.map.weather.usage" = "использование: /map weather [0|1|2] (0=ясно, 1=дождь, 2=снег)"
+"command.map.weather.invalid" = "неверная погода (0, 1 или 2)"
+"command.map.weather.set" = "погода установлена на %d"
+"command.map.color.usage" = "использование: /map %s r g b (0-255 каждый)"
+"command.map.color.invalid" = "неверная компонента %s (0-255)"
+"command.map.color.set" = "цвет %s установлен на %d %d %d"
+"command.map.motd.usage" = "использование: /map motd <текст>"
+"command.map.motd.set" = "MOTD уровня обновлён"
+"command.map.info.weather" = "&aПогода: &7%s"
+"command.map.info.motd" = "&aMOTD: &7%s"

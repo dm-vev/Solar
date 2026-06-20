@@ -49,6 +49,7 @@ func FromGeneratorLevel(lvl *generator.Level) Level {
 			Yaw:   lvl.Spawn.Yaw,
 			Pitch: lvl.Spawn.Pitch,
 		},
+		Env: DefaultEnv(),
 	}
 }
 
@@ -83,6 +84,41 @@ type Spawn struct {
 	Pitch byte
 }
 
+// EnvColor is an RGB color for a CPE environment slot.
+type EnvColor struct {
+	R, G, B byte
+	Set     bool // false = use client default
+}
+
+// Env holds per-level environment properties that drive CPE packets.
+type Env struct {
+	Weather        byte  // 0=sunny, 1=raining, 2=snowing
+	EdgeLevel      int16 // map sides bottom level
+	SidesLevel     int16 // map sides top level
+	CloudsLevel    int16 // clouds height
+	MaxFog         int16 // max fog distance (0 = default)
+	ExpFog         bool
+	CloudsSpeed    int32 // clouds speed * 256
+	WeatherSpeed   int32 // weather speed * 256
+	WeatherFade    int32 // weather fade * 256
+	SkyboxHorSpeed int32
+	SkyboxVerSpeed int32
+	Colors         [5]EnvColor // 0=sky, 1=cloud, 2=fog, 3=ambient, 4=diffuse
+	LightingMode   byte        // 0=classic, 1=fancy
+	LightingLock   bool
+	MOTD           string
+}
+
+// DefaultEnv returns environment defaults (classic Minecraft look).
+func DefaultEnv() Env {
+	return Env{
+		EdgeLevel:   -1, // signals "not set"
+		SidesLevel:  -1,
+		CloudsLevel: -1,
+		MaxFog:      -1,
+	}
+}
+
 // Level is the minimal world state needed by the bootstrap protocol.
 type Level struct {
 	Name   string
@@ -91,6 +127,7 @@ type Level struct {
 	Length int
 	Blocks []byte
 	Spawn  Spawn
+	Env    Env
 }
 
 // Volume returns the number of blocks in the level.

@@ -240,6 +240,9 @@ func (s *session) sendLevelFrom(mgr *world.Manager, fastMap bool) error {
 		return err
 	}
 
+	// Send environment CPE packets based on level.Env.
+	s.sendEnv(level.Env)
+
 	if plugin.OnSentMap.HasHandlers() {
 		plugin.OnSentMap.Fire(plugin.SentMapData{Player: s})
 	}

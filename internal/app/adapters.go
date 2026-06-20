@@ -142,6 +142,7 @@ func buildCommandContext(backend classic.SessionBackend) command.Context {
 		BlockDefs:   sessionBlockDefs{backend},
 		BlockDB:     sessionBlockDB{backend},
 		Levels:      sessionLevels{backend},
+		LevelEnv:    sessionLevelEnv{backend},
 		Tr:          backend.Translate,
 	}
 }
@@ -216,4 +217,32 @@ func (s sessionLevels) PhysicsMode() int {
 
 func (s sessionLevels) SetPhysicsMode(mode int) {
 	s.backend.SetCurrentPhysicsMode(mode)
+}
+
+// ─── LevelEnvService adapter ───
+
+type sessionLevelEnv struct{ backend classic.SessionBackend }
+
+func (s sessionLevelEnv) GetEnvColor(slot int) (r, g, b byte, set bool) {
+	return s.backend.GetEnvColor(slot)
+}
+
+func (s sessionLevelEnv) SetEnvColor(slot int, r, g, b byte) {
+	s.backend.SetLevelEnvColor(slot, r, g, b)
+}
+
+func (s sessionLevelEnv) Weather() int {
+	return s.backend.GetWeather()
+}
+
+func (s sessionLevelEnv) SetWeather(weather int) {
+	s.backend.SetLevelWeather(weather)
+}
+
+func (s sessionLevelEnv) MOTD() string {
+	return s.backend.GetLevelMOTD()
+}
+
+func (s sessionLevelEnv) SetMOTD(motd string) {
+	s.backend.SetLevelMOTD(motd)
 }
