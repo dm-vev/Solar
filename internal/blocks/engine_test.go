@@ -1,11 +1,11 @@
-package physics
+package blocks
 
 import (
 	"sync"
 	"testing"
 )
 
-func makeEngine(w, h, l int) (*Engine, []byte) {
+func makeEngine(w, h, l int) (*PhysicsEngine, []byte) {
 	blocks := make([]byte, w*h*l)
 	var mu sync.Mutex
 	broadcast := func(x, y, z int, block byte) {
@@ -24,7 +24,7 @@ func makeEngine(w, h, l int) (*Engine, []byte) {
 			blocks[idx] = block
 		}
 	}
-	e := New(w, h, l, getBlk, setBlk, broadcast)
+	e := NewPhysics(w, h, l, getBlk, setBlk, broadcast)
 	e.SetMode(ModeAdvanced)
 	return e, blocks
 }

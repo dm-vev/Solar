@@ -43,7 +43,7 @@
 //
 //   - opcodes.go defines the Classic protocol packet IDs.
 //
-//   - blockdef.go sends custom block definitions to clients.
+//   - blocks.go sends custom block definitions to clients.
 //
 //   - level_stream.go encodes the level data stream (gzip or fastmap).
 package classic

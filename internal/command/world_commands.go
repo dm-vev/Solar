@@ -105,7 +105,7 @@ func physicsCommand(ctx Context, args []string) (string, bool) {
 	}
 	if len(args) == 0 {
 		mode := ctx.Levels.PhysicsMode()
-		return ctx.tr("command.physics.current", mode), true
+		return ctx.tr("command.blocks.current", mode), true
 	}
 	var mode int
 	switch args[0] {
@@ -118,8 +118,8 @@ func physicsCommand(ctx Context, args []string) (string, bool) {
 	case "3", "custom":
 		mode = 3
 	default:
-		return ctx.tr("command.physics.usage"), true
+		return ctx.tr("command.blocks.usage"), true
 	}
 	ctx.Levels.SetPhysicsMode(mode)
-	return ctx.tr("command.physics.set", mode), true
+	return ctx.tr("command.blocks.set", mode), true
 }

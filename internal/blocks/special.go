@@ -15,7 +15,7 @@
 //   Doors: 201 (Door_Log_air), 168-174 (oDoor variants)
 //   TNT: 182 (small), 183 (big), 186 (nuke), 184 (explosion visual)
 
-package specialblocks
+package blocks
 
 import (
 	"sync"
@@ -33,10 +33,6 @@ const (
 	PortalLava   byte = 162
 	PortalBlue   byte = 175
 	PortalOrange byte = 176
-	TNTSmall     byte = 182
-	TNTBig       byte = 183
-	TNTExplosion byte = 184
-	TNTNuke      byte = 186
 	DoorLogAir   byte = 201
 )
 
@@ -51,7 +47,7 @@ const (
 )
 
 // Entry stores metadata for a special block at a coordinate.
-type Entry struct {
+type SpecialEntry struct {
 	Type        SpecialType
 	Message     string // for message blocks
 	PortalDst   [3]int // for portals: destination coords
@@ -65,25 +61,25 @@ func key(x, y, z int) int64 {
 }
 
 // Registry stores special blocks for a single level.
-type Registry struct {
+type SpecialRegistry struct {
 	mu      sync.RWMutex
-	entries map[int64]*Entry
+	entries map[int64]*SpecialEntry
 }
 
 // NewRegistry creates an empty special block registry.
-func NewRegistry() *Registry {
-	return &Registry{entries: make(map[int64]*Entry)}
+func NewSpecialRegistry() *SpecialRegistry {
+	return &SpecialRegistry{entries: make(map[int64]*SpecialEntry)}
 }
 
 // Set registers a special block at the given coordinates.
-func (r *Registry) Set(x, y, z int, e *Entry) {
+func (r *SpecialRegistry) Set(x, y, z int, e *SpecialEntry) {
 	r.mu.Lock()
 	r.entries[key(x, y, z)] = e
 	r.mu.Unlock()
 }
 
 // Get returns the special block entry at the given coordinates, or nil.
-func (r *Registry) Get(x, y, z int) *Entry {
+func (r *SpecialRegistry) Get(x, y, z int) *SpecialEntry {
 	r.mu.RLock()
 	e := r.entries[key(x, y, z)]
 	r.mu.RUnlock()
@@ -91,7 +87,7 @@ func (r *Registry) Get(x, y, z int) *Entry {
 }
 
 // Remove deletes a special block entry.
-func (r *Registry) Remove(x, y, z int) {
+func (r *SpecialRegistry) Remove(x, y, z int) {
 	r.mu.Lock()
 	delete(r.entries, key(x, y, z))
 	r.mu.Unlock()

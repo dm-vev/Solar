@@ -7,7 +7,7 @@
 //	  PackedIndex(LE i32) + OldBlock(u8) + NewBlock(u8) + Flags(LE u16)
 //
 // All integers are little-endian, matching MCGalaxy's BlockDBFile.V1.
-package blockdb
+package blocks
 
 import (
 	"encoding/binary"

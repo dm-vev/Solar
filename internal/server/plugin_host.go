@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/solar-mc/solar/internal/blockdb"
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
@@ -236,7 +236,7 @@ func (p *pluginServer) BlockDB(levelName string) plugin.BlockDB {
 	}
 	lvl := mgr.Current()
 	path := p.server.store.BlockDBFile(levelName)
-	db, err := blockdb.New(path, lvl.Width, lvl.Height, lvl.Length)
+	db, err := blocks.New(path, lvl.Width, lvl.Height, lvl.Length)
 	if err != nil {
 		p.server.logger.Error("load blockdb", "level", levelName, "error", err)
 		return nil

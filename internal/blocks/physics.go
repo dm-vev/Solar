@@ -7,7 +7,7 @@
 //
 // The engine runs in the server tick loop (20 TPS by default).
 // Block changes from physics are broadcast to all players on the level.
-package physics
+package blocks
 
 import (
 	"math/rand"
@@ -53,7 +53,7 @@ const removeFlag = 255
 // Engine runs block physics for a single level.
 // It accesses blocks through getBlock/setBlock callbacks so it shares
 // the same block array as the world.Manager (no copy divergence).
-type Engine struct {
+type PhysicsEngine struct {
 	mu        sync.Mutex
 	width     int
 	height    int
@@ -81,8 +81,8 @@ type updateEntry struct {
 // getBlock returns the block at a flat index; setBlock stages a block
 // change (applied at end of tick). broadcast is called for each block
 // change so clients see the update.
-func New(width, height, length int, getBlk func(int) byte, setBlk func(int, byte), broadcast func(x, y, z int, block byte)) *Engine {
-	return &Engine{
+func NewPhysics(width, height, length int, getBlk func(int) byte, setBlk func(int, byte), broadcast func(x, y, z int, block byte)) *PhysicsEngine {
+	return &PhysicsEngine{
 		width:     width,
 		height:    height,
 		length:    length,
@@ -94,21 +94,21 @@ func New(width, height, length int, getBlk func(int) byte, setBlk func(int, byte
 	}
 }
 
-func (e *Engine) Mode() int {
+func (e *PhysicsEngine) Mode() int {
 	e.mu.Lock()
 	m := e.mode
 	e.mu.Unlock()
 	return m
 }
 
-func (e *Engine) SetMode(mode int) {
+func (e *PhysicsEngine) SetMode(mode int) {
 	e.mu.Lock()
 	e.mode = mode
 	e.mu.Unlock()
 }
 
 // Queue adds a block at the given coordinates for processing next tick.
-func (e *Engine) Queue(x, y, z int) {
+func (e *PhysicsEngine) Queue(x, y, z int) {
 	idx := e.posToInt(x, y, z)
 	if idx < 0 {
 		return
@@ -119,7 +119,7 @@ func (e *Engine) Queue(x, y, z int) {
 }
 
 // Tick processes one physics tick.
-func (e *Engine) Tick() {
+func (e *PhysicsEngine) Tick() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -150,7 +150,7 @@ func (e *Engine) Tick() {
 	e.updates = e.updates[:0]
 }
 
-func (e *Engine) processBlock(c *checkEntry, block byte, adv bool) {
+func (e *PhysicsEngine) processBlock(c *checkEntry, block byte, adv bool) {
 	x, y, z := e.intToPos(c.index)
 
 	switch block {
@@ -197,14 +197,14 @@ func (e *Engine) processBlock(c *checkEntry, block byte, adv bool) {
 
 // ─── coordinate helpers ───
 
-func (e *Engine) posToInt(x, y, z int) int {
+func (e *PhysicsEngine) posToInt(x, y, z int) int {
 	if x < 0 || x >= e.width || y < 0 || y >= e.height || z < 0 || z >= e.length {
 		return -1
 	}
 	return x + e.width*(z+e.length*y)
 }
 
-func (e *Engine) intToPos(idx int) (x, y, z int) {
+func (e *PhysicsEngine) intToPos(idx int) (x, y, z int) {
 	y = idx / (e.width * e.length)
 	rem := idx - y*e.width*e.length
 	z = rem / e.width
@@ -212,26 +212,26 @@ func (e *Engine) intToPos(idx int) (x, y, z int) {
 	return
 }
 
-func (e *Engine) getBlock(idx int) byte {
+func (e *PhysicsEngine) getBlock(idx int) byte {
 	if idx < 0 {
 		return Invalid
 	}
 	return e.getBlk(idx)
 }
 
-func (e *Engine) setBlock(idx int, block byte) {
+func (e *PhysicsEngine) setBlock(idx int, block byte) {
 	if idx >= 0 {
 		e.updates = append(e.updates, updateEntry{index: idx, block: block})
 	}
 }
 
-func (e *Engine) queueCheck(idx int) {
+func (e *PhysicsEngine) queueCheck(idx int) {
 	if idx >= 0 {
 		e.checks = append(e.checks, checkEntry{index: idx})
 	}
 }
 
-func (e *Engine) applyUpdate(u updateEntry) {
+func (e *PhysicsEngine) applyUpdate(u updateEntry) {
 	if u.index < 0 {
 		return
 	}
@@ -245,7 +245,7 @@ func (e *Engine) applyUpdate(u updateEntry) {
 	}
 }
 
-func (e *Engine) activateNeighbours(idx int) {
+func (e *PhysicsEngine) activateNeighbours(idx int) {
 	w := e.width
 	wl := e.width * e.length
 	e.queueCheck(idx + 1)
@@ -258,7 +258,7 @@ func (e *Engine) activateNeighbours(idx int) {
 
 // ─── liquid physics (water + lava) ───
 
-func (e *Engine) doLiquid(c *checkEntry, x, y, z int, block byte, isLava, adv bool) {
+func (e *PhysicsEngine) doLiquid(c *checkEntry, x, y, z int, block byte, isLava, adv bool) {
 	// Lava delay: upper 3 bits of data must reach 4<<5 before flowing.
 	if isLava && block != FastLava {
 		if c.data < 4<<5 {
@@ -323,7 +323,7 @@ func (e *Engine) doLiquid(c *checkEntry, x, y, z int, block byte, isLava, adv bo
 	}
 }
 
-func (e *Engine) liquidBlocked(idx int, isLava, adv bool) bool {
+func (e *PhysicsEngine) liquidBlocked(idx int, isLava, adv bool) bool {
 	b := e.getBlock(idx)
 	switch b {
 	case Air, Invalid:
@@ -338,7 +338,7 @@ func (e *Engine) liquidBlocked(idx int, isLava, adv bool) bool {
 	return true
 }
 
-func (e *Engine) trySpread(idx int, block byte, isLava, adv bool) {
+func (e *PhysicsEngine) trySpread(idx int, block byte, isLava, adv bool) {
 	if idx < 0 {
 		return
 	}
@@ -375,7 +375,7 @@ func (e *Engine) trySpread(idx int, block byte, isLava, adv bool) {
 	}
 }
 
-func (e *Engine) checkSponge(idx int, isLava bool) bool {
+func (e *PhysicsEngine) checkSponge(idx int, isLava bool) bool {
 	x, y, z := e.intToPos(idx)
 	target := Sponge
 	if isLava {
@@ -395,7 +395,7 @@ func (e *Engine) checkSponge(idx int, isLava bool) bool {
 
 // ─── sand / gravel falling ───
 
-func (e *Engine) doFalling(c *checkEntry, x, y, z int, block byte, adv bool) {
+func (e *PhysicsEngine) doFalling(c *checkEntry, x, y, z int, block byte, adv bool) {
 	idx := e.posToInt(x, y, z)
 	movedDown := false
 
@@ -451,7 +451,7 @@ func (e *Engine) doFalling(c *checkEntry, x, y, z int, block byte, adv bool) {
 
 // ─── grass grow / die ───
 
-func (e *Engine) doGrassGrow(c *checkEntry, x, y, z int) {
+func (e *PhysicsEngine) doGrassGrow(c *checkEntry, x, y, z int) {
 	if c.data > 20 {
 		above := e.getBlock(e.posToInt(x, y+1, z))
 		if e.lightPasses(above) {
@@ -463,7 +463,7 @@ func (e *Engine) doGrassGrow(c *checkEntry, x, y, z int) {
 	}
 }
 
-func (e *Engine) doGrassDie(c *checkEntry, x, y, z int) {
+func (e *PhysicsEngine) doGrassDie(c *checkEntry, x, y, z int) {
 	if c.data > 20 {
 		above := e.getBlock(e.posToInt(x, y+1, z))
 		if !e.lightPasses(above) {
@@ -475,7 +475,7 @@ func (e *Engine) doGrassDie(c *checkEntry, x, y, z int) {
 	}
 }
 
-func (e *Engine) lightPasses(b byte) bool {
+func (e *PhysicsEngine) lightPasses(b byte) bool {
 	switch b {
 	case Air, Glass, Leaves, Invalid:
 		return true
@@ -485,7 +485,7 @@ func (e *Engine) lightPasses(b byte) bool {
 
 // ─── leaf decay ───
 
-func (e *Engine) doLeafDecay(c *checkEntry, x, y, z int) {
+func (e *PhysicsEngine) doLeafDecay(c *checkEntry, x, y, z int) {
 	if c.data < 5 {
 		if e.rng.Intn(10) == 0 {
 			c.data++
@@ -499,7 +499,7 @@ func (e *Engine) doLeafDecay(c *checkEntry, x, y, z int) {
 	c.data = removeFlag
 }
 
-func (e *Engine) hasNearbyLog(x, y, z int) bool {
+func (e *PhysicsEngine) hasNearbyLog(x, y, z int) bool {
 	for dy := -4; dy <= 4; dy++ {
 		for dz := -4; dz <= 4; dz++ {
 			for dx := -4; dx <= 4; dx++ {
@@ -514,7 +514,7 @@ func (e *Engine) hasNearbyLog(x, y, z int) bool {
 
 // ─── fire spread ───
 
-func (e *Engine) doFire(c *checkEntry, x, y, z int, adv bool) {
+func (e *PhysicsEngine) doFire(c *checkEntry, x, y, z int, adv bool) {
 	if c.data < 2 {
 		c.data++
 		return
@@ -573,7 +573,7 @@ func (e *Engine) doFire(c *checkEntry, x, y, z int, adv bool) {
 
 // ─── sponge ───
 
-func (e *Engine) doSponge(c *checkEntry, x, y, z int, isLava bool) {
+func (e *PhysicsEngine) doSponge(c *checkEntry, x, y, z int, isLava bool) {
 	// Absorb nearby liquid.
 	liquid := []byte{Water, StillWater}
 	if isLava {
@@ -597,7 +597,7 @@ func (e *Engine) doSponge(c *checkEntry, x, y, z int, isLava bool) {
 
 // ─── block property helpers ───
 
-func (e *Engine) waterKills(b byte) bool {
+func (e *PhysicsEngine) waterKills(b byte) bool {
 	switch b {
 	case Sapling:
 		return true
@@ -605,7 +605,7 @@ func (e *Engine) waterKills(b byte) bool {
 	return false
 }
 
-func (e *Engine) lavaKills(b byte) bool {
+func (e *PhysicsEngine) lavaKills(b byte) bool {
 	switch b {
 	case Wood, Log, Leaves, Sponge, Sapling:
 		return true
@@ -621,7 +621,7 @@ const (
 
 // ─── TNT explosion (ported from MCGalaxy TntPhysics) ───
 
-func (e *Engine) doTNT(c *checkEntry, x, y, z int, block byte, adv bool) {
+func (e *PhysicsEngine) doTNT(c *checkEntry, x, y, z int, block byte, adv bool) {
 	// MCGalaxy: physics < 3 → just remove TNT (no explosion).
 	// physics >= 3 → fuse delay (5 ticks) before explosion.
 	// physics >= 2 (advanced) → explode immediately via MakeExplosion.
@@ -645,7 +645,7 @@ func (e *Engine) doTNT(c *checkEntry, x, y, z int, block byte, adv bool) {
 
 // makeExplosion mirrors MCGalaxy's MakeExplosion + Explode:
 // 3 layered passes with increasing radius and decreasing probability.
-func (e *Engine) makeExplosion(x, y, z, size int) {
+func (e *PhysicsEngine) makeExplosion(x, y, z, size int) {
 	// Set center to TNT_Explosion (visual block 184).
 	centerIdx := e.posToInt(x, y, z)
 	if centerIdx >= 0 {
@@ -659,7 +659,7 @@ func (e *Engine) makeExplosion(x, y, z, size int) {
 
 // explodeLayer destroys blocks in a cube of the given radius.
 // prob < 0 means always destroy. Otherwise prob/10 chance per block.
-func (e *Engine) explodeLayer(cx, cy, cz, size, prob int) {
+func (e *PhysicsEngine) explodeLayer(cx, cy, cz, size, prob int) {
 	for x := cx - size; x <= cx+size; x++ {
 		for y := cy - size; y <= cy+size; y++ {
 			for z := cz - size; z <= cz+size; z++ {

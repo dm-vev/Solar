@@ -9,7 +9,7 @@
 //   - Line: 3D Bresenham
 //   - Sphere: integer squared distance (AdvSphere)
 //   - Fill: 6-connected flood fill
-package drawing
+package blocks
 
 // Vec3 is a 3D integer coordinate.
 type Vec3 struct{ X, Y, Z int }

@@ -6,7 +6,7 @@
 // The clipboard is per-player (stored on the session) and persists
 // until overwritten by a new /copy.
 
-package drawing
+package blocks
 
 // CopyState holds a captured region of blocks for paste.
 type CopyState struct {

@@ -26,13 +26,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/solar-mc/solar/internal/blockdb"
-	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
-	"github.com/solar-mc/solar/internal/drawing"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
-	"github.com/solar-mc/solar/internal/specialblocks"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
 	"github.com/solar-mc/solar/plugin/playerdb"
@@ -225,7 +222,7 @@ func (s *session) CopyRegion(min, max [3]int) bool {
 	if w < 1 || h < 1 || l < 1 {
 		return false
 	}
-	cs := drawing.NewCopyState(w, h, l)
+	cs := blocks.NewCopyState(w, h, l)
 	for y := 0; y < h; y++ {
 		for z := 0; z < l; z++ {
 			for x := 0; x < w; x++ {
@@ -259,8 +256,8 @@ func (s *session) SetSpecialBlock(x, y, z int, entry command.SpecialBlockEntry) 
 	if s.specialBlocks == nil {
 		return false
 	}
-	s.specialBlocks.Set(x, y, z, &specialblocks.Entry{
-		Type:        specialblocks.SpecialType(entry.Type),
+	s.specialBlocks.Set(x, y, z, &blocks.SpecialEntry{
+		Type:        blocks.SpecialType(entry.Type),
 		Message:     entry.Message,
 		PortalDst:   [3]int{entry.PortalX, entry.PortalY, entry.PortalZ},
 		PortalLevel: entry.PortalLevel,
@@ -624,7 +621,7 @@ func entityPosition(x, y, z int) entity.Position {
 
 // --- Block definition methods ---
 
-func (s *session) AddBlockDef(def blockdef.BlockDefinition) bool {
+func (s *session) AddBlockDef(def blocks.BlockDefinition) bool {
 	if s.blockDefs == nil {
 		return false
 	}
@@ -644,14 +641,14 @@ func (s *session) RemoveBlockDef(id byte) bool {
 	return true
 }
 
-func (s *session) GetBlockDef(id byte) (blockdef.BlockDefinition, bool) {
+func (s *session) GetBlockDef(id byte) (blocks.BlockDefinition, bool) {
 	if s.blockDefs == nil {
-		return blockdef.BlockDefinition{}, false
+		return blocks.BlockDefinition{}, false
 	}
 	return s.blockDefs.Get(id)
 }
 
-func (s *session) ListBlockDefs() []blockdef.BlockDefinition {
+func (s *session) ListBlockDefs() []blocks.BlockDefinition {
 	if s.blockDefs == nil {
 		return nil
 	}
@@ -718,7 +715,7 @@ func (s *session) BlockDBRevertBlock(x, y, z int, block byte) bool {
 	return s.applyBlockChange(x, y, z, block, true) == nil
 }
 
-func convertEntries(entries []plugin.BlockEntry, nc *blockdb.NameConverter) []command.BlockDBEntry {
+func convertEntries(entries []plugin.BlockEntry, nc *blocks.NameConverter) []command.BlockDBEntry {
 	if len(entries) == 0 {
 		return nil
 	}

@@ -6,8 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/solar-mc/solar/internal/antispam"
-	"github.com/solar-mc/solar/internal/blockdb"
-	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/config"
 	"github.com/solar-mc/solar/internal/entity"
@@ -44,7 +43,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	core.SetMaxBlocks(cfg.World.MaxBlocks)
 
 	blockDefsDir := filepath.Join(cfg.DataDir, cfg.Storage.BlockDefsDir)
-	blockDefs := blockdef.NewRegistry(blockDefsDir)
+	blockDefs := blocks.NewRegistry(blockDefsDir)
 	if err := blockDefs.LoadGlobal(); err != nil {
 		logger.Error("load block definitions", "error", err)
 	}
@@ -113,7 +112,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	pluginSrv.PostInit()
 	codec.SetPlayerDatabase(pluginSrv.PlayerDB())
 	codec.SetBlockDBLookup(pluginSrv.BlockDB)
-	codec.SetNameConverter(blockdb.NewNameConverter())
+	codec.SetNameConverter(blocks.NewNameConverter())
 	codec.SetLevelCallbacks(
 		pluginSrv.ChangeMap,
 		pluginSrv.MainLevelName,

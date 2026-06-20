@@ -18,7 +18,7 @@ package classic
 import (
 	"time"
 
-	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin/playerdb"
@@ -73,10 +73,10 @@ type SessionBackend interface {
 	OnlineNames() []string
 	WhitelistNames() []string
 
-	AddBlockDef(def blockdef.BlockDefinition) bool
+	AddBlockDef(def blocks.BlockDefinition) bool
 	RemoveBlockDef(id byte) bool
-	GetBlockDef(id byte) (blockdef.BlockDefinition, bool)
-	ListBlockDefs() []blockdef.BlockDefinition
+	GetBlockDef(id byte) (blocks.BlockDefinition, bool)
+	ListBlockDefs() []blocks.BlockDefinition
 	FreeBlockID() byte
 
 	BlockDBChangesAt(x, y, z int) []command.BlockDBEntry

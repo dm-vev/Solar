@@ -30,7 +30,7 @@ type PhysicsBlock struct {
 //nolint:revive // intentional: re-exported as plugin.X
 type PhysicsHandler func(block PhysicsBlock) bool
 
-// Physics is the interface plugins use to control block physics.
+// Physics is the interface plugins use to control block blocks.
 type Physics interface {
 	// Mode returns the current physics mode for the main level.
 	Mode() PhysicsMode

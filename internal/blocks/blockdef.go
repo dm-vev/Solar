@@ -1,4 +1,4 @@
-package blockdef
+package blocks
 
 import "math"
 

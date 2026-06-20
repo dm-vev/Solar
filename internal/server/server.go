@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/config"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/network"
-	"github.com/solar-mc/solar/internal/physics"
 	"github.com/solar-mc/solar/internal/player"
 	"github.com/solar-mc/solar/internal/protocol/classic"
 	"github.com/solar-mc/solar/internal/storage"
@@ -39,7 +39,7 @@ type Server struct {
 	pprofAddr       string
 	cancel          context.CancelFunc
 	physics         *pluginPhysics
-	blockPhysics    *physics.Engine
+	blockPhysics    *blocks.PhysicsEngine
 	playerDB        plugin.PlayerDB
 	flushBlockDBsFn func()
 }
@@ -109,7 +109,7 @@ func (s *Server) Run(ctx context.Context) error {
 	// Create block physics engine for the main level.
 	lvl := s.worlds.Current()
 	w, h, l := lvl.Width, lvl.Height, lvl.Length
-	s.blockPhysics = physics.New(w, h, l,
+	s.blockPhysics = blocks.NewPhysics(w, h, l,
 		func(idx int) byte {
 			// Convert flat index to xyz and read from world.Manager.
 			y := idx / (w * l)
@@ -299,7 +299,7 @@ func (s *Server) runTicks(ctx context.Context) {
 			}
 			s.codec.BroadcastEntityUpdates()
 			s.blockPhysics.Tick()
-			s.physics.Tick()
+			s.blockPhysics.Tick()
 			plugin.DefaultScheduler.Tick()
 			if plugin.OnTick.HasHandlers() {
 				plugin.OnTick.Fire(plugin.TickData{Tick: s.worlds.TickCount()})
@@ -319,6 +319,6 @@ func (s *Server) SetFlushBlockDBsFn(fn func()) {
 }
 
 // BlockPhysics returns the block physics engine for the main level.
-func (s *Server) BlockPhysics() *physics.Engine {
+func (s *Server) BlockPhysics() *blocks.PhysicsEngine {
 	return s.blockPhysics
 }

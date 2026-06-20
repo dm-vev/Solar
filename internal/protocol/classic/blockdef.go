@@ -1,4 +1,4 @@
-// blockdef.go sends custom block definitions to clients.
+// blocks.go sends custom block definitions to clients.
 //
 // Custom blocks use the BlockDefinitions CPE extension to define
 // new block types beyond the original 255 Classic blocks. Each
@@ -14,7 +14,7 @@ package classic
 import (
 	"fmt"
 
-	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/internal/blocks"
 )
 
 // sendBlockDefinitions pushes all custom block definitions to the client
@@ -35,7 +35,7 @@ func (s *session) sendBlockDefinitions() error {
 
 // encodeBlockDef chooses the appropriate packet variant based on which
 // CPE extension version the client supports.
-func (s *session) encodeBlockDef(def blockdef.BlockDefinition) []byte {
+func (s *session) encodeBlockDef(def blocks.BlockDefinition) []byte {
 	extTex := s.supportsExt(cpeExtExtTextures)
 	if !def.IsSprite() && s.supportsExt(cpeExtBlockDefinitionsExt) {
 		return encodeDefineBlockExt(
@@ -57,7 +57,7 @@ func (s *session) encodeBlockDef(def blockdef.BlockDefinition) []byte {
 }
 
 // broadcastBlockDef sends a DefineBlock packet to all CPE-supporting peers.
-func (s *session) broadcastBlockDef(def blockdef.BlockDefinition) {
+func (s *session) broadcastBlockDef(def blocks.BlockDefinition) {
 	if s.room == nil {
 		return
 	}

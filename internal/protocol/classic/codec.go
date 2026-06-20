@@ -19,14 +19,12 @@ import (
 	"time"
 
 	"github.com/solar-mc/solar/internal/antispam"
-	"github.com/solar-mc/solar/internal/blockdb"
-	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/i18n"
 	"github.com/solar-mc/solar/internal/player"
 	sess "github.com/solar-mc/solar/internal/session"
-	"github.com/solar-mc/solar/internal/specialblocks"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
@@ -68,12 +66,12 @@ type Codec struct {
 	writeBatchSize      int
 	shutdownBatchSize   int
 	tcpNoDelay          bool
-	blockDefs           *blockdef.Registry
+	blockDefs           *blocks.Registry
 	buildCommandContext func(SessionBackend) command.Context
 	playerDB            playerdb.PlayerDB
 	i18n                *i18n.I18n
 	blockDBForLevel     func(levelName string) plugin.BlockDB
-	nameConv            *blockdb.NameConverter
+	nameConv            *blocks.NameConverter
 	gotoLevel           func(p plugin.Player, name string) bool
 	mainLevelName       func() string
 	loadLevel           func(name string) bool
@@ -185,7 +183,7 @@ func (c *Codec) SetTCPNoDelay(enable bool) {
 }
 
 // SetBlockDefinitions configures the custom block definition registry.
-func (c *Codec) SetBlockDefinitions(reg *blockdef.Registry) {
+func (c *Codec) SetBlockDefinitions(reg *blocks.Registry) {
 	c.blockDefs = reg
 }
 
@@ -226,7 +224,7 @@ func (c *Codec) SetBlockDBLookup(fn func(levelName string) plugin.BlockDB) {
 }
 
 // SetNameConverter configures the player name→integer ID converter for BlockDB.
-func (c *Codec) SetNameConverter(nc *blockdb.NameConverter) {
+func (c *Codec) SetNameConverter(nc *blocks.NameConverter) {
 	c.nameConv = nc
 }
 
@@ -334,7 +332,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		color:               "&e",
 		model:               "humanoid",
 		allowBuild:          true,
-		specialBlocks:       specialblocks.NewRegistry(),
+		specialBlocks:       blocks.NewSpecialRegistry(),
 		spamChecker:         c.spamChecker,
 	}
 

@@ -1,4 +1,4 @@
-package drawing
+package blocks
 
 import (
 	"testing"

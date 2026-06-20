@@ -16,7 +16,7 @@ package command
 import (
 	"strconv"
 
-	"github.com/solar-mc/solar/internal/drawing"
+	"github.com/solar-mc/solar/internal/blocks"
 )
 
 func parseBlock(s string) (byte, bool) {
@@ -43,8 +43,8 @@ func cuboidCommand(ctx Context, args []string) (string, bool) {
 	walls := len(args) > 1 && args[1] == "walls"
 
 	ctx.Draw.StartSelection(2, func(marks [][3]int) {
-		min := drawing.Vec3{marks[0][0], marks[0][1], marks[0][2]}
-		max := drawing.Vec3{marks[1][0], marks[1][1], marks[1][2]}
+		min := blocks.Vec3{marks[0][0], marks[0][1], marks[0][2]}
+		max := blocks.Vec3{marks[1][0], marks[1][1], marks[1][2]}
 		if min.X > max.X {
 			min.X, max.X = max.X, min.X
 		}
@@ -62,11 +62,11 @@ func cuboidCommand(ctx Context, args []string) (string, bool) {
 		}
 		switch {
 		case hollow:
-			drawing.CuboidHollow(min, max, place)
+			blocks.CuboidHollow(min, max, place)
 		case walls:
-			drawing.CuboidWalls(min, max, place)
+			blocks.CuboidWalls(min, max, place)
 		default:
-			drawing.Cuboid(min, max, place)
+			blocks.Cuboid(min, max, place)
 		}
 	})
 	return ctx.tr("command.draw.select2"), true
@@ -85,9 +85,9 @@ func lineCommand(ctx Context, args []string) (string, bool) {
 		return ctx.tr("command.draw.invalid_block", args[0]), true
 	}
 	ctx.Draw.StartSelection(2, func(marks [][3]int) {
-		p1 := drawing.Vec3{marks[0][0], marks[0][1], marks[0][2]}
-		p2 := drawing.Vec3{marks[1][0], marks[1][1], marks[1][2]}
-		drawing.Line(p1, p2, func(x, y, z int) {
+		p1 := blocks.Vec3{marks[0][0], marks[0][1], marks[0][2]}
+		p2 := blocks.Vec3{marks[1][0], marks[1][1], marks[1][2]}
+		blocks.Line(p1, p2, func(x, y, z int) {
 			ctx.Draw.PlaceBlock(x, y, z, block)
 		})
 	})
@@ -116,13 +116,13 @@ func sphereCommand(ctx Context, args []string) (string, bool) {
 		}
 	}
 	ctx.Draw.StartSelection(1, func(marks [][3]int) {
-		center := drawing.Vec3{marks[0][0], marks[0][1], marks[0][2]}
+		center := blocks.Vec3{marks[0][0], marks[0][1], marks[0][2]}
 		if hollow {
-			drawing.SphereHollow(center, radius, func(x, y, z int) {
+			blocks.SphereHollow(center, radius, func(x, y, z int) {
 				ctx.Draw.PlaceBlock(x, y, z, block)
 			})
 		} else {
-			drawing.Sphere(center, radius, func(x, y, z int) {
+			blocks.Sphere(center, radius, func(x, y, z int) {
 				ctx.Draw.PlaceBlock(x, y, z, block)
 			})
 		}
@@ -151,17 +151,17 @@ func fillCommand(ctx Context, args []string) (string, bool) {
 		// Get the current level blocks for flood fill.
 		// ponytail: reading blocks one-by-one is slow for large fills;
 		// a bulk read API would be better. Acceptable for now.
-		blocks := make([]byte, w*h*l)
+		levelBlocks := make([]byte, w*h*l)
 		for yy := 0; yy < h; yy++ {
 			for zz := 0; zz < l; zz++ {
 				for xx := 0; xx < w; xx++ {
 					b, _ := ctx.Draw.GetBlockAt(xx, yy, zz)
-					blocks[xx+w*(zz+l*yy)] = b
+					levelBlocks[xx+w*(zz+l*yy)] = b
 				}
 			}
 		}
 		startIdx := x + w*(z+l*y)
-		drawing.Fill(blocks, w, h, l, startIdx, drawing.FillNormal, func(fx, fy, fz int) {
+		blocks.Fill(levelBlocks, w, h, l, startIdx, blocks.FillNormal, func(fx, fy, fz int) {
 			ctx.Draw.PlaceBlock(fx, fy, fz, block)
 		})
 	})

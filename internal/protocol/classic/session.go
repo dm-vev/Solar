@@ -29,15 +29,12 @@ import (
 	"time"
 
 	"github.com/solar-mc/solar/internal/antispam"
-	"github.com/solar-mc/solar/internal/blockdb"
-	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
-	"github.com/solar-mc/solar/internal/drawing"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/i18n"
 	"github.com/solar-mc/solar/internal/player"
 	sess "github.com/solar-mc/solar/internal/session"
-	"github.com/solar-mc/solar/internal/specialblocks"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
@@ -66,7 +63,7 @@ type session struct {
 	writeBatchSize      int
 	shutdownBatchSize   int
 	tcpNoDelay          bool
-	blockDefs           *blockdef.Registry
+	blockDefs           *blocks.Registry
 	outbox              chan []byte
 	stop                chan struct{}
 	writerDone          chan struct{}
@@ -89,7 +86,7 @@ type session struct {
 	blockDB             plugin.BlockDB
 	playerDBID          int32
 	blockDBForLevel     func(levelName string) plugin.BlockDB
-	nameConv            *blockdb.NameConverter
+	nameConv            *blocks.NameConverter
 	gotoLevel           func(p plugin.Player, name string) bool
 	mainLevelName       func() string
 	loadLevel           func(name string) bool
@@ -123,10 +120,10 @@ type session struct {
 	markState *markSelection
 
 	// clipboard holds the last /copy region for /paste.
-	clipboard *drawing.CopyState
+	clipboard *blocks.CopyState
 
 	// specialBlocks holds per-level interactive blocks (doors, portals, MBs).
-	specialBlocks *specialblocks.Registry
+	specialBlocks *blocks.SpecialRegistry
 	spamChecker   *antispam.Checker
 }
 

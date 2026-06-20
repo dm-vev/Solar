@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/plugin/playerdb"
 )
 
@@ -124,10 +124,10 @@ type ServerInfo interface {
 
 // BlockDefService exposes custom block definition operations.
 type BlockDefService interface {
-	AddBlockDef(def blockdef.BlockDefinition) bool
+	AddBlockDef(def blocks.BlockDefinition) bool
 	RemoveBlockDef(id byte) bool
-	GetBlockDef(id byte) (blockdef.BlockDefinition, bool)
-	ListBlockDefs() []blockdef.BlockDefinition
+	GetBlockDef(id byte) (blocks.BlockDefinition, bool)
+	ListBlockDefs() []blocks.BlockDefinition
 	FreeBlockID() byte
 }
 

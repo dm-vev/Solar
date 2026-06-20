@@ -3,7 +3,7 @@ package app
 import (
 	"time"
 
-	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/protocol/classic"
 	"github.com/solar-mc/solar/internal/world"
@@ -124,7 +124,7 @@ type sessionBlockDefs struct {
 	backend classic.SessionBackend
 }
 
-func (b sessionBlockDefs) AddBlockDef(def blockdef.BlockDefinition) bool {
+func (b sessionBlockDefs) AddBlockDef(def blocks.BlockDefinition) bool {
 	return b.backend.AddBlockDef(def)
 }
 
@@ -132,11 +132,11 @@ func (b sessionBlockDefs) RemoveBlockDef(id byte) bool {
 	return b.backend.RemoveBlockDef(id)
 }
 
-func (b sessionBlockDefs) GetBlockDef(id byte) (blockdef.BlockDefinition, bool) {
+func (b sessionBlockDefs) GetBlockDef(id byte) (blocks.BlockDefinition, bool) {
 	return b.backend.GetBlockDef(id)
 }
 
-func (b sessionBlockDefs) ListBlockDefs() []blockdef.BlockDefinition {
+func (b sessionBlockDefs) ListBlockDefs() []blocks.BlockDefinition {
 	return b.backend.ListBlockDefs()
 }
 

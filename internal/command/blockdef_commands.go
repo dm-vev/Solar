@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/internal/blocks"
 )
 
 func globalBlockCommand(ctx Context, args []string) (string, bool) {
@@ -58,11 +58,11 @@ func blockDefAdd(ctx Context, args []string, cmd string) (string, bool) {
 		return fmt.Sprintf("invalid id: %v", err), true
 	}
 
-	if id < blockdef.FirstCustomBlock {
-		return fmt.Sprintf("custom block IDs must be >= %d", blockdef.FirstCustomBlock), true
+	if id < blocks.FirstCustomBlock {
+		return fmt.Sprintf("custom block IDs must be >= %d", blocks.FirstCustomBlock), true
 	}
 
-	def := blockdef.Default(id)
+	def := blocks.Default(id)
 	if len(args) > 1 {
 		def.Name = args[1]
 	}
@@ -148,11 +148,11 @@ func blockDefList(ctx Context) (string, bool) {
 	return fmt.Sprintf("blocks (%d): %s", len(defs), strings.Join(parts, ", ")), true
 }
 
-func formatBlockDef(d blockdef.BlockDefinition) string {
+func formatBlockDef(d blocks.BlockDefinition) string {
 	return fmt.Sprintf("block %d: name=%s collide=%s speed=%.1f tex=%d/%d/%d draw=%s sound=%s shape=%d fallback=%d fog=%d(%d,%d,%d) bbox=%d,%d,%d-%d,%d,%d",
-		d.ID, d.Name, blockdef.CollideTypeName(d.CollideType), d.Speed,
+		d.ID, d.Name, blocks.CollideTypeName(d.CollideType), d.Speed,
 		d.TopTex, d.RightTex, d.BottomTex,
-		blockdef.DrawTypeName(d.BlockDraw), blockdef.SoundTypeName(d.WalkSound),
+		blocks.DrawTypeName(d.BlockDraw), blocks.SoundTypeName(d.WalkSound),
 		d.Shape, d.FallBack, d.FogDensity, d.FogR, d.FogG, d.FogB,
 		d.MinX, d.MinY, d.MinZ, d.MaxX, d.MaxY, d.MaxZ,
 	)
@@ -169,7 +169,7 @@ func parseBlockID(s string) (byte, error) {
 	return byte(v), nil
 }
 
-func editBlockProp(def *blockdef.BlockDefinition, prop, val string) error {
+func editBlockProp(def *blocks.BlockDefinition, prop, val string) error {
 	switch prop {
 	case "name":
 		def.Name = val
@@ -233,7 +233,7 @@ func editBlockProp(def *blockdef.BlockDefinition, prop, val string) error {
 	return nil
 }
 
-func editTexture(def *blockdef.BlockDefinition, prop, val string) error {
+func editTexture(def *blocks.BlockDefinition, prop, val string) error {
 	v, err := parseByteProp(val, 255)
 	if err != nil {
 		return err
@@ -259,7 +259,7 @@ func editTexture(def *blockdef.BlockDefinition, prop, val string) error {
 	return nil
 }
 
-func editFogColor(def *blockdef.BlockDefinition, val string) error {
+func editFogColor(def *blocks.BlockDefinition, val string) error {
 	parts := strings.FieldsFunc(val, func(r rune) bool { return r == ' ' || r == ',' })
 	if len(parts) != 3 {
 		return fmt.Errorf("expected r g b")

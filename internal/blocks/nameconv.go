@@ -1,4 +1,4 @@
-package blockdb
+package blocks
 
 import (
 	"strings"
