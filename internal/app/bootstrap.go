@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/solar-mc/solar/internal/antispam"
 	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/config"
@@ -127,7 +126,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 		}
 	})
 	codec.SetMaxPlayers(cfg.MaxPlayers)
-	codec.SetSpamChecker(antispam.New(antispam.Config{
+	codec.SetSpamChecker(player.New(player.Config{
 		Enabled:      cfg.AntiSpam.Enabled,
 		ChatMax:      cfg.AntiSpam.ChatMax,
 		ChatWindow:   cfg.AntiSpam.ChatWindow,
@@ -135,7 +134,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 		BlockWindow:  cfg.AntiSpam.BlockWindow,
 		CmdMax:       cfg.AntiSpam.CmdMax,
 		CmdWindow:    cfg.AntiSpam.CmdWindow,
-		Action:       antispam.Action(cfg.AntiSpam.Action),
+		Action:       player.Action(cfg.AntiSpam.Action),
 		MuteDuration: cfg.AntiSpam.MuteDuration,
 	}))
 	if err := plugin.LoadAll(pluginSrv, logger); err != nil {

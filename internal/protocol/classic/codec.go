@@ -18,7 +18,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/solar-mc/solar/internal/antispam"
 	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
@@ -80,7 +79,7 @@ type Codec struct {
 	listLevelFiles      func() []string
 	queuePhysics        func(x, y, z int)
 	maxPlayers          int
-	spamChecker         *antispam.Checker
+	spamChecker         *player.Checker
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -256,7 +255,7 @@ func (c *Codec) SetMaxPlayers(n int) {
 }
 
 // SetSpamChecker configures the anti-spam rate limiter.
-func (c *Codec) SetSpamChecker(sc *antispam.Checker) {
+func (c *Codec) SetSpamChecker(sc *player.Checker) {
 	c.spamChecker = sc
 }
 

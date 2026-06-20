@@ -25,10 +25,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/solar-mc/solar/internal/antispam"
 	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
+	"github.com/solar-mc/solar/internal/player"
 	"github.com/solar-mc/solar/plugin"
 )
 
@@ -220,16 +220,16 @@ func (s *session) handleMessage() error {
 	// Anti-spam chat check.
 	if s.spamChecker != nil {
 		if s.spamChecker.IsMuted(s.currentUsername()) {
-			s.Message(s.Tr("antispam.muted"))
+			s.Message(s.Tr("player.muted"))
 			return nil
 		}
 		r := s.spamChecker.CheckChat(s.currentUsername())
 		if r.Exceeded {
 			s.handleSpamResult(r)
-			if r.Action == antispam.ActionKick {
+			if r.Action == player.ActionKick {
 				return nil
 			}
-			s.Message(s.Tr("antispam.chat_exceeded", r.Count, r.Max))
+			s.Message(s.Tr("player.chat_exceeded", r.Count, r.Max))
 			return nil
 		}
 	}
@@ -291,14 +291,14 @@ func (s *session) handleMessage() error {
 }
 
 // handleSpamResult applies the configured action when a rate limit is exceeded.
-func (s *session) handleSpamResult(r antispam.Result) {
+func (s *session) handleSpamResult(r player.Result) {
 	switch r.Action {
-	case antispam.ActionKick:
-		s.disconnect(s.Tr("antispam.kick"))
-	case antispam.ActionMute:
-		s.Message(s.Tr("antispam.muted"))
-	case antispam.ActionWarn:
-		s.Message(s.Tr("antispam.warn", r.Count, r.Max))
+	case player.ActionKick:
+		s.disconnect(s.Tr("player.kick"))
+	case player.ActionMute:
+		s.Message(s.Tr("player.muted"))
+	case player.ActionWarn:
+		s.Message(s.Tr("player.warn", r.Count, r.Max))
 	}
 }
 
@@ -312,10 +312,10 @@ func (s *session) handleCommand(line string) error {
 		r := s.spamChecker.CheckCommand(s.currentUsername())
 		if r.Exceeded {
 			s.handleSpamResult(r)
-			if r.Action == antispam.ActionKick {
+			if r.Action == player.ActionKick {
 				return nil
 			}
-			s.Message(s.Tr("antispam.cmd_exceeded", r.Count, r.Max))
+			s.Message(s.Tr("player.cmd_exceeded", r.Count, r.Max))
 			return nil
 		}
 	}

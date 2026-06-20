@@ -8,7 +8,7 @@
 // The checker is safe for concurrent use. Player state is tracked
 // in a map keyed by normalized username.
 
-package antispam
+package player
 
 import (
 	"strings"

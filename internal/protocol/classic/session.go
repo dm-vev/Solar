@@ -28,7 +28,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/solar-mc/solar/internal/antispam"
 	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
@@ -124,7 +123,7 @@ type session struct {
 
 	// specialBlocks holds per-level interactive blocks (doors, portals, MBs).
 	specialBlocks *blocks.SpecialRegistry
-	spamChecker   *antispam.Checker
+	spamChecker   *player.Checker
 }
 
 // markSelection tracks a multi-click block selection for drawing commands.

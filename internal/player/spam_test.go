@@ -1,4 +1,4 @@
-package antispam
+package player
 
 import (
 	"testing"
