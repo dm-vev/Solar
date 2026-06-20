@@ -158,8 +158,8 @@ func (s *Server) Run(ctx context.Context) error {
 	tickWG.Wait()
 	debugWG.Wait()
 
-	s.codec.BroadcastMessage("&cServer is shutting down...")
-	s.codec.KickAll("&cServer is shutting down. Please reconnect later.")
+	s.codec.BroadcastMessage(s.codec.I18nGet("server.shutdown.msg"))
+	s.codec.KickAll(s.codec.I18nGet("server.shutdown.kick"))
 
 	if plugin.OnShutdown.HasHandlers() {
 		plugin.OnShutdown.Fire(plugin.ShutdownData{Reason: "server stopping"})

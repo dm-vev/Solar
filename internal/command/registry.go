@@ -1,7 +1,6 @@
 package command
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 
@@ -71,6 +70,16 @@ type Context struct {
 	Moderation  ModerationService
 	Players     PlayerDirectory
 	BlockDefs   BlockDefService
+	Tr          func(string, ...any) string
+}
+
+// tr translates a message key for the current player. Falls back to
+// the key itself if no translator is configured.
+func (ctx Context) tr(key string, args ...any) string {
+	if ctx.Tr != nil {
+		return ctx.Tr(key, args...)
+	}
+	return key
 }
 
 // Handler processes a command and returns a user-facing response.
@@ -167,11 +176,11 @@ func (r *Registry) Execute(ctx Context, line string) (string, bool) {
 	r.mu.RUnlock()
 
 	if handler == nil {
-		return fmt.Sprintf("unknown command: /%s", name), true
+		return ctx.tr("command.shared.unknown", name), true
 	}
 
 	if r.requiresAdmin(name) && (ctx.Authority == nil || !ctx.Authority.CanAdmin()) {
-		return "permission denied", true
+		return ctx.tr("command.shared.permission_denied"), true
 	}
 
 	return handler(ctx, args)

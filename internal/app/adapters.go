@@ -138,5 +138,6 @@ func buildCommandContext(backend classic.SessionBackend) command.Context {
 		Moderation:  sessionModeration{backend},
 		Players:     sessionDirectory{backend},
 		BlockDefs:   sessionBlockDefs{backend},
+		Tr:          backend.Translate,
 	}
 }

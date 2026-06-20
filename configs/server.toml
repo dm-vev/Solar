@@ -98,3 +98,10 @@ dir = "plugins"
 # Each .lua file becomes a plugin; see plugins/example.lua for the API.
 enabled = false
 dir = "lua"
+
+[language]
+# Default language code for server messages (e.g. "en", "ru").
+# Players can override via SetLanguage(); stored in PlayerDB.
+default = "en"
+# Path to the language TOML file.
+file = "configs/language.toml"

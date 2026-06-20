@@ -92,6 +92,15 @@ func (s *session) handleHandshake() error {
 		s.stateMu.Unlock()
 	}
 
+	// Load player language from PlayerDB.
+	if s.playerDB != nil {
+		if e := s.playerDB.Get(username); e != nil {
+			if lang, ok := e.Data["lang"]; ok && lang != "" {
+				s.SetLanguage(lang)
+			}
+		}
+	}
+
 	if plugin.OnPlayerStartConnecting.HasHandlers() {
 		plugin.OnPlayerStartConnecting.Fire(plugin.PlayerStartConnectingData{Player: s})
 	}

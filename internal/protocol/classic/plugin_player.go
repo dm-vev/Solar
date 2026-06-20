@@ -266,3 +266,37 @@ func (s *session) ClearSelection(id byte) bool {
 	}
 	return s.writePacket(encodeRemoveSelection(id)) == nil
 }
+
+func (s *session) Language() string {
+	s.stateMu.RLock()
+	l := s.lang
+	s.stateMu.RUnlock()
+	if l == "" {
+		l = "en"
+	}
+	return l
+}
+
+func (s *session) SetLanguage(lang string) {
+	s.stateMu.Lock()
+	s.lang = lang
+	s.stateMu.Unlock()
+	// Persist to PlayerDB.
+	if s.playerDB != nil {
+		if e := s.playerDB.Get(s.currentUsername()); e != nil {
+			if e.Data == nil {
+				e.Data = make(map[string]string)
+			}
+			e.Data["lang"] = lang
+			s.playerDB.Save(e)
+		}
+	}
+}
+
+// Tr returns a translated message for this player's language.
+func (s *session) Tr(key string, args ...any) string {
+	if s.i18n != nil {
+		return s.i18n.Get(s.Language(), key, args...)
+	}
+	return key
+}

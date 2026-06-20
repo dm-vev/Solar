@@ -1,0 +1,218 @@
+# Language file for Solar server messages.
+# Add new languages by creating a [xx] section with the same keys.
+# %s = string, %d = number, %v = any value — standard fmt.Sprintf formatting.
+# Key format: domain.feature.string (e.g. command.teleport.usage)
+
+[en]
+# ─── general ───
+"general.muted" = "&cYou are muted."
+"general.kicked" = "kicked"
+"general.kicked_by" = "kicked by %s"
+"general.banned_by" = "banned by %s"
+"general.reconnected" = "reconnected from another client"
+"general.invalid_username" = "invalid username"
+
+# ─── server ───
+"server.shutdown.msg" = "&cServer is shutting down..."
+"server.shutdown.kick" = "&cServer is shutting down. Please reconnect later."
+
+# ─── connect ───
+"connect.whitelist_rejected" = "server is whitelisted"
+
+# ─── command.teleport ───
+"command.teleport.unavailable" = "teleport is unavailable"
+"command.teleport.usage" = "usage: /tp x y z [yaw pitch]"
+"command.teleport.failed" = "teleport failed"
+"command.teleport.done" = "teleported to %d %d %d"
+
+# ─── command.setspawn ───
+"command.setspawn.unavailable" = "spawn update is unavailable"
+"command.setspawn.usage" = "usage: /setspawn [x y z [yaw pitch]]"
+"command.setspawn.failed" = "spawn update failed"
+"command.setspawn.done" = "spawn set to %d %d %d"
+
+# ─── command.save ───
+"command.save.unavailable" = "save is unavailable"
+"command.save.failed" = "save failed"
+"command.save.queued" = "save queued"
+
+# ─── command.kick ───
+"command.kick.unavailable" = "kick is unavailable"
+"command.kick.usage" = "usage: /kick name [reason...]"
+"command.kick.done" = "kicked %s"
+"command.kick.done_reason" = "kicked %s: %s"
+
+# ─── command.ban ───
+"command.ban.unavailable" = "ban is unavailable"
+"command.ban.usage" = "usage: /ban name [reason...]"
+"command.ban.failed" = "ban failed"
+"command.ban.done" = "banned %s"
+"command.ban.done_reason" = "banned %s: %s"
+
+# ─── command.unban ───
+"command.unban.unavailable" = "unban is unavailable"
+"command.unban.usage" = "usage: /unban name"
+"command.unban.not_banned" = "player not banned: %s"
+"command.unban.done" = "unbanned %s"
+
+# ─── command.newlvl ───
+"command.newlvl.unavailable" = "world generation is unavailable"
+"command.newlvl.usage" = "usage: /newlvl name theme width height length [seed]"
+"command.newlvl.failed" = "level generation failed"
+"command.newlvl.done" = "generated level %s (%s %dx%dx%d)"
+
+# ─── command.whitelist ───
+"command.whitelist.usage" = "usage: /whitelist [on|off|add|remove|list]"
+"command.whitelist.unavailable" = "whitelist is unavailable"
+"command.whitelist.enabled" = "whitelist enabled"
+"command.whitelist.disabled" = "whitelist disabled"
+"command.whitelist.already_on" = "whitelist already enabled"
+"command.whitelist.already_off" = "whitelist already disabled"
+"command.whitelist.add.usage" = "usage: /whitelist add name"
+"command.whitelist.add.done" = "whitelisted %s"
+"command.whitelist.add.already" = "player already whitelisted: %s"
+"command.whitelist.remove.usage" = "usage: /whitelist remove name"
+"command.whitelist.remove.done" = "removed %s from whitelist"
+"command.whitelist.remove.not" = "player not whitelisted: %s"
+"command.whitelist.list.none" = "whitelist: none"
+"command.whitelist.list.items" = "whitelist: %s"
+"command.whitelist.status.on" = "whitelist: on"
+"command.whitelist.status.off" = "whitelist: off"
+
+# ─── command.players ───
+"command.players.none" = "players: none"
+"command.players.list" = "players: %s"
+"command.players.unavailable" = "player list is unavailable"
+
+# ─── command.setblock ───
+"command.setblock.usage" = "usage: /setblock x y z block"
+"command.setblock.oob" = "block position out of bounds"
+"command.setblock.done" = "set block at %d %d %d to %d"
+
+# ─── command.help ───
+"command.help.list" = "commands: %s"
+
+# ─── command.where ───
+"command.where.position" = "%s is at %d %d %d"
+
+# ─── command.shared ───
+"command.shared.invalid_name" = "invalid name"
+"command.shared.invalid_x" = "invalid x: %v"
+"command.shared.invalid_y" = "invalid y: %v"
+"command.shared.invalid_z" = "invalid z: %v"
+"command.shared.invalid_yaw" = "invalid yaw: %v"
+"command.shared.invalid_pitch" = "invalid pitch: %v"
+"command.shared.invalid_width" = "invalid width: %v"
+"command.shared.invalid_height" = "invalid height: %v"
+"command.shared.invalid_length" = "invalid length: %v"
+"command.shared.invalid_block" = "invalid block: %v"
+"command.shared.permission_denied" = "permission denied"
+"command.shared.unknown" = "unknown command: /%s"
+"command.shared.player_not_found" = "player not found: %s"
+
+[ru]
+# ─── general ───
+"general.muted" = "&cВы в муте."
+"general.kicked" = "кикнут"
+"general.kicked_by" = "кикнут %s"
+"general.banned_by" = "забанен %s"
+"general.reconnected" = "переподключился с другого клиента"
+"general.invalid_username" = "неверное имя пользователя"
+
+# ─── server ───
+"server.shutdown.msg" = "&cСервер выключается..."
+"server.shutdown.kick" = "&cСервер выключается. Пожалуйста, переподключитесь позже."
+
+# ─── connect ───
+"connect.whitelist_rejected" = "сервер в режиме вайтлиста"
+
+# ─── command.teleport ───
+"command.teleport.unavailable" = "телепорт недоступен"
+"command.teleport.usage" = "использование: /tp x y z [yaw pitch]"
+"command.teleport.failed" = "телепорт не удался"
+"command.teleport.done" = "телепортирован на %d %d %d"
+
+# ─── command.setspawn ───
+"command.setspawn.unavailable" = "обновление спавна недоступно"
+"command.setspawn.usage" = "использование: /setspawn [x y z [yaw pitch]]"
+"command.setspawn.failed" = "обновление спавна не удалось"
+"command.setspawn.done" = "спавн установлен на %d %d %d"
+
+# ─── command.save ───
+"command.save.unavailable" = "сохранение недоступно"
+"command.save.failed" = "сохранение не удалось"
+"command.save.queued" = "сохранение в очереди"
+
+# ─── command.kick ───
+"command.kick.unavailable" = "кик недоступен"
+"command.kick.usage" = "использование: /kick имя [причина...]"
+"command.kick.done" = "кикнут %s"
+"command.kick.done_reason" = "кикнут %s: %s"
+
+# ─── command.ban ───
+"command.ban.unavailable" = "бан недоступен"
+"command.ban.usage" = "использование: /ban имя [причина...]"
+"command.ban.failed" = "бан не удался"
+"command.ban.done" = "забанен %s"
+"command.ban.done_reason" = "забанен %s: %s"
+
+# ─── command.unban ───
+"command.unban.unavailable" = "разбан недоступен"
+"command.unban.usage" = "использование: /unban имя"
+"command.unban.not_banned" = "игрок не в бане: %s"
+"command.unban.done" = "разбанен %s"
+
+# ─── command.newlvl ───
+"command.newlvl.unavailable" = "генерация мира недоступна"
+"command.newlvl.usage" = "использование: /newlvl имя тема ширина высота длина [сид]"
+"command.newlvl.failed" = "генерация уровня не удалась"
+"command.newlvl.done" = "сгенерирован уровень %s (%s %dx%dx%d)"
+
+# ─── command.whitelist ───
+"command.whitelist.usage" = "использование: /whitelist [on|off|add|remove|list]"
+"command.whitelist.unavailable" = "вайтлист недоступен"
+"command.whitelist.enabled" = "вайтлист включён"
+"command.whitelist.disabled" = "вайтлист выключен"
+"command.whitelist.already_on" = "вайтлист уже включён"
+"command.whitelist.already_off" = "вайтлист уже выключен"
+"command.whitelist.add.usage" = "использование: /whitelist add имя"
+"command.whitelist.add.done" = "добавлен в вайтлист %s"
+"command.whitelist.add.already" = "игрок уже в вайтлисте: %s"
+"command.whitelist.remove.usage" = "использование: /whitelist remove имя"
+"command.whitelist.remove.done" = "удалён из вайтлиста %s"
+"command.whitelist.remove.not" = "игрок не в вайтлисте: %s"
+"command.whitelist.list.none" = "вайтлист: нет"
+"command.whitelist.list.items" = "вайтлист: %s"
+"command.whitelist.status.on" = "вайтлист: вкл"
+"command.whitelist.status.off" = "вайтлист: выкл"
+
+# ─── command.players ───
+"command.players.none" = "игроки: нет"
+"command.players.list" = "игроки: %s"
+"command.players.unavailable" = "список игроков недоступен"
+
+# ─── command.setblock ───
+"command.setblock.usage" = "использование: /setblock x y z блок"
+"command.setblock.oob" = "позиция блока вне границ"
+"command.setblock.done" = "установлен блок на %d %d %d в %d"
+
+# ─── command.help ───
+"command.help.list" = "команды: %s"
+
+# ─── command.where ───
+"command.where.position" = "%s на координатах %d %d %d"
+
+# ─── command.shared ───
+"command.shared.invalid_name" = "неверное имя"
+"command.shared.invalid_x" = "неверный x: %v"
+"command.shared.invalid_y" = "неверный y: %v"
+"command.shared.invalid_z" = "неверный z: %v"
+"command.shared.invalid_yaw" = "неверный yaw: %v"
+"command.shared.invalid_pitch" = "неверный pitch: %v"
+"command.shared.invalid_width" = "неверная ширина: %v"
+"command.shared.invalid_height" = "неверная высота: %v"
+"command.shared.invalid_length" = "неверная длина: %v"
+"command.shared.invalid_block" = "неверный блок: %v"
+"command.shared.permission_denied" = "нет прав"
+"command.shared.unknown" = "неизвестная команда: /%s"
+"command.shared.player_not_found" = "игрок не найден: %s"

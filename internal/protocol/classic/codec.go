@@ -14,6 +14,7 @@ import (
 	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
+	"github.com/solar-mc/solar/internal/i18n"
 	"github.com/solar-mc/solar/internal/player"
 	sess "github.com/solar-mc/solar/internal/session"
 	"github.com/solar-mc/solar/internal/worker"
@@ -60,6 +61,7 @@ type Codec struct {
 	blockDefs           *blockdef.Registry
 	buildCommandContext func(SessionBackend) command.Context
 	playerDB            playerdb.PlayerDB
+	i18n                *i18n.I18n
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -190,6 +192,19 @@ func (c *Codec) SetPlayerDatabase(db playerdb.PlayerDB) {
 	c.playerDB = db
 }
 
+// SetI18n configures the internationalisation message store.
+func (c *Codec) SetI18n(i *i18n.I18n) {
+	c.i18n = i
+}
+
+// I18nGet returns a message in the server's default language.
+func (c *Codec) I18nGet(key string, args ...any) string {
+	if c.i18n != nil {
+		return c.i18n.Get("", key, args...)
+	}
+	return key
+}
+
 // ServeConn handles a single client connection until it closes, sends bad
 // data, or ctx is canceled.
 func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
@@ -233,6 +248,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		writerDone:          make(chan struct{}),
 		buildCommandContext: c.buildCommandContext,
 		playerDB:            c.playerDB,
+		i18n:                c.i18n,
 		color:               "&e",
 		model:               "humanoid",
 		allowBuild:          true,
@@ -302,6 +318,7 @@ type session struct {
 	buildCommandContext func(SessionBackend) command.Context
 	playerDB            playerdb.PlayerDB
 	loginTime           time.Time
+	i18n                *i18n.I18n
 
 	// ponytail: plugin.Player stub state, guarded by stateMu
 	color      string
@@ -311,6 +328,7 @@ type session struct {
 	frozen     bool
 	afk        bool
 	allowBuild bool
+	lang       string
 }
 
 func (s *session) RoomEntityID() uint32 {

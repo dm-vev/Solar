@@ -350,6 +350,7 @@ func testBuildContext(backend SessionBackend) command.Context {
 		Persistence: testPersistence{backend: backend},
 		Moderation:  testModeration{backend: backend},
 		Players:     testDirectory{backend: backend},
+		Tr:          backend.Translate,
 	}
 }
 
@@ -501,8 +502,8 @@ func TestServeConnExecutesChatCommand(t *testing.T) {
 		t.Fatalf("reply type = %d, want %d", reply[1], selfID)
 	}
 	text := bytes.TrimRight(reply[2:66], " \x00")
-	if !strings.Contains(string(text), "tester is at 64 48 64") {
-		t.Fatalf("reply text = %q, want tester coordinates", text)
+	if !strings.Contains(string(text), "command.where.position") {
+		t.Fatalf("reply text = %q, want command.where.position", text)
 	}
 
 	if err := client.Close(); err != nil {
@@ -654,16 +655,16 @@ func TestServeConnExecutesTeleportAndSetSpawnCommands(t *testing.T) {
 		if _, err := io.ReadFull(client, reply); err != nil {
 			t.Fatalf("read tp reply: %v", err)
 		}
-		if got := bytes.TrimRight(reply[2:66], " \x00"); !strings.Contains(string(got), "teleported to 24 32 40") {
-			t.Fatalf("tp reply = %q, want teleport confirmation", got)
+		if got := bytes.TrimRight(reply[2:66], " \x00"); !strings.Contains(string(got), "command.teleport.done") {
+			t.Fatalf("tp reply = %q, want command.teleport.done key", got)
 		}
 	case opcodeMessage:
 		reply = make([]byte, 65)
 		if _, err := io.ReadFull(client, reply); err != nil {
 			t.Fatalf("read tp reply: %v", err)
 		}
-		if got := bytes.TrimRight(reply[1:65], " \x00"); !strings.Contains(string(got), "teleported to 24 32 40") {
-			t.Fatalf("tp reply = %q, want teleport confirmation", got)
+		if got := bytes.TrimRight(reply[1:65], " \x00"); !strings.Contains(string(got), "command.teleport.done") {
+			t.Fatalf("tp reply = %q, want command.teleport.done key", got)
 		}
 
 		if err := client.SetReadDeadline(time.Now().Add(500 * time.Millisecond)); err != nil {
@@ -692,8 +693,8 @@ func TestServeConnExecutesTeleportAndSetSpawnCommands(t *testing.T) {
 	if _, err := io.ReadFull(client, reply); err != nil {
 		t.Fatalf("read setspawn reply: %v", err)
 	}
-	if got := bytes.TrimRight(reply[2:66], " \x00"); !strings.Contains(string(got), "spawn set to 1 2 3") {
-		t.Fatalf("setspawn reply = %q, want spawn confirmation", got)
+	if got := bytes.TrimRight(reply[2:66], " \x00"); !strings.Contains(string(got), "command.setspawn.done") {
+		t.Fatalf("setspawn reply = %q, want command.setspawn.done", got)
 	}
 	if got := worlds.Current().Spawn; got.X != 1 || got.Y != 2 || got.Z != 3 || got.Yaw != 4 || got.Pitch != 5 {
 		t.Fatalf("world spawn = %+v, want 1 2 3 4 5", got)
@@ -999,8 +1000,8 @@ func TestServeConnSaveFailsWithClosedWorkerPool(t *testing.T) {
 		t.Fatalf("read save reply: %v", err)
 	}
 	text := bytes.TrimRight(reply[2:66], " \x00")
-	if !strings.Contains(string(text), "save failed") {
-		t.Fatalf("save reply = %q, want 'save failed'", text)
+	if !strings.Contains(string(text), "command.save.failed") {
+		t.Fatalf("save reply = %q, want command.save.failed key", text)
 	}
 
 	if err := client.Close(); err != nil {
@@ -1036,8 +1037,8 @@ func TestServeConnBanFailsWithClosedWorkerPool(t *testing.T) {
 		t.Fatalf("read ban reply: %v", err)
 	}
 	text := bytes.TrimRight(reply[2:66], " \x00")
-	if !strings.Contains(string(text), "ban failed") {
-		t.Fatalf("ban reply = %q, want 'ban failed'", text)
+	if !strings.Contains(string(text), "command.ban.failed") {
+		t.Fatalf("ban reply = %q, want command.ban.failed key", text)
 	}
 
 	if err := client.Close(); err != nil {

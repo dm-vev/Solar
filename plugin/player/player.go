@@ -130,4 +130,10 @@ type Player interface {
 	MakeSelection(id byte, label string, minX, minY, minZ, maxX, maxY, maxZ int, r, g, b byte) bool
 	// ClearSelection removes a selection box.
 	ClearSelection(id byte) bool
+
+	// Language returns the player's preferred language code (e.g. "en", "ru").
+	Language() string
+
+	// SetLanguage sets the player's preferred language code.
+	SetLanguage(lang string)
 }

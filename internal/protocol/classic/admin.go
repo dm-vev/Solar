@@ -17,6 +17,7 @@ type SessionBackend interface {
 	CurrentUsername() string
 	CurrentLocation() (world.Spawn, byte, byte)
 	IsOperator() bool
+	Translate(key string, args ...any) string
 
 	ApplyBlockChange(x, y, z int, blockID byte, echo bool) error
 	TeleportSelf(x, y, z int, yaw, pitch byte) bool
@@ -58,6 +59,13 @@ func (s *session) IsOperator() bool {
 		return false
 	}
 	return s.players.IsOperator(s.currentUsername())
+}
+
+func (s *session) Translate(key string, args ...any) string {
+	if s.i18n != nil {
+		return s.i18n.Get(s.Language(), key, args...)
+	}
+	return key
 }
 
 func (s *session) ApplyBlockChange(x, y, z int, blockID byte, echo bool) error {

@@ -1,14 +1,13 @@
 package command
 
 import (
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 )
 
 func helpCommand(registry *Registry) Handler {
-	return func(_ Context, _ []string) (string, bool) {
+	return func(ctx Context, _ []string) (string, bool) {
 		registry.mu.RLock()
 		names := make([]string, 0, len(registry.handlers))
 		for name := range registry.handlers {
@@ -17,41 +16,41 @@ func helpCommand(registry *Registry) Handler {
 		registry.mu.RUnlock()
 
 		sort.Strings(names)
-		return "commands: /" + strings.Join(names, ", /"), true
+		return ctx.tr("command.help.list", "/"+strings.Join(names, ", /")), true
 	}
 }
 
 func whereCommand(ctx Context, _ []string) (string, bool) {
-	return fmt.Sprintf("%s is at %d %d %d", ctx.Username, ctx.Position.X, ctx.Position.Y, ctx.Position.Z), true
+	return ctx.tr("command.where.position", ctx.Username, ctx.Position.X, ctx.Position.Y, ctx.Position.Z), true
 }
 
 func setBlockCommand(ctx Context, args []string) (string, bool) {
 	if len(args) != 4 {
-		return "usage: /setblock x y z block", true
+		return ctx.tr("command.setblock.usage"), true
 	}
 	if ctx.World == nil {
-		return "block updates are unavailable", true
+		return ctx.tr("command.teleport.unavailable"), true
 	}
 
 	x, err := strconv.Atoi(args[0])
 	if err != nil {
-		return fmt.Sprintf("invalid x: %v", err), true
+		return ctx.tr("command.shared.invalid_x", err), true
 	}
 	y, err := strconv.Atoi(args[1])
 	if err != nil {
-		return fmt.Sprintf("invalid y: %v", err), true
+		return ctx.tr("command.shared.invalid_y", err), true
 	}
 	z, err := strconv.Atoi(args[2])
 	if err != nil {
-		return fmt.Sprintf("invalid z: %v", err), true
+		return ctx.tr("command.shared.invalid_z", err), true
 	}
 	blockValue, err := strconv.Atoi(args[3])
 	if err != nil {
-		return fmt.Sprintf("invalid block: %v", err), true
+		return ctx.tr("command.shared.invalid_block", err), true
 	}
 
 	if !ctx.World.SetBlock(x, y, z, byte(blockValue)) {
-		return "block position out of bounds", true
+		return ctx.tr("command.setblock.oob"), true
 	}
-	return fmt.Sprintf("set block at %d %d %d to %d", x, y, z, blockValue), true
+	return ctx.tr("command.setblock.done", x, y, z, blockValue), true
 }

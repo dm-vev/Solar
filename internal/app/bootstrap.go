@@ -11,6 +11,7 @@ import (
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
 	"github.com/solar-mc/solar/internal/generator/core"
+	"github.com/solar-mc/solar/internal/i18n"
 	"github.com/solar-mc/solar/internal/network"
 	"github.com/solar-mc/solar/internal/player"
 	"github.com/solar-mc/solar/internal/protocol/classic"
@@ -57,6 +58,15 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	codec.SetTCPNoDelay(cfg.Network.TCPNoDelay)
 	codec.SetSendTimeout(cfg.Network.SendTimeoutMode, cfg.Network.SendTimeout)
 	codec.SetBlockDefinitions(blockDefs)
+
+	// Load internationalisation.
+	i18nStore := i18n.New(cfg.Language.Default)
+	if err := i18nStore.Load(cfg.Language.File); err != nil {
+		logger.Error("load language file", "path", cfg.Language.File, "error", err)
+	} else {
+		logger.Info("loaded translations", "languages", i18nStore.Languages())
+	}
+	codec.SetI18n(i18nStore)
 
 	srv := server.New(
 		cfg,

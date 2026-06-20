@@ -36,6 +36,7 @@ type Config struct {
 	Log              LogConfig      `toml:"log"`
 	Plugins          PluginsConfig  `toml:"plugins"`
 	Lua              LuaConfig      `toml:"lua"`
+	Language         LanguageConfig `toml:"language"`
 }
 
 // NetworkConfig controls per-session TCP I/O tuning.
@@ -123,6 +124,12 @@ type LuaConfig struct {
 	Dir     string `toml:"dir"`
 }
 
+// LanguageConfig controls server-side internationalisation.
+type LanguageConfig struct {
+	Default string `toml:"default"`
+	File    string `toml:"file"`
+}
+
 // Load returns bootstrap config and ensures base directories exist.
 func Load(path string) (Config, error) {
 	cfg := Config{
@@ -190,6 +197,10 @@ func Load(path string) (Config, error) {
 		Lua: LuaConfig{
 			Enabled: false,
 			Dir:     "lua",
+		},
+		Language: LanguageConfig{
+			Default: "en",
+			File:    "configs/language.toml",
 		},
 	}
 

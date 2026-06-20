@@ -6,8 +6,8 @@ func TestRegistryExecuteDeniesAdminCommandsWithoutPermission(t *testing.T) {
 	t.Parallel()
 
 	registry := NewRegistry()
-	if got, handled := registry.Execute(Context{}, "/tp 1 2 3"); !handled || got != "permission denied" {
-		t.Fatalf("Execute = %q handled=%v, want permission denied", got, handled)
+	if got, handled := registry.Execute(Context{Tr: testTr}, "/tp 1 2 3"); !handled || got != "command.shared.permission_denied" {
+		t.Fatalf("Execute = %q handled=%v, want command.shared.permission_denied", got, handled)
 	}
 }
 
@@ -18,10 +18,11 @@ func TestRegistryExecuteAllowsAdminCommandsWithPermission(t *testing.T) {
 	ctx := Context{
 		Authority: testAuthority(true),
 		World:     testWorld{t: t},
+		Tr:        testTr,
 	}
 
-	if got, handled := registry.Execute(ctx, "/tp 1 2 3 4 5"); !handled || got != "teleported to 1 2 3" {
-		t.Fatalf("Execute = %q handled=%v, want teleport confirmation", got, handled)
+	if got, handled := registry.Execute(ctx, "/tp 1 2 3 4 5"); !handled || got != "command.teleport.done" {
+		t.Fatalf("Execute = %q handled=%v, want command.teleport.done", got, handled)
 	}
 }
 

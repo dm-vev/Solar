@@ -190,7 +190,7 @@ func (s *session) handleMessage() error {
 	}
 
 	if s.IsMuted() {
-		s.Message("&cYou are muted.")
+		s.Message(s.Tr("general.muted"))
 		return nil
 	}
 
