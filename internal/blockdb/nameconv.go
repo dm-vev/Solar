@@ -7,8 +7,9 @@ import (
 )
 
 // NameConverter maps player names to compact integer IDs for BlockDB.
-// IDs are stable across restarts (persisted in PlayerDB Data["blockdb_id"]).
-// ponytail: simple in-memory map; IDs are 1-based, 0 = server/console.
+// IDs are assigned in-memory (1-based, 0 = server/console) and are NOT
+// persisted across restarts. ponytail: persist in PlayerDB.Data["blockdb_id"]
+// if cross-restart ID stability is needed for undo/rollback continuity.
 type NameConverter struct {
 	mu     sync.Mutex
 	nextID atomic.Int32

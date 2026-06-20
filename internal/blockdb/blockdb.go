@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/solar-mc/solar/plugin/blockdb"
@@ -35,7 +36,7 @@ type fileDB struct {
 	width     int
 	height    int
 	length    int
-	enabled   bool
+	enabled   atomic.Bool
 	cache     []blockdb.Entry
 	cacheMu   sync.Mutex
 	fileCount int64
@@ -43,12 +44,12 @@ type fileDB struct {
 
 func New(path string, width, height, length int) (blockdb.BlockDB, error) {
 	db := &fileDB{
-		path:    path,
-		width:   width,
-		height:  height,
-		length:  length,
-		enabled: true,
+		path:   path,
+		width:  width,
+		height: height,
+		length: length,
 	}
+	db.enabled.Store(true)
 	if err := db.loadHeader(); err != nil {
 		return nil, err
 	}
@@ -88,7 +89,7 @@ func (db *fileDB) loadHeader() error {
 }
 
 func (db *fileDB) Add(e blockdb.Entry) {
-	if !db.Enabled() {
+	if !db.enabled.Load() {
 		return
 	}
 	db.cacheMu.Lock()
@@ -284,16 +285,11 @@ func (db *fileDB) Clear() error {
 }
 
 func (db *fileDB) Enabled() bool {
-	db.cacheMu.Lock()
-	e := db.enabled
-	db.cacheMu.Unlock()
-	return e
+	return db.enabled.Load()
 }
 
 func (db *fileDB) SetEnabled(enabled bool) {
-	db.cacheMu.Lock()
-	db.enabled = enabled
-	db.cacheMu.Unlock()
+	db.enabled.Store(enabled)
 }
 
 func (db *fileDB) pack(x, y, z int) uint32 {
