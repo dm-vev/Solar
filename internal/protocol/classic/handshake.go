@@ -73,6 +73,11 @@ func (s *session) handleHandshake() error {
 	}
 	s.loginTime = time.Now()
 
+	// Assign BlockDB player ID.
+	if s.nameConv != nil {
+		s.playerDBID = s.nameConv.Get(username)
+	}
+
 	// Load persisted player props (color, model, frozen, muted, afk, allow_build).
 	if s.players != nil {
 		props := s.players.GetProps(username)

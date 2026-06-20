@@ -1,8 +1,12 @@
 // Package blockdb implements a per-level block change history log.
 //
-// Storage: append-only binary file with 16-byte fixed records.
-// In-memory cache buffers writes and is flushed periodically.
-// Format: 16-byte header (magic + version + dims) + N × 16-byte entries.
+// Binary format is byte-compatible with MCGalaxy's .cbdb files:
+//
+//	Header (16 bytes): "CBDB_MCG" + version(LE u16) + dims(LE u16×3)
+//	Each entry (16 bytes): PlayerID(LE i32) + TimeDelta(LE i32) +
+//	  PackedIndex(LE i32) + OldBlock(u8) + NewBlock(u8) + Flags(LE u16)
+//
+// All integers are little-endian, matching MCGalaxy's BlockDBFile.V1.
 package blockdb
 
 import (
@@ -17,14 +21,14 @@ import (
 )
 
 const (
-	magic     = "CBDB_SOL"
+	magic     = "CBDB_MCG"
+	fileVer   = uint16(1)
 	entrySize = 16
 	headerLen = 16
 	epoch     = 1262304000 // 2010-01-01 00:00:00 UTC
 	bulkRead  = 4096
 )
 
-// fileDB is a per-level BlockDB backed by a .cbdb binary file.
 type fileDB struct {
 	mu        sync.RWMutex
 	path      string
@@ -37,7 +41,6 @@ type fileDB struct {
 	fileCount int64
 }
 
-// New creates a BlockDB for a level with the given dimensions.
 func New(path string, width, height, length int) (blockdb.BlockDB, error) {
 	db := &fileDB{
 		path:    path,
@@ -69,9 +72,10 @@ func (db *fileDB) loadHeader() error {
 	if string(header[0:8]) != magic {
 		return nil
 	}
-	db.width = int(binary.BigEndian.Uint16(header[8:10]))
-	db.height = int(binary.BigEndian.Uint16(header[10:12]))
-	db.length = int(binary.BigEndian.Uint16(header[12:14]))
+	// version at bytes 8-9 (LE), dims at 10-15 (LE)
+	db.width = int(binary.LittleEndian.Uint16(header[10:12]))
+	db.height = int(binary.LittleEndian.Uint16(header[12:14]))
+	db.length = int(binary.LittleEndian.Uint16(header[14:16]))
 
 	stat, err := f.Stat()
 	if err != nil {
@@ -117,7 +121,7 @@ func (db *fileDB) ChangesAt(x, y, z int) []blockdb.Entry {
 	for {
 		n, err := f.Read(buf)
 		for i := 0; i < n/entrySize; i++ {
-			ex, ey, ez := db.unpack(binary.BigEndian.Uint32(buf[i*entrySize+8:]))
+			ex, ey, ez := db.unpack(binary.LittleEndian.Uint32(buf[i*entrySize+8:]))
 			if ex == x && ey == y && ez == z {
 				result = append(result, db.decodeEntry(buf[i*entrySize:]))
 			}
@@ -237,9 +241,10 @@ func (db *fileDB) Flush() error {
 	if db.fileCount == 0 {
 		header := make([]byte, headerLen)
 		copy(header[0:8], magic)
-		binary.BigEndian.PutUint16(header[8:10], uint16(db.width))
-		binary.BigEndian.PutUint16(header[10:12], uint16(db.height))
-		binary.BigEndian.PutUint16(header[12:14], uint16(db.length))
+		binary.LittleEndian.PutUint16(header[8:10], fileVer)
+		binary.LittleEndian.PutUint16(header[10:12], uint16(db.width))
+		binary.LittleEndian.PutUint16(header[12:14], uint16(db.height))
+		binary.LittleEndian.PutUint16(header[14:16], uint16(db.length))
 		if _, err := f.Write(header); err != nil {
 			return fmt.Errorf("write blockdb header: %w", err)
 		}
@@ -305,23 +310,23 @@ func (db *fileDB) unpack(idx uint32) (x, y, z int) {
 }
 
 func (db *fileDB) encodeEntry(buf []byte, e blockdb.Entry) {
-	binary.BigEndian.PutUint32(buf[0:4], uint32(e.PlayerID))
-	binary.BigEndian.PutUint32(buf[4:8], uint32(e.Time.Unix()-epoch))
-	binary.BigEndian.PutUint32(buf[8:12], db.pack(e.X, e.Y, e.Z))
+	binary.LittleEndian.PutUint32(buf[0:4], uint32(e.PlayerID))
+	binary.LittleEndian.PutUint32(buf[4:8], uint32(e.Time.Unix()-epoch))
+	binary.LittleEndian.PutUint32(buf[8:12], db.pack(e.X, e.Y, e.Z))
 	buf[12] = e.OldBlock
 	buf[13] = e.NewBlock
-	binary.BigEndian.PutUint16(buf[14:16], uint16(e.Flags))
+	binary.LittleEndian.PutUint16(buf[14:16], uint16(e.Flags))
 }
 
 func (db *fileDB) decodeEntry(buf []byte) blockdb.Entry {
-	idx := binary.BigEndian.Uint32(buf[8:12])
+	idx := binary.LittleEndian.Uint32(buf[8:12])
 	x, y, z := db.unpack(idx)
 	return blockdb.Entry{
-		PlayerID: int32(binary.BigEndian.Uint32(buf[0:4])),
-		Time:     time.Unix(int64(binary.BigEndian.Uint32(buf[4:8]))+epoch, 0),
+		PlayerID: int32(binary.LittleEndian.Uint32(buf[0:4])),
+		Time:     time.Unix(int64(binary.LittleEndian.Uint32(buf[4:8]))+epoch, 0),
 		X:        x, Y: y, Z: z,
 		OldBlock: buf[12],
 		NewBlock: buf[13],
-		Flags:    blockdb.Flags(binary.BigEndian.Uint16(buf[14:16])),
+		Flags:    blockdb.Flags(binary.LittleEndian.Uint16(buf[14:16])),
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/solar-mc/solar/internal/blockdb"
 	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/config"
@@ -111,6 +112,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 	pluginSrv.PostInit()
 	codec.SetPlayerDatabase(pluginSrv.PlayerDB())
 	codec.SetBlockDBLookup(pluginSrv.BlockDB)
+	codec.SetNameConverter(blockdb.NewNameConverter())
 	if err := plugin.LoadAll(pluginSrv, logger); err != nil {
 		logger.Error("plugin load failed", "error", err)
 	}

@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/solar-mc/solar/internal/blockdb"
 	"github.com/solar-mc/solar/internal/blockdef"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
@@ -63,6 +64,7 @@ type Codec struct {
 	playerDB            playerdb.PlayerDB
 	i18n                *i18n.I18n
 	blockDBForLevel     func(levelName string) plugin.BlockDB
+	nameConv            *blockdb.NameConverter
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -205,6 +207,11 @@ func (c *Codec) SetBlockDBLookup(fn func(levelName string) plugin.BlockDB) {
 	c.blockDBForLevel = fn
 }
 
+// SetNameConverter configures the player name→integer ID converter for BlockDB.
+func (c *Codec) SetNameConverter(nc *blockdb.NameConverter) {
+	c.nameConv = nc
+}
+
 // I18nGet returns a message in the server's default language.
 func (c *Codec) I18nGet(key string, args ...any) string {
 	if c.i18n != nil {
@@ -258,6 +265,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		playerDB:            c.playerDB,
 		i18n:                c.i18n,
 		blockDBForLevel:     c.blockDBForLevel,
+		nameConv:            c.nameConv,
 		color:               "&e",
 		model:               "humanoid",
 		allowBuild:          true,
@@ -331,6 +339,7 @@ type session struct {
 	blockDB             plugin.BlockDB
 	playerDBID          int32
 	blockDBForLevel     func(levelName string) plugin.BlockDB
+	nameConv            *blockdb.NameConverter
 
 	// ponytail: plugin.Player stub state, guarded by stateMu
 	color      string
