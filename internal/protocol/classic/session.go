@@ -1,0 +1,277 @@
+package classic
+
+import (
+	"bufio"
+	"fmt"
+	"io"
+	"log/slog"
+	"net"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/solar-mc/solar/internal/blockdb"
+	"github.com/solar-mc/solar/internal/blockdef"
+	"github.com/solar-mc/solar/internal/command"
+	"github.com/solar-mc/solar/internal/entity"
+	"github.com/solar-mc/solar/internal/i18n"
+	"github.com/solar-mc/solar/internal/player"
+	sess "github.com/solar-mc/solar/internal/session"
+	"github.com/solar-mc/solar/internal/worker"
+	"github.com/solar-mc/solar/internal/world"
+	"github.com/solar-mc/solar/plugin"
+	"github.com/solar-mc/solar/plugin/playerdb"
+)
+
+type session struct {
+	conn                net.Conn
+	reader              *bufio.Reader
+	writer              *bufio.Writer
+	serverName          string
+	motd                string
+	worlds              *world.Manager
+	players             *player.Registry
+	entities            *entity.Manager
+	commands            *command.Registry
+	room                *sess.Room[*session]
+	logger              *slog.Logger
+	worldPath           string
+	policyPath          string
+	workers             *worker.Pool
+	readDeadline        time.Duration
+	writeDeadline       time.Duration
+	sendTimeoutVal      *atomic.Int64
+	outboxSize          int
+	writeBatchSize      int
+	shutdownBatchSize   int
+	tcpNoDelay          bool
+	blockDefs           *blockdef.Registry
+	outbox              chan []byte
+	stop                chan struct{}
+	writerDone          chan struct{}
+	stateMu             sync.RWMutex
+	stopOnce            sync.Once
+	connOnce            sync.Once
+	username            string
+	entityID            uint32
+	tracked             bool
+	loggedIn            bool
+	joined              bool
+	lastPos             entity.Position
+	lastYaw             byte
+	lastPitch           byte
+	cpeExts             map[string]uint32
+	buildCommandContext func(SessionBackend) command.Context
+	playerDB            playerdb.PlayerDB
+	loginTime           time.Time
+	i18n                *i18n.I18n
+	blockDB             plugin.BlockDB
+	playerDBID          int32
+	blockDBForLevel     func(levelName string) plugin.BlockDB
+	nameConv            *blockdb.NameConverter
+	gotoLevel           func(p plugin.Player, name string) bool
+	mainLevelName       func() string
+	loadLevel           func(name string) bool
+	unloadLevel         func(name string) bool
+	listLoadedLevels    func() []string
+	listLevelFiles      func() []string
+	queuePhysics        func(x, y, z int)
+	maxPlayers          int
+
+	// ponytail: plugin.Player stub state, guarded by stateMu
+	color      string
+	model      string
+	hidden     bool
+	muted      bool
+	frozen     bool
+	afk        bool
+	allowBuild bool
+	lang       string
+}
+
+func (s *session) RoomEntityID() uint32 {
+	return s.currentEntityID()
+}
+
+func (s *session) RoomUsername() string {
+	return s.currentUsername()
+}
+
+func (s *session) run() error {
+	defer s.cleanup()
+
+	for {
+		if s.readDeadline > 0 {
+			if err := s.conn.SetReadDeadline(time.Now().Add(s.readDeadline)); err != nil {
+				return fmt.Errorf("set read deadline: %w", err)
+			}
+		}
+
+		opcode, err := s.reader.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return fmt.Errorf("read opcode: %w", err)
+		}
+
+		switch opcode {
+		case opcodeHandshake:
+			if err := s.handleHandshake(); err != nil {
+				return err
+			}
+		case opcodePing:
+			continue
+		case opcodeSetBlockClient:
+			if !s.loggedIn {
+				continue
+			}
+			if err := s.handleSetBlock(); err != nil {
+				return err
+			}
+		case opcodeEntityTeleport:
+			if !s.loggedIn {
+				continue
+			}
+			if err := s.handleEntityTeleport(); err != nil {
+				return err
+			}
+		case opcodeRelPosAndOrientation:
+			if !s.loggedIn {
+				continue
+			}
+			if err := s.handleRelativePosition(true, true); err != nil {
+				return err
+			}
+		case opcodeRelPos:
+			if !s.loggedIn {
+				continue
+			}
+			if err := s.handleRelativePosition(true, false); err != nil {
+				return err
+			}
+		case opcodeOrientation:
+			if !s.loggedIn {
+				continue
+			}
+			if err := s.handleRelativePosition(false, true); err != nil {
+				return err
+			}
+		case opcodeMessage:
+			if !s.loggedIn {
+				continue
+			}
+			if err := s.handleMessage(); err != nil {
+				return err
+			}
+		case opcodeTwoWayPing:
+			if err := s.handleLoggedInPacket(opcode, s.handleTwoWayPing); err != nil {
+				return err
+			}
+		case opcodePlayerClick, opcodePluginMessage, opcodeNotifyAction, opcodeNotifyPositionAction:
+			if err := s.handleCPEPacket(opcode); err != nil {
+				return err
+			}
+		default:
+			if s.loggedIn {
+				_ = s.writeKick("unsupported packet")
+			}
+			return fmt.Errorf("unsupported opcode %d", opcode)
+		}
+	}
+}
+
+func (s *session) cleanup() {
+	// Save player props before disconnecting.
+	if s.players != nil {
+		s.stateMu.RLock()
+		props := player.PlayerProps{
+			Color:  s.color,
+			Model:  s.model,
+			Frozen: s.frozen,
+			Muted:  s.muted,
+			AFK:    s.afk,
+		}
+		ab := s.allowBuild
+		props.AllowBuild = &ab
+		s.stateMu.RUnlock()
+		s.players.SetProps(s.currentUsername(), props)
+	}
+
+	// Update PlayerDB with playtime.
+	if s.playerDB != nil && !s.loginTime.IsZero() {
+		if e := s.playerDB.Get(s.currentUsername()); e != nil {
+			e.TotalTime += time.Since(s.loginTime)
+			s.playerDB.Save(e)
+		}
+	}
+
+	if plugin.OnPlayerDisconnect.HasHandlers() {
+		plugin.OnPlayerDisconnect.Fire(plugin.PlayerDisconnectData{
+			Player: s,
+			Reason: "disconnected",
+		})
+	}
+	s.leaveRoom()
+	username, entityID, tracked := s.sessionIdentity()
+	if s.players != nil && tracked && username != "" {
+		s.players.Remove(username)
+	}
+	if s.entities != nil && entityID != 0 {
+		s.entities.Remove(entityID)
+	}
+}
+
+// ─── plugin.Player implementation on *session ───
+
+func (s *session) Name() string { return s.currentUsername() }
+
+func (s *session) Message(msg string) {
+	if plugin.OnMessageReceived.HasHandlers() {
+		m := msg
+		ctx := plugin.OnMessageReceived.Fire(plugin.MessageReceivedData{
+			Player:  s,
+			Message: &m,
+		})
+		if ctx.Cancelled() {
+			return
+		}
+		msg = m
+	}
+	_ = s.writePacket(encodeMessage(selfID, msg))
+}
+
+func (s *session) Teleport(x, y, z int, yaw, pitch byte) bool {
+	return s.teleportSelf(x, y, z, yaw, pitch)
+}
+
+func (s *session) Kick(reason string) {
+	if s.playerDB != nil {
+		if e := s.playerDB.Get(s.currentUsername()); e != nil {
+			e.Kicks++
+			s.playerDB.Save(e)
+		}
+	}
+	s.disconnect(reason)
+}
+
+func (s *session) Position() (int, int, int) {
+	eid := s.currentEntityID()
+	if s.entities != nil && eid != 0 {
+		e, ok := s.entities.Get(eid)
+		if ok {
+			return e.Pos.X, e.Pos.Y, e.Pos.Z
+		}
+	}
+	return 0, 0, 0
+}
+
+func (s *session) SetBlock(x, y, z int, block byte) bool {
+	return s.applyBlockChange(x, y, z, block, false) == nil
+}
+
+func (s *session) SupportsCPE(extName string) bool { return s.supportsExt(extName) }
+
+// ─── Codec broadcast helpers for plugin API ───
+
+// KickAll sends a kick packet to every online player.
