@@ -416,6 +416,11 @@ func (m testModeration) PasteAt(origin [3]int, pasteAir bool) int               
 func (m testModeration) SetSpecialBlock(x, y, z int, entry command.SpecialBlockEntry) bool {
 	return true
 }
+func (m testModeration) BeginBatch()                             {}
+func (m testModeration) RecordChange(x, y, z int, old, new byte) {}
+func (m testModeration) CommitBatch()                            {}
+func (m testModeration) UndoBatch() []command.UndoChange         { return nil }
+func (m testModeration) RedoBatch() []command.UndoChange         { return nil }
 
 func (m testModeration) PlayerDBLookup(name string) *playerdb.PlayerEntry {
 	return m.backend.PlayerDBLookup(name)

@@ -124,6 +124,8 @@ type session struct {
 	// specialBlocks holds per-level interactive blocks (doors, portals, MBs).
 	specialBlocks *blocks.SpecialRegistry
 	spamChecker   *player.Checker
+	undoStack     *player.UndoStack
+	batchChanges  []player.BlockChange
 }
 
 // markSelection tracks a multi-click block selection for drawing commands.

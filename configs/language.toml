@@ -293,6 +293,14 @@
 # ─── command.fill ───
 "command.fill.usage" = "usage: /fill <block>"
 
+# ─── command.undo (drawing) ───
+"command.undo.none" = "&7Nothing to undo"
+"command.undo.done" = "&aUndone %d block changes"
+
+# ─── command.redo ───
+"command.redo.none" = "&7Nothing to redo"
+"command.redo.done" = "&aRedone %d block changes"
+
 # ─── command.copy ───
 "command.copy.usage" = "usage: /copy [air]"
 
@@ -559,6 +567,10 @@
 "command.line.usage" = "использование: /line <блок>"
 "command.sphere.usage" = "использование: /sphere <блок> [hollow] [радиус]"
 "command.fill.usage" = "использование: /fill <блок>"
+"command.undo.none" = "&7Нечего отменять"
+"command.undo.done" = "&aОтменено %d изменений блоков"
+"command.redo.none" = "&7Нечего повторить"
+"command.redo.done" = "&aПовторено %d изменений блоков"
 "command.copy.usage" = "использование: /copy [air]"
 "command.paste.usage" = "использование: /paste [air]"
 "command.paste.empty" = "&7Нечего вставлять — используйте /copy сначала"

@@ -30,6 +30,7 @@ import (
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
+	"github.com/solar-mc/solar/internal/player"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
 	"github.com/solar-mc/solar/plugin/playerdb"
@@ -264,6 +265,56 @@ func (s *session) SetSpecialBlock(x, y, z int, entry command.SpecialBlockEntry) 
 		DoorBlock:   entry.DoorBlock,
 	})
 	return true
+}
+
+// ─── Undo/redo methods ───
+
+func (s *session) BeginBatch() {
+	if s.undoStack == nil {
+		s.undoStack = player.NewUndoStack(200)
+	}
+	s.batchChanges = nil
+}
+
+func (s *session) RecordChange(x, y, z int, oldBlock, newBlock byte) {
+	s.batchChanges = append(s.batchChanges, player.BlockChange{X: x, Y: y, Z: z, Old: oldBlock, New: newBlock})
+}
+
+func (s *session) CommitBatch() {
+	if s.undoStack != nil && len(s.batchChanges) > 0 {
+		s.undoStack.Push(s.batchChanges)
+	}
+	s.batchChanges = nil
+}
+
+func (s *session) UndoBatch() []command.UndoChange {
+	if s.undoStack == nil {
+		return nil
+	}
+	changes := s.undoStack.Undo()
+	if changes == nil {
+		return nil
+	}
+	out := make([]command.UndoChange, len(changes))
+	for i, c := range changes {
+		out[i] = command.UndoChange{X: c.X, Y: c.Y, Z: c.Z, Old: c.Old, New: c.New}
+	}
+	return out
+}
+
+func (s *session) RedoBatch() []command.UndoChange {
+	if s.undoStack == nil {
+		return nil
+	}
+	changes := s.undoStack.Redo()
+	if changes == nil {
+		return nil
+	}
+	out := make([]command.UndoChange, len(changes))
+	for i, c := range changes {
+		out[i] = command.UndoChange{X: c.X, Y: c.Y, Z: c.Z, Old: c.Old, New: c.New}
+	}
+	return out
 }
 
 func (s *session) GenerateWorld(name, theme string, width, height, length int, seed string) bool {

@@ -65,6 +65,23 @@ type DrawService interface {
 	PasteAt(origin [3]int, pasteAir bool) int
 	// SetSpecialBlock registers metadata for a special block at the given coords.
 	SetSpecialBlock(x, y, z int, entry SpecialBlockEntry) bool
+	// BeginBatch starts recording block changes for undo.
+	BeginBatch()
+	// RecordChange records a single block change in the current batch.
+	RecordChange(x, y, z int, oldBlock, newBlock byte)
+	// CommitBatch pushes the recorded changes onto the undo stack.
+	CommitBatch()
+	// Undo reverts the last batch. Returns the changes to restore, or nil.
+	Undo() []UndoChange
+	// Redo re-applies the last undone batch. Returns the changes, or nil.
+	Redo() []UndoChange
+}
+
+// UndoChange records a single block change for undo/redo.
+type UndoChange struct {
+	X, Y, Z int
+	Old     byte
+	New     byte
 }
 
 // SpecialBlockEntry holds metadata for a special block, passed from commands.
@@ -250,7 +267,7 @@ func NewRegistry() *Registry {
 	registry.Register("lb", levelBlockCommand)
 	registry.Register("about", aboutCommand)
 	registry.Register("b", aboutCommand)
-	registry.Register("undo", undoCommand)
+	registry.Register("blockundo", undoBlockDBCommand)
 	registry.Register("blockdb", blockDBCommand)
 	registry.Register("goto", gotoCommand)
 	registry.Register("main", mainCommand)
@@ -289,6 +306,8 @@ func NewRegistry() *Registry {
 	registry.Register("mb", mbCommand)
 	registry.Register("portal", portalCommand)
 	registry.Register("door", doorCommand)
+	registry.Register("blockundo", undoBlockDBCommand)
+	registry.Register("redo", redoCommand)
 	return registry
 }
 

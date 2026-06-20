@@ -54,6 +54,11 @@ type SessionBackend interface {
 	HasClipboard() bool
 	PasteAt(origin [3]int, pasteAir bool) int
 	SetSpecialBlock(x, y, z int, entry command.SpecialBlockEntry) bool
+	BeginBatch()
+	RecordChange(x, y, z int, oldBlock, newBlock byte)
+	CommitBatch()
+	UndoBatch() []command.UndoChange
+	RedoBatch() []command.UndoChange
 
 	KickPlayer(name, reason string) bool
 	BanPlayer(name, reason string) bool

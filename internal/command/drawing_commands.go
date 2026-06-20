@@ -54,10 +54,11 @@ func cuboidCommand(ctx Context, args []string) (string, bool) {
 		if min.Z > max.Z {
 			min.Z, max.Z = max.Z, min.Z
 		}
-		count := 0
+		ctx.Draw.BeginBatch()
 		place := func(x, y, z int) {
+			old, _ := ctx.Draw.GetBlockAt(x, y, z)
 			if ctx.Draw.PlaceBlock(x, y, z, block) {
-				count++
+				ctx.Draw.RecordChange(x, y, z, old, block)
 			}
 		}
 		switch {
@@ -68,6 +69,7 @@ func cuboidCommand(ctx Context, args []string) (string, bool) {
 		default:
 			blocks.Cuboid(min, max, place)
 		}
+		ctx.Draw.CommitBatch()
 	})
 	return ctx.tr("command.draw.select2"), true
 }
@@ -87,9 +89,14 @@ func lineCommand(ctx Context, args []string) (string, bool) {
 	ctx.Draw.StartSelection(2, func(marks [][3]int) {
 		p1 := blocks.Vec3{marks[0][0], marks[0][1], marks[0][2]}
 		p2 := blocks.Vec3{marks[1][0], marks[1][1], marks[1][2]}
+		ctx.Draw.BeginBatch()
 		blocks.Line(p1, p2, func(x, y, z int) {
-			ctx.Draw.PlaceBlock(x, y, z, block)
+			old, _ := ctx.Draw.GetBlockAt(x, y, z)
+			if ctx.Draw.PlaceBlock(x, y, z, block) {
+				ctx.Draw.RecordChange(x, y, z, old, block)
+			}
 		})
+		ctx.Draw.CommitBatch()
 	})
 	return ctx.tr("command.draw.select2"), true
 }
@@ -117,15 +124,23 @@ func sphereCommand(ctx Context, args []string) (string, bool) {
 	}
 	ctx.Draw.StartSelection(1, func(marks [][3]int) {
 		center := blocks.Vec3{marks[0][0], marks[0][1], marks[0][2]}
+		ctx.Draw.BeginBatch()
 		if hollow {
 			blocks.SphereHollow(center, radius, func(x, y, z int) {
-				ctx.Draw.PlaceBlock(x, y, z, block)
+				old, _ := ctx.Draw.GetBlockAt(x, y, z)
+				if ctx.Draw.PlaceBlock(x, y, z, block) {
+					ctx.Draw.RecordChange(x, y, z, old, block)
+				}
 			})
 		} else {
 			blocks.Sphere(center, radius, func(x, y, z int) {
-				ctx.Draw.PlaceBlock(x, y, z, block)
+				old, _ := ctx.Draw.GetBlockAt(x, y, z)
+				if ctx.Draw.PlaceBlock(x, y, z, block) {
+					ctx.Draw.RecordChange(x, y, z, old, block)
+				}
 			})
 		}
+		ctx.Draw.CommitBatch()
 	})
 	return ctx.tr("command.draw.select1"), true
 }
@@ -161,9 +176,14 @@ func fillCommand(ctx Context, args []string) (string, bool) {
 			}
 		}
 		startIdx := x + w*(z+l*y)
+		ctx.Draw.BeginBatch()
 		blocks.Fill(levelBlocks, w, h, l, startIdx, blocks.FillNormal, func(fx, fy, fz int) {
-			ctx.Draw.PlaceBlock(fx, fy, fz, block)
+			old, _ := ctx.Draw.GetBlockAt(fx, fy, fz)
+			if ctx.Draw.PlaceBlock(fx, fy, fz, block) {
+				ctx.Draw.RecordChange(fx, fy, fz, old, block)
+			}
 		})
+		ctx.Draw.CommitBatch()
 	})
 	return ctx.tr("command.draw.select1"), true
 }

@@ -333,6 +333,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		allowBuild:          true,
 		specialBlocks:       blocks.NewSpecialRegistry(),
 		spamChecker:         c.spamChecker,
+		undoStack:           player.NewUndoStack(200),
 	}
 
 	if c.tcpNoDelay {

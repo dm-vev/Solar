@@ -230,6 +230,13 @@ func (s sessionDraw) PasteAt(origin [3]int, pasteAir bool) int {
 func (s sessionDraw) SetSpecialBlock(x, y, z int, entry command.SpecialBlockEntry) bool {
 	return s.backend.SetSpecialBlock(x, y, z, entry)
 }
+func (s sessionDraw) BeginBatch() { s.backend.BeginBatch() }
+func (s sessionDraw) RecordChange(x, y, z int, old, new byte) {
+	s.backend.RecordChange(x, y, z, old, new)
+}
+func (s sessionDraw) CommitBatch()               { s.backend.CommitBatch() }
+func (s sessionDraw) Undo() []command.UndoChange { return s.backend.UndoBatch() }
+func (s sessionDraw) Redo() []command.UndoChange { return s.backend.RedoBatch() }
 
 // ─── BlockDB adapter ───
 

@@ -50,7 +50,7 @@ func aboutCommand(ctx Context, args []string) (string, bool) {
 
 // undoCommand — /undo [timespan]
 // Undoes the player's own block changes within the given timespan (default 5m).
-func undoCommand(ctx Context, args []string) (string, bool) {
+func undoBlockDBCommand(ctx Context, args []string) (string, bool) {
 	if ctx.BlockDB == nil {
 		return ctx.tr("command.undo.unavailable"), true
 	}

@@ -350,6 +350,11 @@ func (stubDraw) CopyRegion(min, max [3]int) bool                            { re
 func (stubDraw) HasClipboard() bool                                         { return false }
 func (stubDraw) PasteAt(origin [3]int, pasteAir bool) int                   { return 0 }
 func (stubDraw) SetSpecialBlock(x, y, z int, entry SpecialBlockEntry) bool  { return true }
+func (stubDraw) BeginBatch()                                                {}
+func (stubDraw) RecordChange(x, y, z int, old, new byte)                    {}
+func (stubDraw) CommitBatch()                                               {}
+func (stubDraw) Undo() []UndoChange                                         { return nil }
+func (stubDraw) Redo() []UndoChange                                         { return nil }
 
 type stubDirectory struct {
 	names       []string
