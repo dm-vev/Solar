@@ -72,6 +72,7 @@ type Codec struct {
 	listLoadedLevels    func() []string
 	listLevelFiles      func() []string
 	queuePhysics        func(x, y, z int)
+	maxPlayers          int
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -241,6 +242,18 @@ func (c *Codec) SetQueuePhysics(fn func(x, y, z int)) {
 	c.queuePhysics = fn
 }
 
+// SetMaxPlayers sets the max player cap for /serverinfo.
+func (c *Codec) SetMaxPlayers(n int) {
+	c.maxPlayers = n
+}
+
+// StartTime records when the server started, for uptime calculation.
+var StartTime time.Time
+
+func init() {
+	StartTime = time.Now()
+}
+
 // I18nGet returns a message in the server's default language.
 func (c *Codec) I18nGet(key string, args ...any) string {
 	if c.i18n != nil {
@@ -302,6 +315,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		listLoadedLevels:    c.listLoadedLevels,
 		listLevelFiles:      c.listLevelFiles,
 		queuePhysics:        c.queuePhysics,
+		maxPlayers:          c.maxPlayers,
 		color:               "&e",
 		model:               "humanoid",
 		allowBuild:          true,
@@ -383,6 +397,7 @@ type session struct {
 	listLoadedLevels    func() []string
 	listLevelFiles      func() []string
 	queuePhysics        func(x, y, z int)
+	maxPlayers          int
 
 	// ponytail: plugin.Player stub state, guarded by stateMu
 	color      string

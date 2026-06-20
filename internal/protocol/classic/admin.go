@@ -274,8 +274,7 @@ func (s *session) OnlinePlayerCount() int {
 	return s.players.Count()
 }
 func (s *session) MaxPlayersCount() int {
-	// ponytail: not available on session; return a default.
-	return 128
+	return s.maxPlayers
 }
 func (s *session) LoadedLevelCount() int {
 	if s.listLoadedLevels == nil {
@@ -284,7 +283,7 @@ func (s *session) LoadedLevelCount() int {
 	return len(s.listLoadedLevels())
 }
 func (s *session) ServerUptime() time.Duration {
-	return time.Since(s.loginTime)
+	return time.Since(StartTime)
 }
 
 func (s *session) OnlineNames() []string {

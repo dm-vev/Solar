@@ -36,15 +36,9 @@ func whoisCommand(ctx Context, args []string) (string, bool) {
 	if e == nil {
 		return ctx.tr("command.seen.never", args[0]), true
 	}
-	rank := "player"
-	if ctx.Authority != nil && ctx.Authority.CanAdmin() {
-		rank = "operator"
-	}
 	playtime := e.TotalTime.Round(time.Minute)
 	var sb strings.Builder
 	sb.WriteString(ctx.tr("command.whois.name", e.Name))
-	sb.WriteString("\n")
-	sb.WriteString(ctx.tr("command.whois.rank", rank))
 	sb.WriteString("\n")
 	sb.WriteString(ctx.tr("command.whois.first_login", e.FirstLogin.Format("2006-01-02 15:04")))
 	sb.WriteString("\n")
@@ -92,6 +86,11 @@ func mapinfoCommand(ctx Context, args []string) (string, bool) {
 	}
 	var sb strings.Builder
 	sb.WriteString(ctx.tr("command.mapinfo.levels", count))
+	if count > 0 && len(levels) > 0 {
+		sb.WriteString(" &7(")
+		sb.WriteString(strings.Join(levels, ", "))
+		sb.WriteString(")")
+	}
 	sb.WriteString("\n")
 	if ctx.BlockDB != nil {
 		sb.WriteString(ctx.tr("command.mapinfo.blockdb", ctx.BlockDB.Count()))

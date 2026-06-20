@@ -126,6 +126,7 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 			srv.BlockPhysics().Queue(x, y, z)
 		}
 	})
+	codec.SetMaxPlayers(cfg.MaxPlayers)
 	if err := plugin.LoadAll(pluginSrv, logger); err != nil {
 		logger.Error("plugin load failed", "error", err)
 	}
