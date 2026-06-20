@@ -166,6 +166,53 @@ func (s *session) isIgnoring(name string) bool {
 	return s.ignoredPlayers[strings.ToLower(name)]
 }
 
+// ─── DrawService methods ───
+
+func (s *session) StartSelection(markCount int, callback func(marks [][3]int)) bool {
+	if markCount < 1 || markCount > 3 {
+		return false
+	}
+	s.markState = &markSelection{
+		marks: make([]markPos, markCount),
+		callback: func(marks []markPos) {
+			out := make([][3]int, len(marks))
+			for i, m := range marks {
+				out[i] = [3]int{m.X, m.Y, m.Z}
+			}
+			callback(out)
+		},
+	}
+	return true
+}
+
+func (s *session) GetBlockAt(x, y, z int) (byte, bool) {
+	if s.worlds == nil {
+		return 0, false
+	}
+	return s.worlds.BlockAt(x, y, z)
+}
+
+func (s *session) PlaceBlock(x, y, z int, block byte) bool {
+	if s.worlds == nil {
+		return false
+	}
+	if !s.worlds.SetBlock(x, y, z, block) {
+		return false
+	}
+	pkt := encodeSetBlock(x, y, z, block)
+	_ = s.writePacket(pkt)
+	s.broadcastToPeers(pkt)
+	return true
+}
+
+func (s *session) LevelDims() (width, height, length int) {
+	if s.worlds == nil {
+		return 0, 0, 0
+	}
+	lvl := s.worlds.Current()
+	return lvl.Width, lvl.Height, lvl.Length
+}
+
 func (s *session) GenerateWorld(name, theme string, width, height, length int, seed string) bool {
 	return s.generateWorld(name, theme, width, height, length, seed)
 }

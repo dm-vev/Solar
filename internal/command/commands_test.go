@@ -339,6 +339,14 @@ func (stubChat) Me(action string)                {}
 func (stubChat) Whisper(target, msg string) bool { return true }
 func (stubChat) Ignore(name string) (bool, bool) { return true, true }
 
+// stubDraw implements DrawService.
+type stubDraw struct{}
+
+func (stubDraw) StartSelection(markCount int, callback func([][3]int)) bool { return true }
+func (stubDraw) GetBlockAt(x, y, z int) (byte, bool)                        { return 0, true }
+func (stubDraw) PlaceBlock(x, y, z int, block byte) bool                    { return true }
+func (stubDraw) LevelDims() (int, int, int)                                 { return 128, 64, 128 }
+
 type stubDirectory struct {
 	names       []string
 	whitelisted []string

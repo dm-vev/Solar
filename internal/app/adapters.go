@@ -163,6 +163,7 @@ func buildCommandContext(backend classic.SessionBackend) command.Context {
 		World:       sessionWorld{backend},
 		Teleport:    sessionTeleport{backend},
 		Chat:        sessionChat{backend},
+		Draw:        sessionDraw{backend},
 		Persistence: sessionPersistence{backend},
 		Moderation:  sessionModeration{backend},
 		Players:     sessionDirectory{backend},
@@ -200,6 +201,23 @@ type sessionChat struct{ backend classic.SessionBackend }
 func (s sessionChat) Me(action string)                { s.backend.MeAction(action) }
 func (s sessionChat) Whisper(target, msg string) bool { return s.backend.WhisperTo(target, msg) }
 func (s sessionChat) Ignore(name string) (bool, bool) { return s.backend.IgnorePlayer(name) }
+
+// ─── DrawService adapter ───
+
+type sessionDraw struct{ backend classic.SessionBackend }
+
+func (s sessionDraw) StartSelection(markCount int, callback func([][3]int)) bool {
+	return s.backend.StartSelection(markCount, callback)
+}
+func (s sessionDraw) GetBlockAt(x, y, z int) (byte, bool) {
+	return s.backend.GetBlockAt(x, y, z)
+}
+func (s sessionDraw) PlaceBlock(x, y, z int, block byte) bool {
+	return s.backend.PlaceBlock(x, y, z, block)
+}
+func (s sessionDraw) LevelDims() (int, int, int) {
+	return s.backend.LevelDims()
+}
 
 // ─── BlockDB adapter ───
 

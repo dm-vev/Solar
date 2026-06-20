@@ -406,6 +406,11 @@ func (m testModeration) MeAction(action string)                  {}
 func (m testModeration) WhisperTo(target, msg string) bool       { return true }
 func (m testModeration) IgnorePlayer(name string) (bool, bool)   { return true, true }
 
+func (m testModeration) StartSelection(markCount int, callback func([][3]int)) bool { return true }
+func (m testModeration) GetBlockAt(x, y, z int) (byte, bool)                        { return 0, true }
+func (m testModeration) PlaceBlock(x, y, z int, block byte) bool                    { return true }
+func (m testModeration) LevelDims() (int, int, int)                                 { return 128, 64, 128 }
+
 func (m testModeration) PlayerDBLookup(name string) *playerdb.PlayerEntry {
 	return m.backend.PlayerDBLookup(name)
 }

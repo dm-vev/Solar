@@ -46,6 +46,11 @@ type SessionBackend interface {
 	WhisperTo(targetName, msg string) bool
 	IgnorePlayer(name string) (bool, bool)
 
+	StartSelection(markCount int, callback func(marks [][3]int)) bool
+	GetBlockAt(x, y, z int) (byte, bool)
+	PlaceBlock(x, y, z int, block byte) bool
+	LevelDims() (width, height, length int)
+
 	KickPlayer(name, reason string) bool
 	BanPlayer(name, reason string) bool
 	UnbanPlayer(name string) bool

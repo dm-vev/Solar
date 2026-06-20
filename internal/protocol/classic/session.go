@@ -113,7 +113,21 @@ type session struct {
 
 	// ignoredPlayers tracks chat ignores for this session.
 	ignoredPlayers map[string]bool
+
+	// markState holds the active block selection for drawing commands.
+	// When non-nil, block placements are intercepted as marks instead
+	// of being applied to the world.
+	markState *markSelection
 }
+
+// markSelection tracks a multi-click block selection for drawing commands.
+type markSelection struct {
+	marks    []markPos
+	index    int
+	callback func(marks []markPos) // called when all marks are collected
+}
+
+type markPos struct{ X, Y, Z int }
 
 func (s *session) RoomEntityID() uint32 {
 	return s.currentEntityID()

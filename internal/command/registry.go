@@ -51,6 +51,14 @@ type ChatService interface {
 	Ignore(name string) (ignored bool, ok bool)
 }
 
+// DrawService exposes block selection and placement for drawing commands.
+type DrawService interface {
+	StartSelection(markCount int, callback func(marks [][3]int)) bool
+	GetBlockAt(x, y, z int) (byte, bool)
+	PlaceBlock(x, y, z int, block byte) bool
+	LevelDims() (width, height, length int)
+}
+
 // PersistenceService persists runtime state.
 type PersistenceService interface {
 	SaveState() bool
@@ -165,6 +173,7 @@ type Context struct {
 	World       WorldService
 	Teleport    TeleportService
 	Chat        ChatService
+	Draw        DrawService
 	Persistence PersistenceService
 	Moderation  ModerationService
 	Players     PlayerDirectory
@@ -252,6 +261,10 @@ func NewRegistry() *Registry {
 	registry.Register("me", meCommand)
 	registry.Register("whisper", whisperCommand)
 	registry.Register("ignore", ignoreCommand)
+	registry.Register("cuboid", cuboidCommand)
+	registry.Register("line", lineCommand)
+	registry.Register("sphere", sphereCommand)
+	registry.Register("fill", fillCommand)
 	return registry
 }
 

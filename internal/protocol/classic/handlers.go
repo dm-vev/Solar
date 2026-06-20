@@ -73,6 +73,21 @@ func (s *session) handleSetBlock() error {
 		blockID = 0
 	}
 
+	// If a drawing selection is active, intercept the click as a mark.
+	if s.markState != nil {
+		s.RevertBlock(x, y, z) // don't actually place the block
+		s.markState.marks[s.markState.index] = markPos{x, y, z}
+		s.markState.index++
+		s.Message(s.Tr("command.draw.mark") + " #" + fmt.Sprintf("%d", s.markState.index))
+		if s.markState.index >= len(s.markState.marks) {
+			cb := s.markState.callback
+			marks := s.markState.marks
+			s.markState = nil // clear selection
+			cb(marks)
+		}
+		return nil
+	}
+
 	if !s.AllowBuild() {
 		if s.worlds != nil {
 			if block, ok := s.worlds.BlockAt(x, y, z); ok {

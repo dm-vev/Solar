@@ -275,6 +275,24 @@
 "command.ignore.on" = "&7You are now ignoring %s"
 "command.ignore.off" = "&7You are no longer ignoring %s"
 
+# ─── command.draw (shared) ───
+"command.draw.unavailable" = "drawing is unavailable"
+"command.draw.invalid_block" = "invalid block: %s"
+"command.draw.select1" = "&eClick a block to select (1 mark needed)"
+"command.draw.select2" = "&eClick 2 blocks to mark the region"
+
+# ─── command.cuboid ───
+"command.cuboid.usage" = "usage: /cuboid <block> [hollow|walls]"
+
+# ─── command.line ───
+"command.line.usage" = "usage: /line <block>"
+
+# ─── command.sphere ───
+"command.sphere.usage" = "usage: /sphere <block> [hollow] [radius]"
+
+# ─── command.fill ───
+"command.fill.usage" = "usage: /fill <block>"
+
 [ru]
 # ─── general ───
 "general.muted" = "&cВы в муте."
@@ -511,3 +529,13 @@
 "command.ignore.usage" = "использование: /ignore <имя>"
 "command.ignore.on" = "&7Вы теперь игнорируете %s"
 "command.ignore.off" = "&7Вы больше не игнорируете %s"
+
+# ─── command.draw (shared) ───
+"command.draw.unavailable" = "рисование недоступно"
+"command.draw.invalid_block" = "неверный блок: %s"
+"command.draw.select1" = "&eКликните блок для выбора (нужна 1 отметка)"
+"command.draw.select2" = "&eКликните 2 блока для отметки области"
+"command.cuboid.usage" = "использование: /cuboid <блок> [hollow|walls]"
+"command.line.usage" = "использование: /line <блок>"
+"command.sphere.usage" = "использование: /sphere <блок> [hollow] [радиус]"
+"command.fill.usage" = "использование: /fill <блок>"
