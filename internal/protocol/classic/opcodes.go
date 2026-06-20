@@ -1,3 +1,12 @@
+// opcodes.go defines the Minecraft Classic protocol packet IDs.
+//
+// These are the single-byte opcodes that prefix every packet in the
+// Classic wire protocol. The server reads the opcode first, then
+// dispatches to the appropriate handler based on the value.
+//
+// Opcodes 0x00–0x0D are defined by the original Minecraft Classic
+// protocol. CPE extension packets use opcodes 0x10 and above.
+
 package classic
 
 import "github.com/solar-mc/solar/internal/protocol/wire"

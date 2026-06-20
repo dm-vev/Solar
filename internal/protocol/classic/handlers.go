@@ -1,3 +1,20 @@
+// handlers.go processes incoming client packets.
+//
+// Each handler reads the packet payload from the session's buffered
+// reader, validates it, applies the change to the world/session, and
+// fires the appropriate plugin events.
+//
+// Handlers:
+//   - handleSetBlock: player places or removes a block
+//   - handleEntityTeleport: player moves (full position update)
+//   - handleRelativePosition*: player moves (delta-encoded position)
+//   - handleMessage: player sends chat or a command
+//   - applyBlockChange: shared block change logic (fires OnBlockChange,
+//     writes to world, records in BlockDB, tracks stats, broadcasts)
+//
+// All handlers are called from the session read loop (session.run).
+// They must not block on network I/O — use writePacket for responses.
+
 package classic
 
 import (

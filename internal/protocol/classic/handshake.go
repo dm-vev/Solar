@@ -1,3 +1,26 @@
+// handshake.go implements the login handshake and level streaming.
+//
+// The handshake flow:
+//  1. Read 129-byte handshake payload (version, username, userType)
+//  2. Validate username, check ban/whitelist
+//  3. Register player in registry, create entity
+//  4. If CPE requested: negotiate extensions (ExtInfo + ExtEntry pairs)
+//  5. Send MOTD, block definitions, and level data stream
+//  6. Teleport player to spawn, join room, fire OnPlayerConnect
+//
+// changeMap switches the player to a different level:
+//  1. Fire OnJoiningLevel (cancelable)
+//  2. Leave room (despawn from old level peers)
+//  3. Swap world Manager
+//  4. Send new level stream + teleport
+//  5. Re-join room (spawn for new level peers)
+//  6. Fire OnJoinedLevel
+//
+// sendLevelFrom encodes the level as a gzip or fastmap stream,
+// sends it in chunks, then sends LevelFinalize and a teleport packet.
+// CPE environment packets (env colors, weather, map properties) are
+// sent after the teleport based on level.Env settings.
+
 package classic
 
 import (

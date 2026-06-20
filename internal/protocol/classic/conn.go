@@ -1,3 +1,19 @@
+// conn.go implements the connection write loop and lifecycle.
+//
+// The write loop runs in a goroutine started by Codec.ServeConn. It
+// drains the outbox channel, batches packets into a single TCP write,
+// and flushes the buffered writer. When the session is stopped, the
+// loop drains remaining packets (shutdown batch) before closing the
+// connection.
+//
+// writePacket is the primary entry point for sending packets. It copies
+// the packet (because callers may reuse the buffer), then either sends
+// immediately or blocks up to sendTimeout before disconnecting the client.
+//
+// writePacketNoCopy is used for broadcast packets where the caller
+// guarantees the slice will not be modified. It drops the packet if the
+// outbox is full (best-effort for broadcasts).
+
 package classic
 
 import (

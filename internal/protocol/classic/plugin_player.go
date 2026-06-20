@@ -1,3 +1,20 @@
+// plugin_player.go implements the plugin.Player interface on *Session.
+//
+// This file contains the player-facing methods that plugins call:
+//   - Chat: Message, SendCpeMessage
+//   - Movement: Teleport, Position, Yaw, Pitch, Respawn
+//   - Moderation: Kick, IsOperator, IsMuted, SetMuted, IsFrozen,
+//     SetFrozen, IsAfk, SetAfk, IsHidden, SetHidden
+//   - Building: SetBlock, ChangeBlock, RevertBlock, SendBlockChange,
+//     AllowBuild, SetAllowBuild, MakeSelection, ClearSelection
+//   - Identity: Name, EntityID, IP, Color, SetColor, Model, SetModel,
+//     SetSkin, Language, SetLanguage
+//   - CPE: SupportsCPE, CPE (returns the CPE interface)
+//   - Combat: Kill (fires OnPlayerDying/Died, respawns)
+//
+// State changes (SetColor, SetModel, SetHidden, etc.) broadcast the
+// appropriate packets to peers and fire plugin events.
+
 package classic
 
 import "github.com/solar-mc/solar/plugin"

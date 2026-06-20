@@ -1,3 +1,17 @@
+// encode.go contains pure wire-format encoding functions.
+//
+// Each function takes typed Go values and returns a ready-to-send []byte
+// packet. Functions are stateless and do not perform I/O.
+//
+// Encoding follows the Minecraft Classic protocol specification:
+//   - Packet ID as the first byte
+//   - Fixed-length string fields (64 bytes, space-padded, CP437)
+//   - Big-endian 16-bit integers for coordinates
+//   - Little-endian where specified by CPE extension docs
+//
+// These functions are used by both the session (for responses) and the
+// codec (for broadcasts).
+
 package classic
 
 import (

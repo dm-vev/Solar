@@ -1,3 +1,14 @@
+// blockdef.go sends custom block definitions to clients.
+//
+// Custom blocks use the BlockDefinitions CPE extension to define
+// new block types beyond the original 255 Classic blocks. Each
+// definition includes textures (per-face), collision, shape, fog,
+// and sound properties.
+//
+// sendBlockDefinitions is called during the handshake after CPE
+// negotiation. broadcastBlockDef sends a single definition to all
+// online players (used when a new block def is added at runtime).
+
 package classic
 
 import (

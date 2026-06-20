@@ -1,3 +1,24 @@
+// admin.go implements all SessionBackend methods.
+//
+// These methods provide the operations that chat commands and the
+// plugin API use to interact with the session and the server:
+//
+//   - Identity: CurrentUsername, CurrentLocation, IsOperator, Translate
+//   - World ops: ApplyBlockChange, TeleportSelf, SetSpawn, GenerateWorld
+//   - Persistence: SaveState, PersistPlayerPolicy
+//   - Moderation: KickPlayer, BanPlayer, MutePlayer, FreezePlayer,
+//     ToggleAFK, ToggleHide (all operate on online players via room lookup)
+//   - Level ops: GotoLevel, LoadLevel, UnloadLevel, ReloadCurrentLevel
+//   - BlockDB: ChangesAt, ChangesBy, Count, Enabled, Clear, RevertBlock
+//   - Level env: GetEnvColor, SetLevelEnvColor, GetWeather, SetLevelWeather,
+//     GetLevelMOTD, SetLevelMOTD
+//   - Info: PlayerDBLookup, ServerName, OnlinePlayerCount, ServerUptime
+//   - Block defs: AddBlockDef, RemoveBlockDef, GetBlockDef, ListBlockDefs
+//   - Whitelist: WhitelistAdd, WhitelistRemove, SetWhitelistEnabled
+//
+// findTarget is a shared helper that looks up an online player by name
+// (case-insensitive) via the session room.
+
 package classic
 
 import (

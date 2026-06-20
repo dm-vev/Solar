@@ -1,3 +1,18 @@
+// backend.go defines the SessionBackend interface.
+//
+// SessionBackend is the contract between the protocol layer and the
+// command/adapter layer. It exposes session operations needed by chat
+// commands without coupling the command package to the session struct.
+//
+// The interface is implemented by *Session in admin.go. The app package
+// (adapters.go) wraps SessionBackend methods into command.Context fields
+// (ModerationService, LevelService, BlockDBService, etc.).
+//
+// This separation follows the Go best practice of defining interfaces
+// on the consumer side (Effective Go: "Interfaces belong in the package
+// that uses values of the interface type"). SessionBackend is defined
+// here because it bridges two internal packages.
+
 package classic
 
 import (

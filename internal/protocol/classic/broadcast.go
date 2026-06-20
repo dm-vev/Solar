@@ -1,3 +1,20 @@
+// broadcast.go implements entity visibility and packet fan-out.
+//
+// The room (from internal/session.Room) tracks all online sessions.
+// Broadcast methods on Codec iterate the room and send packets to
+// qualifying peers. Per-level filtering ensures players only see
+// entities and block changes on their current level.
+//
+// Session-level methods (joinRoom, leaveRoom, broadcastToPeers, canSee)
+// handle entity spawn/despawn and per-level visibility:
+//   - joinRoom: spawns the player's entity for same-level peers and vice versa
+//   - leaveRoom: despawns the player's entity from same-level peers
+//   - broadcastToPeers: sends a packet to all same-level peers
+//   - canSee: consults OnGettingCanSee event for visibility overrides
+//
+// Codec.BroadcastEntityUpdates runs the per-tick entity position broadcast
+// with delta encoding (RelPos/RelPosAndOrient/Orientation/Teleport).
+
 package classic
 
 import (

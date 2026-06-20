@@ -1,3 +1,21 @@
+// session.go defines the Session type: per-connection state and lifecycle.
+//
+// A Session is created by Codec.ServeConn and owns:
+//   - The TCP connection (bufio reader/writer)
+//   - The packet outbox (buffered channel for async writes)
+//   - Player identity (username, entity ID, tracked flag)
+//   - Plugin state (color, model, frozen, muted, afk, hidden, allow_build)
+//   - CPE extension support map
+//   - References to world, players, entities, commands, blockDB, i18n
+//
+// The session runs a read loop (session.run) that dispatches incoming
+// packets to handlers, and a write loop (session.writeLoop) that drains
+// the outbox and flushes to the TCP connection. Both loops terminate
+// when the session's stop channel is closed.
+//
+// All plugin.Player and plugin.CPE methods are implemented on *Session
+// in plugin_player.go and cpe_plugin.go respectively.
+
 package classic
 
 import (

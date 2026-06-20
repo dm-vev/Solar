@@ -1,3 +1,13 @@
+// state.go provides safe state accessors for Session.
+//
+// All accessors use session.stateMu (a sync.RWMutex) to protect the
+// session's mutable fields: username, entityID, loggedIn, joined,
+// lastPos/Yaw/Pitch, cpeExts, and plugin state (color, model, hidden,
+// muted, frozen, afk, allowBuild).
+//
+// These accessors are used by handlers, broadcast, plugin methods,
+// and the codec to read/write session state without data races.
+
 package classic
 
 import (

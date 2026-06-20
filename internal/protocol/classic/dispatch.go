@@ -1,3 +1,13 @@
+// dispatch.go contains the packet opcode dispatch logic.
+//
+// The read loop (session.run) reads a single byte opcode, then
+// dispatches to the appropriate handler based on the value. Most
+// handlers require the session to be logged in (handshake completed).
+//
+// CPE packets (PlayerClick, PluginMessage, NotifyAction,
+// NotifyPositionAction) are dispatched to handleCPEPacket which
+// further routes to the specific CPE handler.
+
 package classic
 
 type packetHandler func() error

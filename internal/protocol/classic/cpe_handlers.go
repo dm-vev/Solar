@@ -1,3 +1,14 @@
+// cpe_handlers.go processes incoming CPE-specific packets.
+//
+// These packets are only received from clients that completed CPE
+// negotiation. Each handler checks supportsExt before processing.
+//
+// Handlers:
+//   - handlePlayerClick: CPE PlayerClick (left/right/middle click on entity or block)
+//   - handlePluginMessage: CPE PluginMessage (custom channel data)
+//   - handleNotifyAction: CPE NotifyAction (blocklist toggle, level saved, etc.)
+//   - handleNotifyPositionAction: CPE NotifyPositionAction (respawn, setspawn)
+
 package classic
 
 import (

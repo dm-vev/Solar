@@ -1,3 +1,13 @@
+// codec.go contains the Codec type: the top-level protocol coordinator.
+//
+// Codec is responsible for:
+//   - Configuring protocol parameters (timeouts, outbox size, TCP options)
+//   - Accepting incoming connections via ServeConn
+//   - Creating Session instances with the correct configuration
+//   - Providing broadcast helpers used by the server and plugin API
+//
+// Codec is safe for concurrent use. A single Codec instance is shared
+// across all connections for the lifetime of the server.
 package classic
 
 import (

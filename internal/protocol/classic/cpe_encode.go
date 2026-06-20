@@ -1,3 +1,15 @@
+// cpe_encode.go encodes ClassiCube Protocol Extension (CPE) packets.
+//
+// Each function returns a ready-to-send []byte for a specific CPE
+// packet type. Functions are stateless and follow the CPE specification
+// at https://www.classicube.net/wiki/protocol-extensions/
+//
+// Packet encoding notes:
+//   - String fields are fixed-length, space-padded (same as base protocol)
+//   - Integers are big-endian unless the CPE spec says otherwise
+//   - Some packets have V1/V2 variants (e.g. SetMapAppearance)
+//   - Boolean fields are encoded as single bytes (0 or 1)
+
 package classic
 
 import (

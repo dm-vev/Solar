@@ -1,3 +1,12 @@
+// cpe_plugin.go implements the plugin.CPE interface on *Session.
+//
+// Each method sends a CPE packet to the client, but only if the client
+// supports the relevant extension (checked via supportsExt). If the
+// extension is not supported, the method is a no-op.
+//
+// This allows plugins to call player.CPE().SetWeather(1) without
+// checking extension support — the method handles it internally.
+
 package classic
 
 import "github.com/solar-mc/solar/plugin"

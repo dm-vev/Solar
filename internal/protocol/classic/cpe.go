@@ -1,3 +1,19 @@
+// cpe.go defines ClassiCube Protocol Extension (CPE) constants and
+// the negotiation logic.
+//
+// CPE allows the server and client to agree on optional extensions
+// beyond the base Classic protocol. The negotiation flow:
+//  1. Client sends handshake with userType=0x42 (CPE flag)
+//  2. Server sends ExtInfo (app name + extension count)
+//  3. Server sends ExtEntry for each extension it supports
+//  4. Client sends ExtInfo + ExtEntry for its supported extensions
+//  5. Both sides record which extensions are mutually supported
+//
+// Extension support is stored per-session in session.cpeExts (map of
+// extension name → version). The supportsExt method checks if the
+// client confirmed support for a given extension before sending the
+// corresponding CPE packet.
+
 package classic
 
 import (

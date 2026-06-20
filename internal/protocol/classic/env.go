@@ -1,3 +1,16 @@
+// env.go sends CPE environment packets based on level.Env settings.
+//
+// sendEnv is called after level streaming (in sendLevelFrom) and when
+// environment properties are changed via /map command. It sends:
+//   - Env colors (sky, cloud, fog, ambient, diffuse) — only if Set=true
+//   - Weather type (sunny, rain, snow)
+//   - Map properties (edge level, sides level, clouds height, max fog,
+//     clouds speed, weather speed, weather fade, exp fog, skybox speeds)
+//   - Lighting mode (classic or fancy)
+//
+// Each packet is only sent if the client supports the corresponding
+// CPE extension (EnvColors, EnvWeatherType, EnvMapAspect, LightingMode).
+
 package classic
 
 import "github.com/solar-mc/solar/internal/world"
