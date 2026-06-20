@@ -227,6 +227,9 @@ func (s sessionDraw) HasClipboard() bool {
 func (s sessionDraw) PasteAt(origin [3]int, pasteAir bool) int {
 	return s.backend.PasteAt(origin, pasteAir)
 }
+func (s sessionDraw) SetSpecialBlock(x, y, z int, entry command.SpecialBlockEntry) bool {
+	return s.backend.SetSpecialBlock(x, y, z, entry)
+}
 
 // ─── BlockDB adapter ───
 

@@ -34,6 +34,9 @@ const (
 	FastLava   byte = 112
 	FloatWood  byte = 110
 	LavaSponge byte = 109
+	TNTSmall   byte = 182
+	TNTBig     byte = 183
+	TNTNuke    byte = 186
 	Invalid    byte = 255
 )
 
@@ -176,6 +179,9 @@ func (e *Engine) processBlock(c *checkEntry, block byte, adv bool) {
 
 	case Fire:
 		e.doFire(c, x, y, z, adv)
+
+	case TNTSmall, TNTBig, TNTNuke:
+		e.doTNT(c, x, y, z, block, adv)
 
 	case Sponge:
 		e.doSponge(c, x, y, z, false)
@@ -611,3 +617,59 @@ const (
 	Sapling byte = 6
 	Wood    byte = 5
 )
+
+// ─── TNT explosion ───
+
+func (e *Engine) doTNT(c *checkEntry, x, y, z int, block byte, adv bool) {
+	if !adv {
+		c.data = removeFlag
+		return
+	}
+	radius := 2 // small TNT
+	switch block {
+	case TNTBig:
+		radius = 3
+	case TNTNuke:
+		radius = 6
+	}
+	// Explode: destroy blocks in radius, chain to other TNT.
+	for dy := -radius; dy <= radius; dy++ {
+		for dz := -radius; dz <= radius; dz++ {
+			for dx := -radius; dx <= radius; dx++ {
+				dist := dx*dx + dy*dy + dz*dz
+				if dist > radius*radius {
+					continue
+				}
+				idx := e.posToInt(x+dx, y+dy, z+dz)
+				if idx < 0 {
+					continue
+				}
+				b := e.getBlock(idx)
+				if b == Invalid || b == Air {
+					continue
+				}
+				// Chain reaction: other TNT blocks explode too.
+				if IsTNTBlock(b) {
+					e.queueCheck(idx)
+					continue
+				}
+				// 80% chance to destroy, 20% to leave (visual debris).
+				if e.rng.Intn(10) < 8 {
+					e.setBlock(idx, Air)
+				}
+			}
+		}
+	}
+	// Remove the TNT block itself.
+	e.setBlock(e.posToInt(x, y, z), Air)
+	c.data = removeFlag
+}
+
+// IsTNTBlock checks if a block is TNT (exported for physics dispatch).
+func IsTNTBlock(b byte) bool {
+	switch b {
+	case 182, 183, 186: // TNTSmall, TNTBig, TNTNuke
+		return true
+	}
+	return false
+}

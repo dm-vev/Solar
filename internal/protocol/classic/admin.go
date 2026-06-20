@@ -32,6 +32,7 @@ import (
 	"github.com/solar-mc/solar/internal/drawing"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
+	"github.com/solar-mc/solar/internal/specialblocks"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
 	"github.com/solar-mc/solar/plugin/playerdb"
@@ -252,6 +253,20 @@ func (s *session) PasteAt(origin [3]int, pasteAir bool) int {
 		}
 	})
 	return count
+}
+
+func (s *session) SetSpecialBlock(x, y, z int, entry command.SpecialBlockEntry) bool {
+	if s.specialBlocks == nil {
+		return false
+	}
+	s.specialBlocks.Set(x, y, z, &specialblocks.Entry{
+		Type:        specialblocks.SpecialType(entry.Type),
+		Message:     entry.Message,
+		PortalDst:   [3]int{entry.PortalX, entry.PortalY, entry.PortalZ},
+		PortalLevel: entry.PortalLevel,
+		DoorBlock:   entry.DoorBlock,
+	})
+	return true
 }
 
 func (s *session) GenerateWorld(name, theme string, width, height, length int, seed string) bool {

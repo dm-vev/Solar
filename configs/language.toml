@@ -300,6 +300,12 @@
 "command.paste.usage" = "usage: /paste [air]"
 "command.paste.empty" = "&7Nothing to paste — use /copy first"
 
+# ─── command.mb ───
+"command.mb.usage" = "usage: /mb <message>"
+
+# ─── command.portal ───
+"command.portal.usage" = "usage: /portal <x> <y> <z> [level]"
+
 [ru]
 # ─── general ───
 "general.muted" = "&cВы в муте."
@@ -549,3 +555,5 @@
 "command.copy.usage" = "использование: /copy [air]"
 "command.paste.usage" = "использование: /paste [air]"
 "command.paste.empty" = "&7Нечего вставлять — используйте /copy сначала"
+"command.mb.usage" = "использование: /mb <сообщение>"
+"command.portal.usage" = "использование: /portal <x> <y> <z> [уровень]"

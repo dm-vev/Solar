@@ -25,6 +25,7 @@ import (
 	"github.com/solar-mc/solar/internal/i18n"
 	"github.com/solar-mc/solar/internal/player"
 	sess "github.com/solar-mc/solar/internal/session"
+	"github.com/solar-mc/solar/internal/specialblocks"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
@@ -326,6 +327,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		color:               "&e",
 		model:               "humanoid",
 		allowBuild:          true,
+		specialBlocks:       specialblocks.NewRegistry(),
 	}
 
 	if c.tcpNoDelay {

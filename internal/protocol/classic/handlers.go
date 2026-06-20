@@ -27,6 +27,7 @@ import (
 
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
+	"github.com/solar-mc/solar/internal/specialblocks"
 	"github.com/solar-mc/solar/plugin"
 )
 
@@ -121,6 +122,9 @@ func (s *session) handleEntityTeleport() error {
 	if s.entities != nil {
 		s.entities.SetLocation(targetID, position, yaw, pitch)
 	}
+
+	// Check for special blocks at the player's feet.
+	s.checkSpecialBlocks(position.X/32, position.Y/32, position.Z/32)
 
 	if plugin.OnPlayerMove.HasHandlers() {
 		plugin.OnPlayerMove.Fire(plugin.PlayerMoveData{
@@ -318,11 +322,65 @@ func (s *session) buildCommandContextFn() command.Context {
 	return command.Context{}
 }
 
+func specialBlockType(b byte) specialblocks.SpecialType {
+	if specialblocks.IsMessageBlock(b) {
+		return specialblocks.SpecialMessage
+	}
+	if specialblocks.IsPortal(b) {
+		return specialblocks.SpecialPortal
+	}
+	if specialblocks.IsDoor(b) {
+		return specialblocks.SpecialDoor
+	}
+	return specialblocks.SpecialNone
+}
+
+// checkSpecialBlocks fires message blocks and portals at the player's position.
+func (s *session) checkSpecialBlocks(x, y, z int) {
+	if s.specialBlocks == nil || s.worlds == nil {
+		return
+	}
+	// Check the block at feet level and one below.
+	for dy := 0; dy >= -1; dy-- {
+		entry := s.specialBlocks.Get(x, y+dy, z)
+		if entry == nil {
+			continue
+		}
+		switch entry.Type {
+		case specialblocks.SpecialMessage:
+			if entry.Message != "" {
+				s.Message(entry.Message)
+			}
+		case specialblocks.SpecialPortal:
+			if entry.PortalLevel != "" {
+				// Cross-level portal — use gotoLevel if available.
+				if s.gotoLevel != nil {
+					s.gotoLevel(s, entry.PortalLevel)
+				}
+			} else {
+				// Same-level portal — teleport.
+				s.teleportSelf(entry.PortalDst[0], entry.PortalDst[1], entry.PortalDst[2], s.Yaw(), s.Pitch())
+			}
+		case specialblocks.SpecialDoor:
+			// Door toggle: air ↔ solid block.
+			if s.worlds != nil {
+				b, ok := s.worlds.BlockAt(x, y+dy, z)
+				if ok {
+					if b == 0 {
+						s.applyBlockChange(x, y+dy, z, entry.DoorBlock, true)
+					} else {
+						s.applyBlockChange(x, y+dy, z, 0, true)
+					}
+				}
+			}
+		}
+	}
+}
+
 func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 	if s.worlds == nil {
 		return nil
 	}
-
 	placing := blockID != 0
 	if plugin.OnBlockChange.HasHandlers() {
 		ctx := plugin.OnBlockChange.Fire(plugin.BlockChangeData{
@@ -346,6 +404,19 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 
 	if !s.worlds.SetBlock(x, y, z, blockID) {
 		return fmt.Errorf("block position out of bounds: %d %d %d", x, y, z)
+	}
+
+	// Register special blocks (message blocks, portals, doors).
+	if placing && s.specialBlocks != nil {
+		if specialblocks.IsSpecialBlock(blockID) && !specialblocks.IsTNT(blockID) {
+			s.specialBlocks.Set(x, y, z, &specialblocks.Entry{
+				Type: specialBlockType(blockID),
+			})
+		}
+		// Remove special block entry if overwriting one.
+		if !placing || !specialblocks.IsSpecialBlock(blockID) {
+			s.specialBlocks.Remove(x, y, z)
+		}
 	}
 
 	// Queue block for physics processing.

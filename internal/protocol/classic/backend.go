@@ -53,6 +53,7 @@ type SessionBackend interface {
 	CopyRegion(min, max [3]int) bool
 	HasClipboard() bool
 	PasteAt(origin [3]int, pasteAir bool) int
+	SetSpecialBlock(x, y, z int, entry command.SpecialBlockEntry) bool
 
 	KickPlayer(name, reason string) bool
 	BanPlayer(name, reason string) bool

@@ -36,6 +36,7 @@ import (
 	"github.com/solar-mc/solar/internal/i18n"
 	"github.com/solar-mc/solar/internal/player"
 	sess "github.com/solar-mc/solar/internal/session"
+	"github.com/solar-mc/solar/internal/specialblocks"
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
@@ -122,6 +123,9 @@ type session struct {
 
 	// clipboard holds the last /copy region for /paste.
 	clipboard *drawing.CopyState
+
+	// specialBlocks holds per-level interactive blocks (doors, portals, MBs).
+	specialBlocks *specialblocks.Registry
 }
 
 // markSelection tracks a multi-click block selection for drawing commands.

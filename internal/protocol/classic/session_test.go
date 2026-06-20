@@ -413,6 +413,9 @@ func (m testModeration) LevelDims() (int, int, int)                             
 func (m testModeration) CopyRegion(min, max [3]int) bool                            { return true }
 func (m testModeration) HasClipboard() bool                                         { return false }
 func (m testModeration) PasteAt(origin [3]int, pasteAir bool) int                   { return 0 }
+func (m testModeration) SetSpecialBlock(x, y, z int, entry command.SpecialBlockEntry) bool {
+	return true
+}
 
 func (m testModeration) PlayerDBLookup(name string) *playerdb.PlayerEntry {
 	return m.backend.PlayerDBLookup(name)

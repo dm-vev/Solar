@@ -63,6 +63,19 @@ type DrawService interface {
 	HasClipboard() bool
 	// PasteAt replays the clipboard at the given origin. Returns false if no clipboard.
 	PasteAt(origin [3]int, pasteAir bool) int
+	// SetSpecialBlock registers metadata for a special block at the given coords.
+	SetSpecialBlock(x, y, z int, entry SpecialBlockEntry) bool
+}
+
+// SpecialBlockEntry holds metadata for a special block, passed from commands.
+type SpecialBlockEntry struct {
+	Type        int // 1=message, 2=portal, 3=door
+	Message     string
+	PortalX     int
+	PortalY     int
+	PortalZ     int
+	PortalLevel string
+	DoorBlock   byte
 }
 
 // PersistenceService persists runtime state.
@@ -273,6 +286,9 @@ func NewRegistry() *Registry {
 	registry.Register("fill", fillCommand)
 	registry.Register("copy", copyCommand)
 	registry.Register("paste", pasteCommand)
+	registry.Register("mb", mbCommand)
+	registry.Register("portal", portalCommand)
+	registry.Register("door", doorCommand)
 	return registry
 }
 
