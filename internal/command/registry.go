@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/solar-mc/solar/internal/blocks"
+	"github.com/solar-mc/solar/internal/ranks"
 	"github.com/solar-mc/solar/plugin/playerdb"
 )
 
@@ -129,7 +130,23 @@ type PlayerLookup interface {
 	Lookup(name string) *playerdb.PlayerEntry
 }
 
-// ServerInfo exposes server-wide stats for info commands.
+// RankService exposes rank operations for commands.
+type RankService interface {
+	Get(name string) *RankInfo
+	GetByPerm(perm int) *RankInfo
+	All() []RankInfo
+	GetPlayerRank(name string) int
+	SetPlayerRank(name string, perm int) bool
+}
+
+// RankInfo is a read-only rank snapshot.
+type RankInfo struct {
+	Name       string
+	Permission int
+	Color      string
+	DrawLimit  int
+	Prefix     string
+}
 type ServerInfo interface {
 	ServerName() string
 	MOTD() string
@@ -219,6 +236,8 @@ type Context struct {
 	LevelEnv    LevelEnvService
 	PlayerDB    PlayerLookup
 	ServerInfo  ServerInfo
+	RankLevel   func() int
+	Ranks       RankService
 	Tr          func(string, ...any) string
 }
 
@@ -234,17 +253,23 @@ func (ctx Context) tr(key string, args ...any) string {
 // Handler processes a command and returns a user-facing response.
 type Handler func(Context, []string) (string, bool)
 
+// cmdEntry holds a registered command with its metadata.
+type cmdEntry struct {
+	handler Handler
+	minRank int // minimum rank permission level to use this command
+}
+
 // Registry stores the available chat commands.
 type Registry struct {
 	mu       sync.RWMutex
-	handlers map[string]Handler
+	handlers map[string]cmdEntry
 	admin    map[string]struct{}
 }
 
 // NewRegistry creates the command registry with the built-in commands.
 func NewRegistry() *Registry {
 	registry := &Registry{
-		handlers: make(map[string]Handler),
+		handlers: make(map[string]cmdEntry),
 		admin:    make(map[string]struct{}),
 	}
 	for _, cmd := range []string{"tp", "setspawn", "setspawnpoint", "save", "kick", "ban", "unban", "whitelist", "newlvl", "gb", "lb", "blockdb", "load", "unload", "reload", "physics", "map", "mute", "unmute", "freeze", "unfreeze", "summon"} {
@@ -253,34 +278,35 @@ func NewRegistry() *Registry {
 	registry.Register("help", helpCommand(registry))
 	registry.Register("where", whereCommand)
 	registry.Register("setblock", setBlockCommand)
-	registry.Register("tp", teleportCommand)
-	registry.Register("setspawn", setSpawnCommand)
-	registry.Register("setspawnpoint", setSpawnCommand)
-	registry.Register("save", saveCommand)
-	registry.Register("kick", kickCommand)
-	registry.Register("ban", banCommand)
-	registry.Register("unban", unbanCommand)
+	registry.RegisterWithRank("tp", ranks.PermOperator, teleportCommand)
+	registry.RegisterWithRank("setspawn", ranks.PermOperator, setSpawnCommand)
+	registry.RegisterWithRank("setspawnpoint", ranks.PermOperator, setSpawnCommand)
+	registry.RegisterWithRank("save", ranks.PermOperator, saveCommand)
+	registry.RegisterWithRank("kick", ranks.PermOperator, kickCommand)
+	registry.RegisterWithRank("ban", ranks.PermOperator, banCommand)
+	registry.RegisterWithRank("unban", ranks.PermOperator, unbanCommand)
 	registry.Register("whitelist", whitelistCommand)
 	registry.Register("players", playersCommand)
-	registry.Register("newlvl", newLevelCommand)
+	registry.RegisterWithRank("newlvl", ranks.PermOperator, newLevelCommand)
 	registry.Register("gb", globalBlockCommand)
 	registry.Register("lb", levelBlockCommand)
+	registry.RegisterWithRank("blockdb", ranks.PermOperator, blockDBCommand)
 	registry.Register("about", aboutCommand)
 	registry.Register("b", aboutCommand)
 	registry.Register("blockundo", undoBlockDBCommand)
-	registry.Register("blockdb", blockDBCommand)
+	registry.RegisterWithRank("load", ranks.PermOperator, loadCommand)
+	registry.RegisterWithRank("unload", ranks.PermOperator, unloadCommand)
+	registry.RegisterWithRank("reload", ranks.PermOperator, reloadCommand)
+	registry.Register("levels", levelsCommand)
 	registry.Register("goto", gotoCommand)
 	registry.Register("main", mainCommand)
-	registry.Register("load", loadCommand)
-	registry.Register("unload", unloadCommand)
-	registry.Register("reload", reloadCommand)
-	registry.Register("levels", levelsCommand)
-	registry.Register("physics", physicsCommand)
-	registry.Register("map", mapCommand)
-	registry.Register("mute", muteCommand)
-	registry.Register("unmute", unmuteCommand)
-	registry.Register("freeze", freezeCommand)
-	registry.Register("unfreeze", unfreezeCommand)
+	registry.RegisterWithRank("physics", ranks.PermOperator, physicsCommand)
+	registry.RegisterWithRank("map", ranks.PermOperator, mapCommand)
+	registry.RegisterWithRank("mute", ranks.PermOperator, muteCommand)
+	registry.RegisterWithRank("unmute", ranks.PermOperator, unmuteCommand)
+	registry.RegisterWithRank("freeze", ranks.PermOperator, freezeCommand)
+	registry.RegisterWithRank("unfreeze", ranks.PermOperator, unfreezeCommand)
+	registry.RegisterWithRank("summon", ranks.PermOperator, summonCommand)
 	registry.Register("afk", afkCommand)
 	registry.Register("hide", hideCommand)
 	registry.Register("seen", seenCommand)
@@ -293,7 +319,6 @@ func NewRegistry() *Registry {
 	registry.Register("spawn", spawnCommand)
 	registry.Register("back", backCommand)
 	registry.Register("tpa", tpaCommand)
-	registry.Register("summon", summonCommand)
 	registry.Register("me", meCommand)
 	registry.Register("whisper", whisperCommand)
 	registry.Register("ignore", ignoreCommand)
@@ -306,7 +331,11 @@ func NewRegistry() *Registry {
 	registry.Register("mb", mbCommand)
 	registry.Register("portal", portalCommand)
 	registry.Register("door", doorCommand)
+	registry.Register("undo", undoCommand)
 	registry.Register("redo", redoCommand)
+	registry.RegisterWithRank("setrank", ranks.PermOperator, setRankCommand)
+	registry.Register("rankinfo", rankInfoCommand)
+	registry.Register("viewranks", viewRanksCommand)
 	return registry
 }
 
@@ -325,10 +354,33 @@ func (r *Registry) Register(name string, handler Handler) {
 	if name == "" || handler == nil {
 		return
 	}
-
 	r.mu.Lock()
-	r.handlers[strings.ToLower(name)] = handler
+	r.handlers[strings.ToLower(name)] = cmdEntry{handler: handler, minRank: 0}
 	r.mu.Unlock()
+}
+
+// RegisterWithRank adds a command with a minimum rank requirement.
+func (r *Registry) RegisterWithRank(name string, minRank int, handler Handler) {
+	if name == "" || handler == nil {
+		return
+	}
+	r.mu.Lock()
+	r.handlers[strings.ToLower(name)] = cmdEntry{handler: handler, minRank: minRank}
+	r.mu.Unlock()
+}
+
+// SetCommandRank sets the minimum rank for an existing command.
+func (r *Registry) SetCommandRank(name string, minRank int) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	key := strings.ToLower(name)
+	e, ok := r.handlers[key]
+	if !ok {
+		return false
+	}
+	e.minRank = minRank
+	r.handlers[key] = e
+	return true
 }
 
 // Unregister removes a command handler. Returns false if not found.
@@ -363,18 +415,30 @@ func (r *Registry) Execute(ctx Context, line string) (string, bool) {
 	args := fields[1:]
 
 	r.mu.RLock()
-	handler := r.handlers[name]
+	entry, ok := r.handlers[name]
 	r.mu.RUnlock()
 
-	if handler == nil {
+	if !ok {
 		return ctx.tr("command.shared.unknown", name), true
 	}
 
+	// Check rank permission.
+	if entry.minRank > 0 {
+		playerRank := 0 // default to guest
+		if ctx.RankLevel != nil {
+			playerRank = ctx.RankLevel()
+		}
+		if playerRank < entry.minRank {
+			return ctx.tr("command.shared.permission_denied"), true
+		}
+	}
+
+	// Check admin commands (legacy binary operator check).
 	if r.requiresAdmin(name) && (ctx.Authority == nil || !ctx.Authority.CanAdmin()) {
 		return ctx.tr("command.shared.permission_denied"), true
 	}
 
-	return handler(ctx, args)
+	return entry.handler(ctx, args)
 }
 
 func (r *Registry) requiresAdmin(name string) bool {

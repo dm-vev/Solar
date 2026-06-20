@@ -352,6 +352,7 @@ func testBuildContext(backend SessionBackend) command.Context {
 		Moderation:  testModeration{backend: backend},
 		Players:     testDirectory{backend: backend},
 		Tr:          backend.Translate,
+		RankLevel:   func() int { return 80 }, // operator for tests
 	}
 }
 

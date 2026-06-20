@@ -301,6 +301,19 @@
 "command.redo.none" = "&7Nothing to redo"
 "command.redo.done" = "&aRedone %d block changes"
 
+# ─── command.rank (shared) ───
+"command.rank.unavailable" = "rank system is unavailable"
+
+# ─── command.setrank ───
+"command.setrank.usage" = "usage: /setrank <name> <rank>"
+"command.setrank.not_found" = "unknown rank: %s"
+"command.setrank.failed" = "failed to set rank for %s"
+"command.setrank.done" = "&aSet %s to rank %s"
+
+# ─── command.rankinfo ───
+"command.rankinfo.none" = "&7%s has no rank"
+"command.rankinfo.result" = "&a%s &7is rank &e%s &7(level %d)"
+
 # ─── command.copy ───
 "command.copy.usage" = "usage: /copy [air]"
 
@@ -571,6 +584,13 @@
 "command.undo.done" = "&aОтменено %d изменений блоков"
 "command.redo.none" = "&7Нечего повторить"
 "command.redo.done" = "&aПовторено %d изменений блоков"
+"command.rank.unavailable" = "система рангов недоступна"
+"command.setrank.usage" = "использование: /setrank <имя> <ранг>"
+"command.setrank.not_found" = "неизвестный ранг: %s"
+"command.setrank.failed" = "не удалось установить ранг для %s"
+"command.setrank.done" = "&aУстановлен ранг %s для %s"
+"command.rankinfo.none" = "&7%s не имеет ранга"
+"command.rankinfo.result" = "&a%s &7имеет ранг &e%s &7(уровень %d)"
 "command.copy.usage" = "использование: /copy [air]"
 "command.paste.usage" = "использование: /paste [air]"
 "command.paste.empty" = "&7Нечего вставлять — используйте /copy сначала"

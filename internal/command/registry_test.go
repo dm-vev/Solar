@@ -19,6 +19,7 @@ func TestRegistryExecuteAllowsAdminCommandsWithPermission(t *testing.T) {
 		Authority: testAuthority(true),
 		World:     testWorld{t: t},
 		Tr:        testTr,
+		RankLevel: func() int { return 80 }, // operator
 	}
 
 	if got, handled := registry.Execute(ctx, "/tp 1 2 3 4 5"); !handled || got != "command.teleport.done" {
