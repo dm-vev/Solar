@@ -3,8 +3,10 @@ package classic
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/solar-mc/solar/internal/entity"
+	pdb "github.com/solar-mc/solar/internal/playerdb"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
 )
@@ -60,6 +62,16 @@ func (s *session) handleHandshake() error {
 		tracked = s.players.Add(username, entityID)
 	}
 	s.setIdentity(username, entityID, tracked)
+
+	// Record login in PlayerDB and capture login time for playtime tracking.
+	if s.playerDB != nil {
+		ip := ""
+		if s.conn != nil && s.conn.RemoteAddr() != nil {
+			ip = s.conn.RemoteAddr().String()
+		}
+		pdb.EnsureEntry(s.playerDB, username, ip)
+	}
+	s.loginTime = time.Now()
 
 	// Load persisted player props (color, model, frozen, muted, afk, allow_build).
 	if s.players != nil {

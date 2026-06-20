@@ -52,6 +52,7 @@ import (
 	"github.com/solar-mc/solar/plugin/level"
 	"github.com/solar-mc/solar/plugin/physics"
 	"github.com/solar-mc/solar/plugin/player"
+	"github.com/solar-mc/solar/plugin/playerdb"
 	"github.com/solar-mc/solar/plugin/scheduler"
 	"github.com/solar-mc/solar/plugin/server"
 	"github.com/solar-mc/solar/plugin/world"
@@ -112,6 +113,12 @@ type EntityInfo = entity.EntityInfo
 
 // EntityManager is re-exported from plugin/entity.
 type EntityManager = entity.EntityManager
+
+// PlayerDB is re-exported from plugin/playerdb.
+type PlayerDB = playerdb.PlayerDB
+
+// PlayerEntry is re-exported from plugin/playerdb.
+type PlayerEntry = playerdb.PlayerEntry
 
 // ─── Re-exported color constants ───
 

@@ -100,6 +100,11 @@ func (s *Server) saveState(worldPath, policyPath string) {
 			s.logger.Error("save player policy", "path", policyPath, "error", err)
 		}
 	}
+	if s.playerDB != nil {
+		if err := s.playerDB.Flush(); err != nil {
+			s.logger.Error("flush playerdb", "error", err)
+		}
+	}
 }
 
 // SaveStateNow persists world and player policy using the store's configured

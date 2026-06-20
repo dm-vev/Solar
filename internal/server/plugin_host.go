@@ -12,6 +12,7 @@ import (
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
+	"github.com/solar-mc/solar/internal/playerdb"
 	"github.com/solar-mc/solar/internal/protocol/classic"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
@@ -26,12 +27,21 @@ type pluginServer struct {
 	server    *Server
 	sched     plugin.Scheduler
 	entityMgr plugin.EntityManager
+	playerDB  plugin.PlayerDB
 }
 
 // NewPluginServer creates a plugin.Server handle from the server's subsystems.
 func NewPluginServer(codec *classic.Codec, worlds *world.Manager, commands *command.Registry, srv *Server) plugin.Server {
 	mm := world.NewMultiManager()
 	mm.SetMain(srv.cfg.Storage.MainWorldName, worlds, srv.worldSavePath())
+
+	dbPath := filepath.Join(srv.store.PlayersDir(), "playerdb.json")
+	pdb, err := playerdb.New(dbPath)
+	if err != nil {
+		srv.logger.Error("load playerdb", "path", dbPath, "error", err)
+	}
+	srv.playerDB = pdb
+
 	return &pluginServer{
 		codec:     codec,
 		worlds:    worlds,
@@ -40,6 +50,7 @@ func NewPluginServer(codec *classic.Codec, worlds *world.Manager, commands *comm
 		server:    srv,
 		sched:     plugin.DefaultScheduler,
 		entityMgr: newEntityManager(codec, srv.entities),
+		playerDB:  pdb,
 	}
 }
 
@@ -195,6 +206,10 @@ func (p *pluginServer) Entities() plugin.EntityManager {
 
 func (p *pluginServer) Config() plugin.Config {
 	return &pluginConfig{server: p.server}
+}
+
+func (p *pluginServer) PlayerDB() plugin.PlayerDB {
+	return p.playerDB
 }
 
 // pluginConfig implements plugin.Config by reading/writing the server's live

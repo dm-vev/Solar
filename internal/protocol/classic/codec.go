@@ -19,6 +19,7 @@ import (
 	"github.com/solar-mc/solar/internal/worker"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
+	"github.com/solar-mc/solar/plugin/playerdb"
 )
 
 // Default deadlines for TCP session I/O. A read deadline protects against
@@ -58,6 +59,7 @@ type Codec struct {
 	tcpNoDelay          bool
 	blockDefs           *blockdef.Registry
 	buildCommandContext func(SessionBackend) command.Context
+	playerDB            playerdb.PlayerDB
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -183,6 +185,11 @@ func (c *Codec) SetServerName(name string) {
 	c.serverName = name
 }
 
+// SetPlayerDatabase configures the persistent player database.
+func (c *Codec) SetPlayerDatabase(db playerdb.PlayerDB) {
+	c.playerDB = db
+}
+
 // ServeConn handles a single client connection until it closes, sends bad
 // data, or ctx is canceled.
 func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
@@ -225,6 +232,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		stop:                make(chan struct{}),
 		writerDone:          make(chan struct{}),
 		buildCommandContext: c.buildCommandContext,
+		playerDB:            c.playerDB,
 		color:               "&e",
 		model:               "humanoid",
 		allowBuild:          true,
@@ -292,6 +300,8 @@ type session struct {
 	lastPitch           byte
 	cpeExts             map[string]uint32
 	buildCommandContext func(SessionBackend) command.Context
+	playerDB            playerdb.PlayerDB
+	loginTime           time.Time
 
 	// ponytail: plugin.Player stub state, guarded by stateMu
 	color      string
@@ -410,6 +420,17 @@ func (s *session) cleanup() {
 		props.AllowBuild = &ab
 		s.stateMu.RUnlock()
 		s.players.SetProps(s.currentUsername(), props)
+	}
+
+	// Update PlayerDB with playtime and save.
+	if s.playerDB != nil && s.loginTime.IsZero() == false {
+		username := s.currentUsername()
+		e := s.playerDB.Get(username)
+		if e != nil {
+			e.TotalTime += time.Since(s.loginTime)
+			s.playerDB.Save(e)
+			_ = s.playerDB.Flush()
+		}
 	}
 
 	if plugin.OnPlayerDisconnect.HasHandlers() {

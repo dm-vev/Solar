@@ -38,6 +38,7 @@ type Server struct {
 	pprofAddr string
 	cancel    context.CancelFunc
 	physics   *pluginPhysics
+	playerDB  plugin.PlayerDB
 }
 
 // New creates the bootstrap server.

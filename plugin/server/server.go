@@ -7,6 +7,7 @@ import (
 	"github.com/solar-mc/solar/plugin/level"
 	"github.com/solar-mc/solar/plugin/physics"
 	"github.com/solar-mc/solar/plugin/player"
+	"github.com/solar-mc/solar/plugin/playerdb"
 	"github.com/solar-mc/solar/plugin/scheduler"
 	"github.com/solar-mc/solar/plugin/world"
 )
@@ -105,4 +106,7 @@ type Server interface {
 
 	// Config returns the server configuration handle.
 	Config() config.Config
+
+	// PlayerDB returns the persistent player database for offline player data.
+	PlayerDB() playerdb.PlayerDB
 }
