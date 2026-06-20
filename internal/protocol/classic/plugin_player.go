@@ -170,6 +170,12 @@ func (s *session) Kill(cause byte) bool {
 	if plugin.OnPlayerDied.HasHandlers() {
 		plugin.OnPlayerDied.Fire(plugin.PlayerDiedData{Player: s, Cause: cause, Cooldown: &cooldown})
 	}
+	if s.playerDB != nil {
+		if e := s.playerDB.Get(s.currentUsername()); e != nil {
+			e.Deaths++
+			s.playerDB.Save(e)
+		}
+	}
 	s.Respawn()
 	return true
 }

@@ -536,14 +536,33 @@ func (c *Codec) BroadcastPacket(packet []byte) {
 	})
 }
 
-// BroadcastAddEntity builds and broadcasts an add-entity packet to all players.
+// BroadcastPacketToLevel sends a raw packet only to players on the given level.
+func (c *Codec) BroadcastPacketToLevel(mgr *world.Manager, packet []byte) {
+	c.room.ForEachPeerExcept(0, func(peer *session) {
+		if peer.CurrentWorldManager() == mgr {
+			_ = peer.writePacket(packet)
+		}
+	})
+}
+
+// BroadcastAddEntity builds and broadcasts an add-entity packet to players on mgr's level.
 func (c *Codec) BroadcastAddEntity(id byte, name string, x, y, z int, yaw, pitch byte) {
 	c.BroadcastPacket(encodeAddEntity(id, name, entity.Position{X: x, Y: y, Z: z}, yaw, pitch))
 }
 
-// BroadcastRemoveEntity builds and broadcasts a remove-entity packet to all players.
+// BroadcastAddEntityToLevel sends an add-entity packet only to players on mgr's level.
+func (c *Codec) BroadcastAddEntityToLevel(mgr *world.Manager, id byte, name string, x, y, z int, yaw, pitch byte) {
+	c.BroadcastPacketToLevel(mgr, encodeAddEntity(id, name, entity.Position{X: x, Y: y, Z: z}, yaw, pitch))
+}
+
+// BroadcastRemoveEntity builds and broadcasts a remove-entity packet to players on mgr's level.
 func (c *Codec) BroadcastRemoveEntity(id byte) {
 	c.BroadcastPacket(encodeRemoveEntity(id))
+}
+
+// BroadcastRemoveEntityToLevel sends a remove-entity packet only to players on mgr's level.
+func (c *Codec) BroadcastRemoveEntityToLevel(mgr *world.Manager, id byte) {
+	c.BroadcastPacketToLevel(mgr, encodeRemoveEntity(id))
 }
 
 // BroadcastEntityTeleport builds and broadcasts an entity-teleport packet to all players.
@@ -551,9 +570,19 @@ func (c *Codec) BroadcastEntityTeleport(id byte, x, y, z int, yaw, pitch byte) {
 	c.BroadcastPacket(encodeEntityTeleport(id, entity.Position{X: x, Y: y, Z: z}, yaw, pitch))
 }
 
+// BroadcastEntityTeleportToLevel sends an entity-teleport packet only to players on mgr's level.
+func (c *Codec) BroadcastEntityTeleportToLevel(mgr *world.Manager, id byte, x, y, z int, yaw, pitch byte) {
+	c.BroadcastPacketToLevel(mgr, encodeEntityTeleport(id, entity.Position{X: x, Y: y, Z: z}, yaw, pitch))
+}
+
 // BroadcastChangeModel builds and broadcasts a change-model packet to all players.
 func (c *Codec) BroadcastChangeModel(entityID byte, model string) {
 	c.BroadcastPacket(encodeChangeModel(entityID, model))
+}
+
+// BroadcastChangeModelToLevel sends a change-model packet only to players on mgr's level.
+func (c *Codec) BroadcastChangeModelToLevel(mgr *world.Manager, entityID byte, model string) {
+	c.BroadcastPacketToLevel(mgr, encodeChangeModel(entityID, model))
 }
 
 // ChangeMap sends a different level to the player and switches their active
@@ -587,6 +616,11 @@ func (c *Codec) PlayerWorldManager(p plugin.Player) *world.Manager {
 		return nil
 	}
 	return s.CurrentWorldManager()
+}
+
+// MainWorldManager returns the codec's default world Manager.
+func (c *Codec) MainWorldManager() *world.Manager {
+	return c.worlds
 }
 
 // BroadcastSetBlockToLevel sends a set-block packet to all players on the

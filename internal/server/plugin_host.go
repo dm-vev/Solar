@@ -349,19 +349,17 @@ func (w *pluginWorld) Name() string {
 }
 
 func (w *pluginWorld) PlayerCount() int {
-	// ponytail: single-level mode — all online players are on this level.
-	if w.codec == nil {
+	if w.codec == nil || w.mgr == nil {
 		return 0
 	}
-	return len(w.codec.OnlinePlayers())
+	return len(w.codec.PlayersOnLevel(w.mgr))
 }
 
 func (w *pluginWorld) Players() []plugin.Player {
-	// ponytail: single-level mode — all online players are on this level.
-	if w.codec == nil {
+	if w.codec == nil || w.mgr == nil {
 		return nil
 	}
-	return w.codec.OnlinePlayers()
+	return w.codec.PlayersOnLevel(w.mgr)
 }
 
 // levelPath derives the on-disk path for a named level from the current
@@ -371,9 +369,11 @@ func (w *pluginWorld) levelPath(name string) string {
 }
 
 func (w *pluginWorld) Message(msg string) {
-	// ponytail: single-level mode — all online players are on this level.
-	if w.codec != nil {
-		w.codec.BroadcastMessage(msg)
+	if w.codec == nil || w.mgr == nil {
+		return
+	}
+	for _, p := range w.codec.PlayersOnLevel(w.mgr) {
+		p.Message(msg)
 	}
 }
 
@@ -874,14 +874,15 @@ func (e *entityManager) Spawn(info plugin.EntityInfo) byte {
 		return 0
 	}
 	e.slots[slot] = entitySlot{internalID: id, info: info}
-	e.codec.BroadcastAddEntity(slot, info.Name, info.X, info.Y, info.Z, info.Yaw, info.Pitch)
+	mgr := e.codec.MainWorldManager()
+	e.codec.BroadcastAddEntityToLevel(mgr, slot, info.Name, info.X, info.Y, info.Z, info.Yaw, info.Pitch)
 	if info.Model != "" && info.Model != "humanoid" {
 		if plugin.OnSendingModel.HasHandlers() {
 			m := info.Model
 			plugin.OnSendingModel.Fire(plugin.SendingModelData{Model: &m})
 			info.Model = m
 		}
-		e.codec.BroadcastChangeModel(slot, info.Model)
+		e.codec.BroadcastChangeModelToLevel(mgr, slot, info.Model)
 	}
 	if plugin.OnEntitySpawned.HasHandlers() {
 		name := info.Name
@@ -901,7 +902,8 @@ func (e *entityManager) Despawn(entityID byte) bool {
 	delete(e.slots, entityID)
 	e.mu.Unlock()
 	e.entities.Remove(slot.internalID)
-	e.codec.BroadcastRemoveEntity(entityID)
+	mgr := e.codec.MainWorldManager()
+	e.codec.BroadcastRemoveEntityToLevel(mgr, entityID)
 	if plugin.OnEntityDespawned.HasHandlers() {
 		plugin.OnEntityDespawned.Fire(plugin.EntityDespawnedData{EntityID: entityID})
 	}
@@ -922,7 +924,8 @@ func (e *entityManager) Teleport(entityID byte, x, y, z int, yaw, pitch byte) bo
 	if !e.entities.SetLocation(slot.internalID, entity.Position{X: x, Y: y, Z: z}, yaw, pitch) {
 		return false
 	}
-	e.codec.BroadcastEntityTeleport(entityID, x, y, z, yaw, pitch)
+	mgr := e.codec.MainWorldManager()
+	e.codec.BroadcastEntityTeleportToLevel(mgr, entityID, x, y, z, yaw, pitch)
 	return true
 }
 

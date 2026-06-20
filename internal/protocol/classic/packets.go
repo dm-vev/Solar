@@ -181,6 +181,14 @@ func (s *session) handleMessage() error {
 		return nil
 	}
 
+	// Track message count in PlayerDB.
+	if s.playerDB != nil {
+		if e := s.playerDB.Get(s.currentUsername()); e != nil {
+			e.MessagesSent++
+			s.playerDB.Save(e)
+		}
+	}
+
 	if s.IsMuted() {
 		s.Message("&cYou are muted.")
 		return nil
@@ -292,6 +300,18 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 
 	if !s.worlds.SetBlock(x, y, z, blockID) {
 		return fmt.Errorf("block position out of bounds: %d %d %d", x, y, z)
+	}
+
+	// Track block stats in PlayerDB.
+	if s.playerDB != nil {
+		if e := s.playerDB.Get(s.currentUsername()); e != nil {
+			if placing {
+				e.BlocksPlaced++
+			} else {
+				e.BlocksDeleted++
+			}
+			s.playerDB.Save(e)
+		}
 	}
 
 	if plugin.OnBlockChanged.HasHandlers() {
@@ -457,6 +477,12 @@ func (s *session) fail() {
 func (s *session) disconnect(message string) {
 	if strings.TrimSpace(message) == "" {
 		message = "kicked"
+	}
+	if s.playerDB != nil {
+		if e := s.playerDB.Get(s.currentUsername()); e != nil {
+			e.Kicks++
+			s.playerDB.Save(e)
+		}
 	}
 	_ = s.writeKick(message)
 	s.fail()

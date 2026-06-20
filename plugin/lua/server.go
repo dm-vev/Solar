@@ -69,6 +69,8 @@ func (a *api) registerServerTable() {
 		"entities": a.serverEntities,
 		// config() -> config
 		"config": a.serverConfig,
+		// player_db() -> player_db
+		"player_db": a.serverPlayerDB,
 		// scheduler() -> scheduler
 		"scheduler": a.serverScheduler,
 	}
@@ -260,6 +262,16 @@ func (a *api) serverEntities(L *glua.LState) int {
 
 func (a *api) serverConfig(L *glua.LState) int {
 	L.Push(wrapUD(L, typeConfig, a.srv.Config()))
+	return 1
+}
+
+func (a *api) serverPlayerDB(L *glua.LState) int {
+	db := a.srv.PlayerDB()
+	if db == nil {
+		L.Push(glua.LNil)
+		return 1
+	}
+	L.Push(wrapUD(L, typePlayerDB, db))
 	return 1
 }
 

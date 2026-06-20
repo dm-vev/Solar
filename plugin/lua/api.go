@@ -54,6 +54,7 @@ func (a *api) registerTypes() {
 	a.makeType(typeEntityManager, entityManagerMethods)
 	a.makeType(typeScheduler, schedulerMethods)
 	a.makeType(typeTask, taskMethods)
+	a.makeType(typePlayerDB, playerdbMethods)
 }
 
 // makeType creates a metatable with __index pointing to the methods map,
