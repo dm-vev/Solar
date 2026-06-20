@@ -25,7 +25,12 @@ func (s *session) joinRoom() {
 
 	username := s.currentUsername()
 	selfPacket := encodeAddEntity(byte(entityID), username, selfState.Pos, selfState.Yaw, selfState.Pitch)
+	myWorld := s.CurrentWorldManager()
 	for _, peer := range peers {
+		// Only spawn entities for peers on the same level.
+		if peer.CurrentWorldManager() != myWorld {
+			continue
+		}
 		peerState, ok := peer.entitySnapshot()
 		if ok {
 			peerUsername, peerEntityID, _ := peer.sessionIdentity()
@@ -83,8 +88,12 @@ func (s *session) leaveRoom() {
 	}
 
 	peers := s.room.Leave(entityID)
+	myWorld := s.CurrentWorldManager()
 	packet := encodeRemoveEntity(byte(entityID))
 	for _, peer := range peers {
+		if peer.CurrentWorldManager() != myWorld {
+			continue
+		}
 		if err := peer.writePacket(packet); err != nil {
 			s.logger.Debug("broadcast leave packet", "entity_id", entityID, "peer", peer.currentUsername(), "error", err)
 		}
@@ -107,7 +116,14 @@ func (s *session) broadcastToPeers(packet []byte) {
 		return
 	}
 
+	myWorld := s.CurrentWorldManager()
+
 	s.room.ForEachPeerExcept(entityID, func(peer *session) {
+		// ponytail: filter by world manager pointer identity — peers on
+		// other levels don't see entity updates from this level.
+		if peer.CurrentWorldManager() != myWorld {
+			return
+		}
 		if err := peer.writePacketNoCopy(packet); err != nil {
 			s.logger.Debug("broadcast packet", "entity_id", entityID, "peer", peer.currentUsername(), "error", err)
 		}

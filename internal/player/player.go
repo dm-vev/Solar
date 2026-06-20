@@ -149,3 +149,13 @@ func (r *Registry) IsOperator(name string) bool {
 func (r *Registry) OperatorNames() []string {
 	return r.policy.OperatorNames()
 }
+
+// GetProps returns the stored properties for a player.
+func (r *Registry) GetProps(name string) PlayerProps {
+	return r.policy.GetProps(name)
+}
+
+// SetProps updates the stored properties for a player.
+func (r *Registry) SetProps(name string, props PlayerProps) {
+	r.policy.SetProps(name, props)
+}

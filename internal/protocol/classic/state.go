@@ -1,6 +1,9 @@
 package classic
 
-import "github.com/solar-mc/solar/internal/entity"
+import (
+	"github.com/solar-mc/solar/internal/entity"
+	"github.com/solar-mc/solar/internal/world"
+)
 
 func (s *session) setIdentity(username string, entityID uint32, tracked bool) {
 	s.stateMu.Lock()
@@ -69,6 +72,14 @@ func (s *session) supportsExt(name string) bool {
 
 func (s *session) currentSupportsFastMap() bool {
 	return s.supportsExt(cpeExtFastMapName)
+}
+
+// CurrentWorldManager returns the session's active world Manager.
+func (s *session) CurrentWorldManager() *world.Manager {
+	s.stateMu.RLock()
+	w := s.worlds
+	s.stateMu.RUnlock()
+	return w
 }
 
 func (s *session) currentSupportsExtPlayerList() bool {

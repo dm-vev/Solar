@@ -52,8 +52,19 @@ func (p *pluginServer) BroadcastMessageTo(scope string, source plugin.Player, ms
 	case "all":
 		p.codec.BroadcastMessage(msg)
 	case "level":
-		// ponytail: single-level mode — all players are on the same level.
-		p.codec.BroadcastMessage(msg)
+		if source == nil {
+			p.codec.BroadcastMessage(msg)
+			return
+		}
+		// Find the source player's level and message only players on it.
+		sourceWorld := p.codec.PlayerWorldManager(source)
+		if sourceWorld == nil {
+			p.codec.BroadcastMessage(msg)
+			return
+		}
+		for _, pl := range p.codec.PlayersOnLevel(sourceWorld) {
+			pl.Message(msg)
+		}
 	case "ops":
 		for _, pl := range p.codec.OnlinePlayers() {
 			if pl.IsOperator() {

@@ -396,6 +396,22 @@ func (s *session) run() error {
 }
 
 func (s *session) cleanup() {
+	// Save player props before disconnecting.
+	if s.players != nil {
+		s.stateMu.RLock()
+		props := player.PlayerProps{
+			Color:  s.color,
+			Model:  s.model,
+			Frozen: s.frozen,
+			Muted:  s.muted,
+			AFK:    s.afk,
+		}
+		ab := s.allowBuild
+		props.AllowBuild = &ab
+		s.stateMu.RUnlock()
+		s.players.SetProps(s.currentUsername(), props)
+	}
+
 	if plugin.OnPlayerDisconnect.HasHandlers() {
 		plugin.OnPlayerDisconnect.Fire(plugin.PlayerDisconnectData{
 			Player: s,
@@ -535,14 +551,21 @@ func (c *Codec) PlayersOnLevel(mgr *world.Manager) []plugin.Player {
 	peers := c.room.Snapshot()
 	var out []plugin.Player
 	for _, s := range peers {
-		s.stateMu.RLock()
-		w := s.worlds
-		s.stateMu.RUnlock()
-		if w == mgr {
+		if s.CurrentWorldManager() == mgr {
 			out = append(out, s)
 		}
 	}
 	return out
+}
+
+// PlayerWorldManager returns the active world Manager for the given player,
+// or nil if the player is not found.
+func (c *Codec) PlayerWorldManager(p plugin.Player) *world.Manager {
+	s, ok := c.room.FindByName(p.Name())
+	if !ok {
+		return nil
+	}
+	return s.CurrentWorldManager()
 }
 
 // BroadcastSetBlockToLevel sends a set-block packet to all players on the
@@ -636,9 +659,14 @@ func (c *Codec) BroadcastEntityUpdates() {
 	}
 
 	for _, dst := range peers {
+		dstWorld := dst.CurrentWorldManager()
 		var buf []byte
 		for _, ch := range changes {
 			if ch.sess == dst {
+				continue
+			}
+			// Only send entity updates to peers on the same level.
+			if ch.sess.CurrentWorldManager() != dstWorld {
 				continue
 			}
 			buf = append(buf, ch.pkt...)

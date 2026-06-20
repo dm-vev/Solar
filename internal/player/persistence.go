@@ -11,10 +11,11 @@ import (
 )
 
 type policySnapshot struct {
-	WhitelistEnabled bool          `json:"whitelist_enabled"`
-	Bans             []policyEntry `json:"bans"`
-	Whitelist        []policyEntry `json:"whitelist"`
-	Operators        []string      `json:"operators"`
+	WhitelistEnabled bool                   `json:"whitelist_enabled"`
+	Bans             []policyEntry          `json:"bans"`
+	Whitelist        []policyEntry          `json:"whitelist"`
+	Operators        []string               `json:"operators"`
+	PlayerProps      map[string]PlayerProps `json:"player_props,omitempty"`
 }
 
 // LoadPolicy restores whitelist and ban policy from disk.
@@ -52,6 +53,7 @@ func (p *Policy) Load(path string) error {
 		p.bans = make(map[string]policyEntry)
 		p.whitelist = make(map[string]policyEntry)
 		p.operators = make(map[string]string)
+		p.props = make(map[string]PlayerProps)
 		p.mu.Unlock()
 		return nil
 	}
@@ -86,6 +88,14 @@ func (p *Policy) Load(path string) error {
 			continue
 		}
 		p.operators[key] = strings.TrimSpace(name)
+	}
+	p.props = make(map[string]PlayerProps, len(snapshot.PlayerProps))
+	for name, props := range snapshot.PlayerProps {
+		key := normalizeName(name)
+		if key == "" {
+			continue
+		}
+		p.props[key] = props
 	}
 	p.mu.Unlock()
 	return nil
@@ -148,6 +158,12 @@ func (p *Policy) snapshot() policySnapshot {
 	snapshot.Operators = make([]string, 0, len(p.operators))
 	for _, name := range p.operators {
 		snapshot.Operators = append(snapshot.Operators, name)
+	}
+	if len(p.props) > 0 {
+		snapshot.PlayerProps = make(map[string]PlayerProps, len(p.props))
+		for name, props := range p.props {
+			snapshot.PlayerProps[name] = props
+		}
 	}
 	sort.Slice(snapshot.Bans, func(i, j int) bool {
 		return strings.TrimSpace(snapshot.Bans[i].Name) < strings.TrimSpace(snapshot.Bans[j].Name)

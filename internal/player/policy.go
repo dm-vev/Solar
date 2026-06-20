@@ -19,13 +19,24 @@ func sortStrings(s []string) {
 	sort.Strings(s)
 }
 
-// Policy stores ban, whitelist, and operator state.
+// PlayerProps stores per-player properties that persist across reconnects.
+type PlayerProps struct {
+	Color      string `json:"color,omitempty"`
+	Model      string `json:"model,omitempty"`
+	Frozen     bool   `json:"frozen,omitempty"`
+	Muted      bool   `json:"muted,omitempty"`
+	AFK        bool   `json:"afk,omitempty"`
+	AllowBuild *bool  `json:"allow_build,omitempty"`
+}
+
+// Policy stores ban, whitelist, operator, and per-player props state.
 type Policy struct {
 	mu               sync.RWMutex
 	bans             map[string]policyEntry
 	whitelist        map[string]policyEntry
 	operators        map[string]string
 	whitelistEnabled bool
+	props            map[string]PlayerProps
 }
 
 // NewPolicy creates an empty policy store.
@@ -34,6 +45,7 @@ func NewPolicy() *Policy {
 		bans:      make(map[string]policyEntry),
 		whitelist: make(map[string]policyEntry),
 		operators: make(map[string]string),
+		props:     make(map[string]PlayerProps),
 	}
 }
 
@@ -285,4 +297,30 @@ func (p *Policy) OperatorNames() []string {
 	p.mu.RUnlock()
 	sortStrings(names)
 	return names
+}
+
+// GetProps returns the stored properties for a player, or zero value.
+func (p *Policy) GetProps(name string) PlayerProps {
+	if p == nil {
+		return PlayerProps{}
+	}
+	key := normalizeName(name)
+	p.mu.RLock()
+	props := p.props[key]
+	p.mu.RUnlock()
+	return props
+}
+
+// SetProps updates the stored properties for a player.
+func (p *Policy) SetProps(name string, props PlayerProps) {
+	if p == nil {
+		return
+	}
+	key := normalizeName(name)
+	if key == "" {
+		return
+	}
+	p.mu.Lock()
+	p.props[key] = props
+	p.mu.Unlock()
 }

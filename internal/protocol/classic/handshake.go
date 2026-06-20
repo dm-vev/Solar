@@ -61,6 +61,25 @@ func (s *session) handleHandshake() error {
 	}
 	s.setIdentity(username, entityID, tracked)
 
+	// Load persisted player props (color, model, frozen, muted, afk, allow_build).
+	if s.players != nil {
+		props := s.players.GetProps(username)
+		s.stateMu.Lock()
+		if props.Color != "" {
+			s.color = props.Color
+		}
+		if props.Model != "" {
+			s.model = props.Model
+		}
+		s.frozen = props.Frozen
+		s.muted = props.Muted
+		s.afk = props.AFK
+		if props.AllowBuild != nil {
+			s.allowBuild = *props.AllowBuild
+		}
+		s.stateMu.Unlock()
+	}
+
 	if plugin.OnPlayerStartConnecting.HasHandlers() {
 		plugin.OnPlayerStartConnecting.Fire(plugin.PlayerStartConnectingData{Player: s})
 	}
@@ -196,13 +215,8 @@ func (s *session) sendLevelFrom(mgr *world.Manager, fastMap bool) error {
 	return nil
 }
 
-// changeMap switches the session's active world Manager and sends the new
-// level stream to the client.
-// ponytail: s.worlds swap under stateMu; existing direct reads in the read
-// loop don't hold the lock — benign pointer race, old Manager is never freed.
-// Switch to atomic.Pointer[world.Manager] if race detector matters.
-// ponytail: single room — peers on other levels also see the teleport.
-// Per-level rooms fix this when entity visibility matters.
+// changeMap switches the session's active world Manager, sends the new
+// level stream, and re-syncs entity visibility across levels.
 func (s *session) changeMap(mgr *world.Manager) error {
 	levelName := mgr.Current().Name
 	prevName := ""
@@ -220,6 +234,9 @@ func (s *session) changeMap(mgr *world.Manager) error {
 		}
 	}
 
+	// Leave room before swapping worlds — removes entity from old level peers.
+	s.leaveRoom()
+
 	s.stateMu.Lock()
 	s.worlds = mgr
 	s.stateMu.Unlock()
@@ -233,7 +250,15 @@ func (s *session) changeMap(mgr *world.Manager) error {
 	if s.entities != nil && entityID != 0 {
 		pos := entityPosition(spawn.X, spawn.Y, spawn.Z)
 		s.entities.SetLocation(entityID, pos, spawn.Yaw, spawn.Pitch)
-		s.broadcastToPeers(encodeEntityTeleport(byte(entityID), pos, spawn.Yaw, spawn.Pitch))
+	}
+
+	// Re-join room — spawns entity for new level peers and vice versa.
+	s.markJoined(false)
+	s.joinRoom()
+
+	if s.entities != nil && entityID != 0 {
+		s.broadcastToPeers(encodeEntityTeleport(byte(entityID),
+			entityPosition(spawn.X, spawn.Y, spawn.Z), spawn.Yaw, spawn.Pitch))
 	}
 
 	if plugin.OnJoinedLevel.HasHandlers() {
