@@ -306,7 +306,6 @@ func NewRegistry() *Registry {
 	registry.Register("mb", mbCommand)
 	registry.Register("portal", portalCommand)
 	registry.Register("door", doorCommand)
-	registry.Register("blockundo", undoBlockDBCommand)
 	registry.Register("redo", redoCommand)
 	return registry
 }

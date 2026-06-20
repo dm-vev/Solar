@@ -246,7 +246,9 @@ func (s *session) PasteAt(origin [3]int, pasteAir bool) int {
 	}
 	count := 0
 	s.clipboard.Paste(origin[0], origin[1], origin[2], pasteAir, func(x, y, z int, block byte) {
+		old, _ := s.worlds.BlockAt(x, y, z)
 		if s.PlaceBlock(x, y, z, block) {
+			s.RecordChange(x, y, z, old, block)
 			count++
 		}
 	})

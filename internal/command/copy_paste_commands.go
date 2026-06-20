@@ -43,7 +43,9 @@ func pasteCommand(ctx Context, args []string) (string, bool) {
 	_ = pasteAir
 
 	ctx.Draw.StartSelection(1, func(marks [][3]int) {
+		ctx.Draw.BeginBatch()
 		ctx.Draw.PasteAt(marks[0], pasteAir)
+		ctx.Draw.CommitBatch()
 	})
 	return ctx.tr("command.draw.select1"), true
 }
