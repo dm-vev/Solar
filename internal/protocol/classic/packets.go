@@ -308,6 +308,11 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 		return fmt.Errorf("block position out of bounds: %d %d %d", x, y, z)
 	}
 
+	// Queue block for physics processing.
+	if s.queuePhysics != nil {
+		s.queuePhysics(x, y, z)
+	}
+
 	// Record in BlockDB.
 	if s.blockDB != nil {
 		s.blockDB.Add(plugin.BlockEntry{

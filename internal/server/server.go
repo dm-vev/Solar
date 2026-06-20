@@ -15,6 +15,7 @@ import (
 	"github.com/solar-mc/solar/internal/config"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/network"
+	"github.com/solar-mc/solar/internal/physics"
 	"github.com/solar-mc/solar/internal/player"
 	"github.com/solar-mc/solar/internal/protocol/classic"
 	"github.com/solar-mc/solar/internal/storage"
@@ -38,6 +39,7 @@ type Server struct {
 	pprofAddr       string
 	cancel          context.CancelFunc
 	physics         *pluginPhysics
+	blockPhysics    *physics.Engine
 	playerDB        plugin.PlayerDB
 	flushBlockDBsFn func()
 }
@@ -103,6 +105,15 @@ func (s *Server) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// Create block physics engine for the main level.
+	lvl := s.worlds.Current()
+	s.blockPhysics = physics.New(
+		lvl.Blocks, lvl.Width, lvl.Height, lvl.Length,
+		func(x, y, z int, block byte) {
+			s.codec.BroadcastSetBlockToLevel(s.worlds, x, y, z, block)
+		},
+	)
 
 	autosaveMsg := s.cfg.Autosave.String()
 	if s.cfg.Autosave <= 0 {
@@ -250,6 +261,7 @@ func (s *Server) runTicks(ctx context.Context) {
 				s.entities.Tick()
 			}
 			s.codec.BroadcastEntityUpdates()
+			s.blockPhysics.Tick()
 			s.physics.Tick()
 			plugin.DefaultScheduler.Tick()
 			if plugin.OnTick.HasHandlers() {
@@ -267,4 +279,9 @@ func (s *Server) flushBlockDBs() {
 
 func (s *Server) SetFlushBlockDBsFn(fn func()) {
 	s.flushBlockDBsFn = fn
+}
+
+// BlockPhysics returns the block physics engine for the main level.
+func (s *Server) BlockPhysics() *physics.Engine {
+	return s.blockPhysics
 }

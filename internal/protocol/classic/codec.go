@@ -71,6 +71,7 @@ type Codec struct {
 	unloadLevel         func(name string) bool
 	listLoadedLevels    func() []string
 	listLevelFiles      func() []string
+	queuePhysics        func(x, y, z int)
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -235,6 +236,11 @@ func (c *Codec) SetLevelCallbacks(
 	c.listLevelFiles = listFiles
 }
 
+// SetQueuePhysics wires the block physics queue function.
+func (c *Codec) SetQueuePhysics(fn func(x, y, z int)) {
+	c.queuePhysics = fn
+}
+
 // I18nGet returns a message in the server's default language.
 func (c *Codec) I18nGet(key string, args ...any) string {
 	if c.i18n != nil {
@@ -295,6 +301,7 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		unloadLevel:         c.unloadLevel,
 		listLoadedLevels:    c.listLoadedLevels,
 		listLevelFiles:      c.listLevelFiles,
+		queuePhysics:        c.queuePhysics,
 		color:               "&e",
 		model:               "humanoid",
 		allowBuild:          true,
@@ -375,6 +382,7 @@ type session struct {
 	unloadLevel         func(name string) bool
 	listLoadedLevels    func() []string
 	listLevelFiles      func() []string
+	queuePhysics        func(x, y, z int)
 
 	// ponytail: plugin.Player stub state, guarded by stateMu
 	color      string

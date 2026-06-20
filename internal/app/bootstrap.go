@@ -121,6 +121,11 @@ func buildServer(ctx context.Context, cfg config.Config) *server.Server {
 		pluginSrv.ListLoadedLevels,
 		pluginSrv.ListLevelFiles,
 	)
+	codec.SetQueuePhysics(func(x, y, z int) {
+		if srv.BlockPhysics() != nil {
+			srv.BlockPhysics().Queue(x, y, z)
+		}
+	})
 	if err := plugin.LoadAll(pluginSrv, logger); err != nil {
 		logger.Error("plugin load failed", "error", err)
 	}
