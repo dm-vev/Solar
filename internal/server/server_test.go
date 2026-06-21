@@ -156,6 +156,38 @@ func TestLoadStateUsesExistingWorld(t *testing.T) {
 	}
 }
 
+func TestHeartbeatPort(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		address  string
+		wantPort int
+		wantErr  bool
+	}{
+		{name: "all interfaces", address: ":25565", wantPort: 25565},
+		{name: "ipv4", address: "127.0.0.1:25566", wantPort: 25566},
+		{name: "ipv6", address: "[::1]:25567", wantPort: 25567},
+		{name: "missing port", address: "127.0.0.1", wantPort: 25565, wantErr: true},
+		{name: "invalid port", address: ":abc", wantPort: 25565, wantErr: true},
+		{name: "zero port", address: ":0", wantPort: 25565, wantErr: true},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			port, err := heartbeatPort(testCase.address)
+			if (err != nil) != testCase.wantErr {
+				t.Fatalf("heartbeatPort(%q) error = %v, wantErr %v", testCase.address, err, testCase.wantErr)
+			}
+			if port != testCase.wantPort {
+				t.Fatalf("heartbeatPort(%q) = %d, want %d", testCase.address, port, testCase.wantPort)
+			}
+		})
+	}
+}
+
 func TestLoadStateRejectsUnknownDefaultGenerator(t *testing.T) {
 	t.Parallel()
 

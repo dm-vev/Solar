@@ -15,7 +15,10 @@ package ranks
 
 import (
 	"sort"
+	"strconv"
 	"sync"
+
+	"github.com/solar-mc/solar/plugin/playerdb"
 )
 
 // Permission level constants matching MCGalaxy's LevelPermission enum.
@@ -40,10 +43,11 @@ type Rank struct {
 
 // Registry holds all ranks, sorted by permission level.
 type Registry struct {
-	mu     sync.RWMutex
-	ranks  []*Rank
-	byName map[string]*Rank
-	byPerm map[int]*Rank
+	mu       sync.RWMutex
+	ranks    []*Rank
+	byName   map[string]*Rank
+	byPerm   map[int]*Rank
+	playerDB playerdb.PlayerDB
 }
 
 // NewRegistry creates a registry with default ranks.
@@ -119,15 +123,47 @@ func IsOperator(perm int) bool {
 }
 
 // GetPlayerRank returns the permission level for a player name.
-// Default is PermGuest if the player has no rank assigned.
+// Reads from PlayerDB.Data["rank"]. Returns PermGuest if not set.
 func (r *Registry) GetPlayerRank(name string) int {
-	return PermGuest // ponytail: rank stored in PlayerDB.Data["rank"], wired later
+	if r.playerDB == nil {
+		return PermGuest
+	}
+	e := r.playerDB.Get(name)
+	if e == nil || e.Data == nil {
+		return PermGuest
+	}
+	val, ok := e.Data["rank"]
+	if !ok || val == "" {
+		return PermGuest
+	}
+	n, err := strconv.Atoi(val)
+	if err != nil {
+		return PermGuest
+	}
+	return n
 }
 
 // SetPlayerRank sets the permission level for a player name.
-// ponytail: persists to PlayerDB.Data["rank"] when wired.
+// Persists to PlayerDB.Data["rank"].
 func (r *Registry) SetPlayerRank(name string, perm int) bool {
-	return true // stub — actual persistence wired in adapters
+	if r.playerDB == nil {
+		return false
+	}
+	e := r.playerDB.Get(name)
+	if e == nil {
+		e = &playerdb.PlayerEntry{Name: name}
+	}
+	if e.Data == nil {
+		e.Data = make(map[string]string)
+	}
+	e.Data["rank"] = strconv.Itoa(perm)
+	r.playerDB.Save(e)
+	return true
+}
+
+// SetPlayerDB wires the PlayerDB for rank persistence.
+func (r *Registry) SetPlayerDB(db playerdb.PlayerDB) {
+	r.playerDB = db
 }
 
 func lower(s string) string {

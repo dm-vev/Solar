@@ -93,7 +93,7 @@ type session struct {
 	unloadLevel         func(name string) bool
 	listLoadedLevels    func() []string
 	listLevelFiles      func() []string
-	queuePhysics        func(x, y, z int)
+	queuePhysics        func(*world.Manager, int, int, int)
 	maxPlayers          int
 
 	// ponytail: plugin.Player stub state, guarded by stateMu

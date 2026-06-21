@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -39,7 +40,8 @@ type Server struct {
 	pprofAddr       string
 	cancel          context.CancelFunc
 	physics         *pluginPhysics
-	blockPhysics    *blocks.PhysicsEngine
+	blockPhysicsMu  sync.RWMutex
+	blockPhysics    map[*world.Manager]*blocks.PhysicsEngine
 	playerDB        plugin.PlayerDB
 	flushBlockDBsFn func()
 }
@@ -63,18 +65,19 @@ func New(
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	return &Server{
-		cfg:       cfg,
-		listener:  listener,
-		codec:     codec,
-		worlds:    worlds,
-		players:   players,
-		entities:  entities,
-		store:     store,
-		workers:   workers,
-		logger:    logger,
-		sema:      make(chan struct{}, cfg.MaxPlayers),
-		pprofAddr: "",
-		physics:   newPluginPhysics(worlds),
+		cfg:          cfg,
+		listener:     listener,
+		codec:        codec,
+		worlds:       worlds,
+		players:      players,
+		entities:     entities,
+		store:        store,
+		workers:      workers,
+		logger:       logger,
+		sema:         make(chan struct{}, cfg.MaxPlayers),
+		pprofAddr:    "",
+		physics:      newPluginPhysics(worlds),
+		blockPhysics: make(map[*world.Manager]*blocks.PhysicsEngine),
 	}
 }
 
@@ -106,30 +109,8 @@ func (s *Server) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Create block physics engine for the main level.
-	lvl := s.worlds.Current()
-	w, h, l := lvl.Width, lvl.Height, lvl.Length
-	s.blockPhysics = blocks.NewPhysics(w, h, l,
-		func(idx int) byte {
-			// Convert flat index to xyz and read from world.Manager.
-			y := idx / (w * l)
-			rem := idx - y*w*l
-			z := rem / w
-			x := rem - z*w
-			b, _ := s.worlds.BlockAt(x, y, z)
-			return b
-		},
-		func(idx int, block byte) {
-			y := idx / (w * l)
-			rem := idx - y*w*l
-			z := rem / w
-			x := rem - z*w
-			s.worlds.SetBlock(x, y, z, block)
-		},
-		func(x, y, z int, block byte) {
-			s.codec.BroadcastSetBlockToLevel(s.worlds, x, y, z, block)
-		},
-	)
+	// Register block physics for the main level after its state is loaded.
+	s.RegisterBlockPhysics(s.worlds)
 
 	autosaveMsg := s.cfg.Autosave.String()
 	if s.cfg.Autosave <= 0 {
@@ -154,13 +135,14 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Start ClassiCube heartbeat if enabled.
 	if s.cfg.Heartbeat.Enabled {
-		port := 25565
-		if host, p, err := net.SplitHostPort(s.cfg.ListenAddress); err == nil {
-			if p != "" {
-				if _, err := fmt.Sscanf(p, "%d", &port); err != nil {
-					_ = host
-				}
-			}
+		port, err := heartbeatPort(s.cfg.ListenAddress)
+		if err != nil {
+			s.logger.Warn(
+				"invalid listen address for heartbeat; using default port",
+				"listen", s.cfg.ListenAddress,
+				"default_port", port,
+				"error", err,
+			)
 		}
 		StartHeartbeat(ctx, HeartbeatConfig{
 			Port:        port,
@@ -219,6 +201,25 @@ func (s *Server) Run(ctx context.Context) error {
 	s.workers.Close()
 
 	return serveErr
+}
+
+func heartbeatPort(listenAddress string) (int, error) {
+	const defaultPort = 25565
+
+	_, portText, err := net.SplitHostPort(listenAddress)
+	if err != nil {
+		return defaultPort, fmt.Errorf("split listen address %q: %w", listenAddress, err)
+	}
+
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		return defaultPort, fmt.Errorf("parse listen port %q: %w", portText, err)
+	}
+	if port < 1 || port > 65535 {
+		return defaultPort, fmt.Errorf("listen port %d is outside valid range", port)
+	}
+
+	return port, nil
 }
 
 func (s *Server) runDebugServer(ctx context.Context) {
@@ -298,8 +299,7 @@ func (s *Server) runTicks(ctx context.Context) {
 				s.entities.Tick()
 			}
 			s.codec.BroadcastEntityUpdates()
-			s.blockPhysics.Tick()
-			s.blockPhysics.Tick()
+			s.tickBlockPhysics()
 			plugin.DefaultScheduler.Tick()
 			if plugin.OnTick.HasHandlers() {
 				plugin.OnTick.Fire(plugin.TickData{Tick: s.worlds.TickCount()})
@@ -316,9 +316,4 @@ func (s *Server) flushBlockDBs() {
 
 func (s *Server) SetFlushBlockDBsFn(fn func()) {
 	s.flushBlockDBsFn = fn
-}
-
-// BlockPhysics returns the block physics engine for the main level.
-func (s *Server) BlockPhysics() *blocks.PhysicsEngine {
-	return s.blockPhysics
 }

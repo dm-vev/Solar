@@ -78,7 +78,7 @@ type Codec struct {
 	unloadLevel         func(name string) bool
 	listLoadedLevels    func() []string
 	listLevelFiles      func() []string
-	queuePhysics        func(x, y, z int)
+	queuePhysics        func(*world.Manager, int, int, int)
 	maxPlayers          int
 	spamChecker         *player.SpamChecker
 	rankRegistry        *ranks.Registry
@@ -246,8 +246,8 @@ func (c *Codec) SetLevelCallbacks(
 	c.listLevelFiles = listFiles
 }
 
-// SetQueuePhysics wires the block physics queue function.
-func (c *Codec) SetQueuePhysics(fn func(x, y, z int)) {
+// SetQueuePhysics wires the per-level block physics queue function.
+func (c *Codec) SetQueuePhysics(fn func(*world.Manager, int, int, int)) {
 	c.queuePhysics = fn
 }
 

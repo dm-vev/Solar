@@ -122,7 +122,12 @@ func (p *pluginServer) FindPlayer(name string) plugin.Player {
 }
 
 func (p *pluginServer) World() plugin.World {
-	return &pluginWorld{mgr: p.worlds, codec: p.codec, worldPath: p.server.worldSavePath()}
+	return &pluginWorld{
+		mgr:       p.worlds,
+		codec:     p.codec,
+		server:    p.server,
+		worldPath: p.server.worldSavePath(),
+	}
 }
 
 func (p *pluginServer) Levels() plugin.LevelManager {
@@ -378,6 +383,7 @@ func (c *pluginConfig) SetWhitelistEnabled(enabled bool) {
 type pluginWorld struct {
 	mgr       *world.Manager
 	codec     *classic.Codec
+	server    *Server
 	worldPath string
 }
 
@@ -509,11 +515,20 @@ func (w *pluginWorld) Resize(width, height, length int) error {
 	cur.Width, cur.Height, cur.Length = width, height, length
 	cur.Blocks = blocks
 	w.mgr.SetCurrent(cur)
+	if w.server != nil {
+		w.server.RegisterBlockPhysics(w.mgr)
+	}
 	return nil
 }
 
 func (w *pluginWorld) Reload() error {
-	return w.mgr.Load(w.worldPath)
+	if err := w.mgr.Load(w.worldPath); err != nil {
+		return fmt.Errorf("reload level %q: %w", w.Name(), err)
+	}
+	if w.server != nil {
+		w.server.RegisterBlockPhysics(w.mgr)
+	}
+	return nil
 }
 
 // copyFile copies src to dst using a single io.Copy.
@@ -536,10 +551,11 @@ func copyFile(src, dst string) error {
 // Unlike pluginWorld (which assumes all players are on the same level),
 // pluginLevel tracks players per-level via codec.PlayersOnLevel.
 type pluginLevel struct {
-	mgr   *world.Manager
-	name  string
-	path  string
-	codec *classic.Codec
+	mgr    *world.Manager
+	name   string
+	path   string
+	codec  *classic.Codec
+	server *Server
 }
 
 func (l *pluginLevel) Name() string {
@@ -661,11 +677,20 @@ func (l *pluginLevel) Resize(width, height, length int) error {
 	cur.Width, cur.Height, cur.Length = width, height, length
 	cur.Blocks = blocks
 	l.mgr.SetCurrent(cur)
+	if l.server != nil {
+		l.server.RegisterBlockPhysics(l.mgr)
+	}
 	return nil
 }
 
 func (l *pluginLevel) Reload() error {
-	return l.mgr.Load(l.path)
+	if err := l.mgr.Load(l.path); err != nil {
+		return fmt.Errorf("reload level %q: %w", l.name, err)
+	}
+	if l.server != nil {
+		l.server.RegisterBlockPhysics(l.mgr)
+	}
+	return nil
 }
 
 // pluginLevelManager implements plugin.LevelManager for multi-level mode.
@@ -680,7 +705,13 @@ func (m *pluginLevelManager) Current() plugin.Level {
 		mgr = m.srv.worlds
 		name = m.srv.server.cfg.Storage.MainWorldName
 	}
-	return &pluginLevel{mgr: mgr, name: name, codec: m.srv.codec, path: m.srv.multiMgr.Path(name)}
+	return &pluginLevel{
+		mgr:    mgr,
+		name:   name,
+		path:   m.srv.multiMgr.Path(name),
+		codec:  m.srv.codec,
+		server: m.srv.server,
+	}
 }
 
 func (m *pluginLevelManager) Find(name string) plugin.Level {
@@ -688,7 +719,13 @@ func (m *pluginLevelManager) Find(name string) plugin.Level {
 	if mgr == nil {
 		return nil
 	}
-	return &pluginLevel{mgr: mgr, name: name, codec: m.srv.codec, path: m.srv.multiMgr.Path(name)}
+	return &pluginLevel{
+		mgr:    mgr,
+		name:   name,
+		path:   m.srv.multiMgr.Path(name),
+		codec:  m.srv.codec,
+		server: m.srv.server,
+	}
 }
 
 func (m *pluginLevelManager) Create(name string, width, height, length int, generatorName, seed string) (plugin.Level, error) {
@@ -706,13 +743,20 @@ func (m *pluginLevelManager) Create(name string, width, height, length int, gene
 	mgr.SetCurrent(level)
 	path := m.srv.server.store.WorldFile(name)
 	if err := mgr.Save(path); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("save level %q: %w", name, err)
 	}
 	m.srv.multiMgr.Add(name, mgr, path)
+	m.srv.server.RegisterBlockPhysics(mgr)
 	if plugin.OnLevelAdded.HasHandlers() {
 		plugin.OnLevelAdded.Fire(plugin.LevelAddedData{Name: name})
 	}
-	return &pluginLevel{mgr: mgr, name: name, codec: m.srv.codec, path: path}, nil
+	return &pluginLevel{
+		mgr:    mgr,
+		name:   name,
+		path:   path,
+		codec:  m.srv.codec,
+		server: m.srv.server,
+	}, nil
 }
 
 func (m *pluginLevelManager) Load(name string) (plugin.Level, error) {
@@ -728,13 +772,20 @@ func (m *pluginLevelManager) Load(name string) (plugin.Level, error) {
 	path := m.srv.server.store.WorldFile(name)
 	mgr := world.NewManager()
 	if err := mgr.Load(path); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load level %q: %w", name, err)
 	}
 	m.srv.multiMgr.Add(name, mgr, path)
+	m.srv.server.RegisterBlockPhysics(mgr)
 	if plugin.OnLevelLoaded.HasHandlers() {
 		plugin.OnLevelLoaded.Fire(plugin.LevelLoadedData{Name: name})
 	}
-	return &pluginLevel{mgr: mgr, name: name, codec: m.srv.codec, path: path}, nil
+	return &pluginLevel{
+		mgr:    mgr,
+		name:   name,
+		path:   path,
+		codec:  m.srv.codec,
+		server: m.srv.server,
+	}, nil
 }
 
 func (m *pluginLevelManager) Unload(name string) bool {
@@ -752,10 +803,14 @@ func (m *pluginLevelManager) Unload(name string) bool {
 		plugin.OnLevelUnload.Fire(plugin.LevelUnloadData{Name: name})
 	}
 	removed := m.srv.multiMgr.Remove(name)
-	if removed && plugin.OnLevelRemoved.HasHandlers() {
+	if !removed {
+		return false
+	}
+	m.srv.server.UnregisterBlockPhysics(mgr)
+	if plugin.OnLevelRemoved.HasHandlers() {
 		plugin.OnLevelRemoved.Fire(plugin.LevelRemovedData{Name: name})
 	}
-	return removed
+	return true
 }
 
 func (m *pluginLevelManager) SaveAll() error {

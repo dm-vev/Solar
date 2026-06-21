@@ -129,6 +129,10 @@ func (s *session) handleHandshake() error {
 		}
 	}
 
+	// Player rank is resolved via ranks.Registry on demand — no need
+	// to load it here. PlayerRank() reads from PlayerDB.Data["rank"]
+	// through the registry at query time.
+
 	// Resolve BlockDB for the main level and player's DB ID.
 	if s.blockDBForLevel != nil && s.worlds != nil {
 		s.blockDB = s.blockDBForLevel(s.worlds.Current().Name)

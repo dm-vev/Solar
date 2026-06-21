@@ -479,7 +479,7 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 
 	// Queue block for physics processing.
 	if s.queuePhysics != nil {
-		s.queuePhysics(x, y, z)
+		s.queuePhysics(s.worlds, x, y, z)
 	}
 
 	// Record in BlockDB.

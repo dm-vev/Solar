@@ -23,7 +23,10 @@ func Run(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		srv := buildServer(ctx, cfg)
+		srv, err := buildServer(ctx, cfg)
+		if err != nil {
+			return fmt.Errorf("build server: %w", err)
+		}
 		if cmd.PprofAddress != "" {
 			srv.SetPprofAddress(cmd.PprofAddress)
 		}

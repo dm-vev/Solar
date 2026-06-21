@@ -174,7 +174,7 @@ internal/protocol/classic/ Classic/ClassiCube wire protocol
 internal/world/          world model, persistence, generation, level mapping
 internal/player/         player registry and moderation policy (bans/whitelist/ops)
 internal/entity/         entity state and simulation
-internal/blockdef/      custom block definitions (CPE BlockDefinitions)
+internal/blocks/          block definitions, editing history, and per-level physics
 internal/command/        command registry and built-ins
 internal/generator/      map generators (Simple, Classic, fCraft, Heightmap)
 internal/loadtest/       synthetic Classic clients
