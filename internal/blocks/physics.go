@@ -242,6 +242,8 @@ func (e *PhysicsEngine) applyUpdate(u updateEntry) {
 		if e.broadcast != nil {
 			e.broadcast(x, y, z, u.block)
 		}
+		// Queue the new block itself for physics processing.
+		e.queueCheck(u.index)
 		e.activateNeighbours(u.index)
 	}
 }
@@ -260,15 +262,16 @@ func (e *PhysicsEngine) activateNeighbours(idx int) {
 // ─── liquid physics (water + lava) ───
 
 func (e *PhysicsEngine) doLiquid(c *checkEntry, x, y, z int, block byte, isLava, adv bool) {
-	// Lava delay: upper 3 bits of data must reach 4<<5 before flowing.
-	// Once expired, flow bits are kept in lower 5 bits and delay is not re-applied.
+	// Lava delay: upper 3 bits of data must reach 4<<5 (128) before flowing.
+	// Bit 7 (0x80) is set once delay expires and preserved across ticks
+	// to prevent re-delaying.
 	if isLava && block != FastLava {
-		if c.data < 4<<5 {
+		if c.data&0x80 == 0 {
 			c.data += 1 << 5
-			return
+			if c.data < 0x80 {
+				return
+			}
 		}
-		// Clear delay bits, keep flow flags.
-		c.data = c.data & 0x1F
 	}
 
 	// Random flow: 5 directions, 25% chance each per tick.
@@ -323,7 +326,12 @@ func (e *PhysicsEngine) doLiquid(c *checkEntry, x, y, z int, block byte, isLava,
 	if done {
 		c.data = removeFlag
 	} else {
-		c.data = flow
+		// Preserve lava delay-done flag (bit 7) across ticks.
+		if isLava && block != FastLava {
+			c.data = flow | 0x80
+		} else {
+			c.data = flow
+		}
 	}
 }
 
