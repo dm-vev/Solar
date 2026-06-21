@@ -364,6 +364,63 @@ func (s *session) RankSetPlayer(name string, perm int) bool {
 	return s.rankRegistry.SetPlayerRank(name, perm)
 }
 
+// ─── Draw limit + per-block permissions ───
+
+func (s *session) DrawLimit() int {
+	if s.rankRegistry == nil {
+		return 1
+	}
+	perm := s.rankRegistry.GetPlayerRank(s.currentUsername())
+	rank := s.rankRegistry.GetByPerm(perm)
+	if rank == nil {
+		return 1
+	}
+	return rank.DrawLimit
+}
+
+// blockPerms holds per-block min rank for place/delete.
+// ponytail: hardcoded defaults matching MCGalaxy's BlockPerms defaults.
+// Configurable persistence can be added later.
+var blockPlacePerms = [256]int{
+	// Default: guest (0) for most blocks
+	// Special blocks: operator (80)
+	182: ranks.PermOperator,   // TNT_Small
+	183: ranks.PermOperator,   // TNT_Big
+	186: ranks.PermOperator,   // TNT_Nuke
+	160: ranks.PermAdvBuilder, // Portal_Air
+	161: ranks.PermAdvBuilder, // Portal_Water
+	162: ranks.PermAdvBuilder, // Portal_Lava
+	175: ranks.PermAdvBuilder, // Portal_Blue
+	176: ranks.PermAdvBuilder, // Portal_Orange
+	130: ranks.PermAdvBuilder, // MB_White
+	131: ranks.PermAdvBuilder, // MB_Black
+	132: ranks.PermAdvBuilder, // MB_Air
+	133: ranks.PermAdvBuilder, // MB_Water
+	134: ranks.PermAdvBuilder, // MB_Lava
+	201: ranks.PermBuilder,    // Door_Log_air
+}
+
+var blockDeletePerms = [256]int{
+	// Default: guest (0) for most blocks
+	// Fluids: guest can delete (clear water/lava)
+	8:  ranks.PermGuest, // Water
+	9:  ranks.PermGuest, // StillWater
+	10: ranks.PermGuest, // Lava
+	11: ranks.PermGuest, // StillLava
+}
+
+func (s *session) CanPlaceBlock(block byte) bool {
+	perm := s.PlayerRank()
+	min := blockPlacePerms[block]
+	return perm >= min
+}
+
+func (s *session) CanDeleteBlock(block byte) bool {
+	perm := s.PlayerRank()
+	min := blockDeletePerms[block]
+	return perm >= min
+}
+
 func (s *session) GenerateWorld(name, theme string, width, height, length int, seed string) bool {
 	return s.generateWorld(name, theme, width, height, length, seed)
 }

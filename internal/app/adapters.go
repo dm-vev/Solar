@@ -239,6 +239,9 @@ func (s sessionDraw) RecordChange(x, y, z int, old, new byte) {
 func (s sessionDraw) CommitBatch()               { s.backend.CommitBatch() }
 func (s sessionDraw) Undo() []command.UndoChange { return s.backend.UndoBatch() }
 func (s sessionDraw) Redo() []command.UndoChange { return s.backend.RedoBatch() }
+func (s sessionDraw) DrawLimit() int             { return s.backend.DrawLimit() }
+func (s sessionDraw) CanPlace(block byte) bool   { return s.backend.CanPlaceBlock(block) }
+func (s sessionDraw) CanDelete(block byte) bool  { return s.backend.CanDeleteBlock(block) }
 
 // ─── BlockDB adapter ───
 

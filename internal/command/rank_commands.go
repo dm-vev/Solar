@@ -6,7 +6,10 @@
 
 package command
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // setRankCommand — /setrank <name> <rank>
 // Safety checks (matching MCGalaxy):

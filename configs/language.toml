@@ -280,6 +280,9 @@
 "command.draw.invalid_block" = "invalid block: %s"
 "command.draw.select1" = "&eClick a block to select (1 mark needed)"
 "command.draw.select2" = "&eClick 2 blocks to mark the region"
+"command.draw.limit" = "&cToo many blocks: %d (limit: %d)"
+"command.draw.cannot_place" = "&cYou cannot place block %d"
+"command.draw.cannot_delete" = "&cYou cannot delete block %d"
 
 # ─── command.cuboid ───
 "command.cuboid.usage" = "usage: /cuboid <block> [hollow|walls]"
@@ -580,6 +583,9 @@
 "command.draw.invalid_block" = "неверный блок: %s"
 "command.draw.select1" = "&eКликните блок для выбора (нужна 1 отметка)"
 "command.draw.select2" = "&eКликните 2 блока для отметки области"
+"command.draw.limit" = "&cСлишком много блоков: %d (лимит: %d)"
+"command.draw.cannot_place" = "&cВы не можете ставить блок %d"
+"command.draw.cannot_delete" = "&cВы не можете удалять блок %d"
 "command.cuboid.usage" = "использование: /cuboid <блок> [hollow|walls]"
 "command.line.usage" = "использование: /line <блок>"
 "command.sphere.usage" = "использование: /sphere <блок> [hollow] [радиус]"

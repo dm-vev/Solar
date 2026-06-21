@@ -99,6 +99,29 @@ func (s *session) handleSetBlock() error {
 		return nil
 	}
 
+	// Per-block permission check.
+	if place && !s.CanPlaceBlock(blockID) {
+		if s.worlds != nil {
+			if block, ok := s.worlds.BlockAt(x, y, z); ok {
+				s.SendBlockChange(x, y, z, block)
+			}
+		}
+		s.Message(s.Tr("command.draw.cannot_place", blockID))
+		return nil
+	}
+	if !place {
+		// Check the block being deleted
+		if s.worlds != nil {
+			if old, ok := s.worlds.BlockAt(x, y, z); ok {
+				if !s.CanDeleteBlock(old) {
+					s.SendBlockChange(x, y, z, old)
+					s.Message(s.Tr("command.draw.cannot_delete", old))
+					return nil
+				}
+			}
+		}
+	}
+
 	return s.applyBlockChange(x, y, z, blockID, true)
 }
 

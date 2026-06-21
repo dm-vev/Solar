@@ -76,6 +76,12 @@ type DrawService interface {
 	Undo() []UndoChange
 	// Redo re-applies the last undone batch. Returns the changes, or nil.
 	Redo() []UndoChange
+	// DrawLimit returns the max blocks this player can place per drawing command.
+	DrawLimit() int
+	// CanPlace reports whether the player can place the given block.
+	CanPlace(block byte) bool
+	// CanDelete reports whether the player can delete the given block.
+	CanDelete(block byte) bool
 }
 
 // UndoChange records a single block change for undo/redo.

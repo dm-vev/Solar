@@ -67,6 +67,9 @@ type SessionBackend interface {
 	RankGetByPerm(perm int) *ranks.Rank
 	RankAll() []*ranks.Rank
 	RankSetPlayer(name string, perm int) bool
+	DrawLimit() int
+	CanPlaceBlock(block byte) bool
+	CanDeleteBlock(block byte) bool
 
 	KickPlayer(name, reason string) bool
 	BanPlayer(name, reason string) bool

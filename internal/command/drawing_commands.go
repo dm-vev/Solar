@@ -27,6 +27,20 @@ func parseBlock(s string) (byte, bool) {
 	return byte(v), true
 }
 
+// checkDrawLimit verifies the block count doesn't exceed the player's draw limit.
+func checkDrawLimit(ctx Context, blockCount int) (string, bool) {
+	limit := ctx.Draw.DrawLimit()
+	if limit > 0 && blockCount > limit {
+		return ctx.tr("command.draw.limit", blockCount, limit), true
+	}
+	return "", false
+}
+
+// cuboidVolume returns the number of blocks in a cuboid from min to max.
+func cuboidVolume(min, max blocks.Vec3) int {
+	return (max.X - min.X + 1) * (max.Y - min.Y + 1) * (max.Z - min.Z + 1)
+}
+
 // cuboidCommand — /cuboid <block> [hollow|walls]
 func cuboidCommand(ctx Context, args []string) (string, bool) {
 	if ctx.Draw == nil {
@@ -42,6 +56,11 @@ func cuboidCommand(ctx Context, args []string) (string, bool) {
 	hollow := len(args) > 1 && args[1] == "hollow"
 	walls := len(args) > 1 && args[1] == "walls"
 
+	// Check per-block permission.
+	if !ctx.Draw.CanPlace(block) {
+		return ctx.tr("command.draw.cannot_place", block), true
+	}
+
 	ctx.Draw.StartSelection(2, func(marks [][3]int) {
 		min := blocks.Vec3{marks[0][0], marks[0][1], marks[0][2]}
 		max := blocks.Vec3{marks[1][0], marks[1][1], marks[1][2]}
@@ -53,6 +72,12 @@ func cuboidCommand(ctx Context, args []string) (string, bool) {
 		}
 		if min.Z > max.Z {
 			min.Z, max.Z = max.Z, min.Z
+		}
+		// Check draw limit before executing.
+		vol := cuboidVolume(min, max)
+		limit := ctx.Draw.DrawLimit()
+		if limit > 0 && vol > limit {
+			return // silently fail — too many blocks
 		}
 		ctx.Draw.BeginBatch()
 		place := func(x, y, z int) {
@@ -86,6 +111,9 @@ func lineCommand(ctx Context, args []string) (string, bool) {
 	if !ok {
 		return ctx.tr("command.draw.invalid_block", args[0]), true
 	}
+	if !ctx.Draw.CanPlace(block) {
+		return ctx.tr("command.draw.cannot_place", block), true
+	}
 	ctx.Draw.StartSelection(2, func(marks [][3]int) {
 		p1 := blocks.Vec3{marks[0][0], marks[0][1], marks[0][2]}
 		p2 := blocks.Vec3{marks[1][0], marks[1][1], marks[1][2]}
@@ -112,6 +140,9 @@ func sphereCommand(ctx Context, args []string) (string, bool) {
 	block, ok := parseBlock(args[0])
 	if !ok {
 		return ctx.tr("command.draw.invalid_block", args[0]), true
+	}
+	if !ctx.Draw.CanPlace(block) {
+		return ctx.tr("command.draw.cannot_place", block), true
 	}
 	hollow := false
 	radius := 3
@@ -156,6 +187,9 @@ func fillCommand(ctx Context, args []string) (string, bool) {
 	block, ok := parseBlock(args[0])
 	if !ok {
 		return ctx.tr("command.draw.invalid_block", args[0]), true
+	}
+	if !ctx.Draw.CanPlace(block) {
+		return ctx.tr("command.draw.cannot_place", block), true
 	}
 	ctx.Draw.StartSelection(1, func(marks [][3]int) {
 		w, h, l := ctx.Draw.LevelDims()

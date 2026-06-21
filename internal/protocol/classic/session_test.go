@@ -429,6 +429,9 @@ func (m testModeration) RankGet(name string) *ranks.Rank          { return nil }
 func (m testModeration) RankGetByPerm(perm int) *ranks.Rank       { return nil }
 func (m testModeration) RankAll() []*ranks.Rank                   { return nil }
 func (m testModeration) RankSetPlayer(name string, perm int) bool { return true }
+func (m testModeration) DrawLimit() int                           { return 4096 }
+func (m testModeration) CanPlaceBlock(block byte) bool            { return true }
+func (m testModeration) CanDeleteBlock(block byte) bool           { return true }
 
 func (m testModeration) PlayerDBLookup(name string) *playerdb.PlayerEntry {
 	return m.backend.PlayerDBLookup(name)

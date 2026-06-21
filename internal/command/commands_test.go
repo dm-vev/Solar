@@ -355,6 +355,9 @@ func (stubDraw) RecordChange(x, y, z int, old, new byte)                    {}
 func (stubDraw) CommitBatch()                                               {}
 func (stubDraw) Undo() []UndoChange                                         { return nil }
 func (stubDraw) Redo() []UndoChange                                         { return nil }
+func (stubDraw) DrawLimit() int                                             { return 4096 }
+func (stubDraw) CanPlace(block byte) bool                                   { return true }
+func (stubDraw) CanDelete(block byte) bool                                  { return true }
 
 type stubDirectory struct {
 	names       []string
