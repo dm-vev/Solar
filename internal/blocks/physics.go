@@ -261,11 +261,14 @@ func (e *PhysicsEngine) activateNeighbours(idx int) {
 
 func (e *PhysicsEngine) doLiquid(c *checkEntry, x, y, z int, block byte, isLava, adv bool) {
 	// Lava delay: upper 3 bits of data must reach 4<<5 before flowing.
+	// Once expired, flow bits are kept in lower 5 bits and delay is not re-applied.
 	if isLava && block != FastLava {
 		if c.data < 4<<5 {
 			c.data += 1 << 5
 			return
 		}
+		// Clear delay bits, keep flow flags.
+		c.data = c.data & 0x1F
 	}
 
 	// Random flow: 5 directions, 25% chance each per tick.

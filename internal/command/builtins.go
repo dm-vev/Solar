@@ -8,10 +8,16 @@ import (
 
 func helpCommand(registry *Registry) Handler {
 	return func(ctx Context, _ []string) (string, bool) {
+		playerRank := 0
+		if ctx.RankLevel != nil {
+			playerRank = ctx.RankLevel()
+		}
 		registry.mu.RLock()
 		names := make([]string, 0, len(registry.handlers))
-		for name := range registry.handlers {
-			names = append(names, name)
+		for name, entry := range registry.handlers {
+			if playerRank >= entry.minRank {
+				names = append(names, name)
+			}
 		}
 		registry.mu.RUnlock()
 

@@ -283,7 +283,7 @@ func NewRegistry() *Registry {
 	}
 	registry.Register("help", helpCommand(registry))
 	registry.Register("where", whereCommand)
-	registry.Register("setblock", setBlockCommand)
+	registry.RegisterWithRank("setblock", ranks.PermOperator, setBlockCommand)
 	registry.RegisterWithRank("tp", ranks.PermOperator, teleportCommand)
 	registry.RegisterWithRank("setspawn", ranks.PermOperator, setSpawnCommand)
 	registry.RegisterWithRank("setspawnpoint", ranks.PermOperator, setSpawnCommand)

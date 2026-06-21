@@ -95,6 +95,10 @@ func (s *session) TeleportToPlayer(name string) bool {
 	if !ok {
 		return false
 	}
+	// Can't teleport to hidden players.
+	if target.IsHidden() {
+		return false
+	}
 	s.saveLastPos()
 	tx, ty, tz := target.Position()
 	targetYaw, targetPitch := target.Yaw(), target.Pitch()
@@ -150,6 +154,10 @@ func (s *session) MeAction(action string) {
 func (s *session) WhisperTo(targetName, msg string) bool {
 	target, ok := s.findTarget(targetName)
 	if !ok {
+		return false
+	}
+	// Check if target is ignoring the sender.
+	if target.isIgnoring(s.currentUsername()) {
 		return false
 	}
 	target.Message("&7[whisper] &e" + s.currentUsername() + "&7: &f" + msg)
