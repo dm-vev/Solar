@@ -378,7 +378,7 @@ func (s *session) DrawLimit() int {
 	return rank.DrawLimit
 }
 
-// blockPerms holds per-block min rank for place/delete.
+// blockPlacePerms holds per-block min rank for placing.
 // ponytail: hardcoded defaults matching MCGalaxy's BlockPerms defaults.
 // Configurable persistence can be added later.
 var blockPlacePerms = [256]int{
@@ -400,25 +400,12 @@ var blockPlacePerms = [256]int{
 	201: ranks.PermBuilder,    // Door_Log_air
 }
 
-var blockDeletePerms = [256]int{
-	// Default: guest (0) for most blocks
-	// Fluids: guest can delete (clear water/lava)
-	8:  ranks.PermGuest, // Water
-	9:  ranks.PermGuest, // StillWater
-	10: ranks.PermGuest, // Lava
-	11: ranks.PermGuest, // StillLava
-}
-
 func (s *session) CanPlaceBlock(block byte) bool {
-	perm := s.PlayerRank()
-	min := blockPlacePerms[block]
-	return perm >= min
+	return s.PlayerRank() >= blockPlacePerms[block]
 }
 
 func (s *session) CanDeleteBlock(block byte) bool {
-	perm := s.PlayerRank()
-	min := blockDeletePerms[block]
-	return perm >= min
+	return true // ponytail: all blocks deletable by guest (matching MCGalaxy defaults)
 }
 
 func (s *session) GenerateWorld(name, theme string, width, height, length int, seed string) bool {

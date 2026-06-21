@@ -121,7 +121,6 @@ func (s *session) handleSetBlock() error {
 			}
 		}
 	}
-
 	return s.applyBlockChange(x, y, z, blockID, true)
 }
 

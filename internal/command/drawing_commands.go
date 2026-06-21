@@ -27,15 +27,6 @@ func parseBlock(s string) (byte, bool) {
 	return byte(v), true
 }
 
-// checkDrawLimit verifies the block count doesn't exceed the player's draw limit.
-func checkDrawLimit(ctx Context, blockCount int) (string, bool) {
-	limit := ctx.Draw.DrawLimit()
-	if limit > 0 && blockCount > limit {
-		return ctx.tr("command.draw.limit", blockCount, limit), true
-	}
-	return "", false
-}
-
 // cuboidVolume returns the number of blocks in a cuboid from min to max.
 func cuboidVolume(min, max blocks.Vec3) int {
 	return (max.X - min.X + 1) * (max.Y - min.Y + 1) * (max.Z - min.Z + 1)
@@ -77,7 +68,7 @@ func cuboidCommand(ctx Context, args []string) (string, bool) {
 		vol := cuboidVolume(min, max)
 		limit := ctx.Draw.DrawLimit()
 		if limit > 0 && vol > limit {
-			return // silently fail — too many blocks
+			return // too many blocks — silently abort
 		}
 		ctx.Draw.BeginBatch()
 		place := func(x, y, z int) {
@@ -155,6 +146,12 @@ func sphereCommand(ctx Context, args []string) (string, bool) {
 	}
 	ctx.Draw.StartSelection(1, func(marks [][3]int) {
 		center := blocks.Vec3{marks[0][0], marks[0][1], marks[0][2]}
+		// Check draw limit: sphere volume ≈ (2R+1)³
+		estVol := (2*radius + 1) * (2*radius + 1) * (2*radius + 1)
+		limit := ctx.Draw.DrawLimit()
+		if limit > 0 && estVol > limit {
+			return
+		}
 		ctx.Draw.BeginBatch()
 		if hollow {
 			blocks.SphereHollow(center, radius, func(x, y, z int) {
