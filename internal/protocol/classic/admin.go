@@ -119,7 +119,17 @@ func (s *session) BackToLastPos() bool {
 	x, y, z := s.lastTeleportPos[0], s.lastTeleportPos[1], s.lastTeleportPos[2]
 	yaw, pitch := s.Yaw(), s.Pitch()
 	s.lastTeleportValid = false
-	return s.teleportSelf(x, y, z, yaw, pitch)
+	// Don't call teleportSelf — it would saveLastPos and overwrite.
+	// Teleport directly without saving.
+	entityID := s.currentEntityID()
+	if s.entities == nil || entityID == 0 {
+		return false
+	}
+	pos := entityPosition(x, y, z)
+	if !s.entities.SetLocation(entityID, pos, yaw, pitch) {
+		return false
+	}
+	return s.writePacket(encodeEntityTeleport(byte(entityID), pos, yaw, pitch)) == nil
 }
 
 func (s *session) saveLastPos() {

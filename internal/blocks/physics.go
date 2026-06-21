@@ -128,7 +128,8 @@ func (e *PhysicsEngine) Tick() {
 	}
 
 	adv := e.mode >= ModeAdvanced
-	checks := e.checks
+	checks := make([]checkEntry, len(e.checks))
+	copy(checks, e.checks)
 	e.checks = e.checks[:0]
 
 	for i := range checks {

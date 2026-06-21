@@ -147,7 +147,7 @@ func (s *session) handleEntityTeleport() error {
 	}
 
 	// Check for special blocks at the player's feet.
-	s.checkSpecialBlocks(position.X/32, position.Y/32, position.Z/32)
+	s.checkSpecialBlocks(position.X/32, (position.Y/32)-1, position.Z/32)
 
 	if plugin.OnPlayerMove.HasHandlers() {
 		plugin.OnPlayerMove.Fire(plugin.PlayerMoveData{
@@ -224,6 +224,12 @@ func (s *session) applyRelativeUpdate(targetID uint32, dx, dy, dz, yaw, pitch by
 	s.entities.ApplyDelta(targetID,
 		decodeClassicDelta(dx), decodeClassicDelta(dy), decodeClassicDelta(dz),
 		yaw, pitch)
+
+	// Check special blocks for the moving player.
+	if targetID == s.currentEntityID() {
+		x, y, z := s.Position()
+		s.checkSpecialBlocks(x/32, (y/32)-1, z/32)
+	}
 	return nil
 }
 
@@ -307,7 +313,8 @@ func (s *session) handleMessage() error {
 		if peer.isIgnoring(s.currentUsername()) {
 			return
 		}
-		_ = peer.writePacket(packet)
+		// Use Message() so OnMessageReceived fires for each recipient.
+		peer.Message(readFixedString(packet[2:]))
 	})
 	return nil
 }
@@ -401,10 +408,17 @@ func specialBlockType(b byte) blocks.SpecialType {
 }
 
 // checkSpecialBlocks fires message blocks and portals at the player's position.
+// Only fires once per block — tracks the last checked position to avoid spam.
 func (s *session) checkSpecialBlocks(x, y, z int) {
 	if s.specialBlocks == nil || s.worlds == nil {
 		return
 	}
+	// Skip if same block as last check.
+	if x == s.lastSpecialBlock[0] && y == s.lastSpecialBlock[1] && z == s.lastSpecialBlock[2] {
+		return
+	}
+	s.lastSpecialBlock = [3]int{x, y, z}
+
 	// Check the block at feet level and one below.
 	for dy := 0; dy >= -1; dy-- {
 		entry := s.specialBlocks.Get(x, y+dy, z)

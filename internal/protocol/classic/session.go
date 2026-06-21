@@ -123,11 +123,12 @@ type session struct {
 	clipboard *blocks.CopyState
 
 	// specialBlocks holds per-level interactive blocks (doors, portals, MBs).
-	specialBlocks *blocks.SpecialRegistry
-	spamChecker   *player.SpamChecker
-	undoStack     *player.UndoStack
-	batchChanges  []player.BlockChange
-	rankRegistry  *ranks.Registry
+	specialBlocks    *blocks.SpecialRegistry
+	spamChecker      *player.SpamChecker
+	undoStack        *player.UndoStack
+	batchChanges     []player.BlockChange
+	rankRegistry     *ranks.Registry
+	lastSpecialBlock [3]int // last block coords checked for special blocks
 }
 
 // markSelection tracks a multi-click block selection for drawing commands.
