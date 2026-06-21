@@ -279,6 +279,9 @@ func (s *session) sendLevelFrom(mgr *world.Manager, fastMap bool) error {
 // changeMap switches the session's active world Manager, sends the new
 // level stream, and re-syncs entity visibility across levels.
 func (s *session) changeMap(mgr *world.Manager) error {
+	// Save last position so /back works after /goto.
+	s.saveLastPos()
+
 	levelName := mgr.Current().Name
 	prevName := ""
 	if s.worlds != nil {

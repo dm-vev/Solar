@@ -117,3 +117,9 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+// BUG: DrawService stubs need to track PlaceBlock calls for permission tests.
+// This is a compile-time check — if the interface changes, stubs must update.
+func TestBug_DrawServiceInterface(t *testing.T) {
+	var _ DrawService = stubDraw{}
+}

@@ -215,6 +215,17 @@ func (s *session) PlaceBlock(x, y, z int, block byte) bool {
 	if s.worlds == nil {
 		return false
 	}
+	// Check per-block permissions for both the new block (place) and
+	// the old block (delete). A guest shouldn't be able to overwrite
+	// TNT with stone any more than they can delete TNT directly.
+	if !s.CanPlaceBlock(block) {
+		return false
+	}
+	if old, ok := s.worlds.BlockAt(x, y, z); ok && old != block {
+		if !s.CanDeleteBlock(old) {
+			return false
+		}
+	}
 	if !s.worlds.SetBlock(x, y, z, block) {
 		return false
 	}
