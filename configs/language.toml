@@ -312,6 +312,7 @@
 "command.setrank.self" = "&cYou cannot change your own rank"
 "command.setrank.banned" = "&cUse /ban instead of setting rank to banned"
 "command.setrank.too_high" = "&cYou cannot set a rank equal to or higher than your own"
+"command.setrank.target_too_high" = "&cYou cannot change the rank of someone ranked equal to or higher than you"
 
 # ─── command.rankinfo ───
 "command.rankinfo.none" = "&7%s has no rank"
@@ -595,6 +596,7 @@
 "command.setrank.self" = "&cНельзя изменить свой собственный ранг"
 "command.setrank.banned" = "&cИспользуйте /ban вместо установки ранга banned"
 "command.setrank.too_high" = "&cНельзя установить ранг равный или выше своего"
+"command.setrank.target_too_high" = "&cНельзя менять ранг игрока с рангом равным или выше вашего"
 "command.rankinfo.none" = "&7%s не имеет ранга"
 "command.rankinfo.result" = "&a%s &7имеет ранг &e%s &7(уровень %d)"
 "command.copy.usage" = "использование: /copy [air]"

@@ -385,7 +385,7 @@ func (s sessionRanks) All() []command.RankInfo {
 	}
 	return out
 }
-func (s sessionRanks) GetPlayerRank(name string) int { return s.backend.PlayerRank() }
+func (s sessionRanks) GetPlayerRank(name string) int { return s.backend.RankGetPlayer(name) }
 func (s sessionRanks) SetPlayerRank(name string, perm int) bool {
 	return s.backend.RankSetPlayer(name, perm)
 }

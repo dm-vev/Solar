@@ -329,6 +329,13 @@ func (s *session) PlayerRank() int {
 	return s.rankRegistry.GetPlayerRank(s.currentUsername())
 }
 
+func (s *session) RankGetPlayer(name string) int {
+	if s.rankRegistry == nil {
+		return ranks.PermGuest
+	}
+	return s.rankRegistry.GetPlayerRank(name)
+}
+
 func (s *session) RankGet(name string) *ranks.Rank {
 	if s.rankRegistry == nil {
 		return nil

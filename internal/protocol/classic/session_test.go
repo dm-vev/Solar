@@ -424,6 +424,7 @@ func (m testModeration) CommitBatch()                             {}
 func (m testModeration) UndoBatch() []command.UndoChange          { return nil }
 func (m testModeration) RedoBatch() []command.UndoChange          { return nil }
 func (m testModeration) PlayerRank() int                          { return 80 }
+func (m testModeration) RankGetPlayer(name string) int            { return 0 }
 func (m testModeration) RankGet(name string) *ranks.Rank          { return nil }
 func (m testModeration) RankGetByPerm(perm int) *ranks.Rank       { return nil }
 func (m testModeration) RankAll() []*ranks.Rank                   { return nil }

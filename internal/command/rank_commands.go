@@ -6,9 +6,7 @@
 
 package command
 
-import (
-	"strings"
-)
+import "strings"
 
 // setRankCommand — /setrank <name> <rank>
 // Safety checks (matching MCGalaxy):
@@ -49,6 +47,12 @@ func setRankCommand(ctx Context, args []string) (string, bool) {
 		return ctx.tr("command.setrank.too_high"), true
 	}
 
+	// Cannot change rank of someone >= your own rank (matching MCGalaxy CheckRank).
+	targetRank := ctx.Ranks.GetPlayerRank(playerName)
+	if targetRank >= myRank {
+		return ctx.tr("command.setrank.target_too_high"), true
+	}
+
 	if !ctx.Ranks.SetPlayerRank(playerName, rank.Permission) {
 		return ctx.tr("command.setrank.failed", playerName), true
 	}
@@ -80,29 +84,7 @@ func viewRanksCommand(ctx Context, args []string) (string, bool) {
 	all := ctx.Ranks.All()
 	var parts []string
 	for _, r := range all {
-		parts = append(parts, r.Color+r.Name+"("+itoa(r.Permission)+")")
+		parts = append(parts, r.Color+r.Name+"("+strconv.Itoa(r.Permission)+")")
 	}
 	return "&aRanks: &7" + strings.Join(parts, " "), true
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var buf [12]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		buf[i] = '-'
-	}
-	return string(buf[i:])
 }

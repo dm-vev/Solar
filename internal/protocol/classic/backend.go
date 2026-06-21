@@ -62,6 +62,7 @@ type SessionBackend interface {
 	RedoBatch() []command.UndoChange
 
 	PlayerRank() int
+	RankGetPlayer(name string) int
 	RankGet(name string) *ranks.Rank
 	RankGetByPerm(perm int) *ranks.Rank
 	RankAll() []*ranks.Rank

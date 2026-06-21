@@ -77,7 +77,7 @@ func DefaultRanks() []*Rank {
 
 func (r *Registry) add(rank *Rank) {
 	r.ranks = append(r.ranks, rank)
-	r.byName[rank.Name] = rank
+	r.byName[lower(rank.Name)] = rank
 	r.byPerm[rank.Permission] = rank
 	sort.Slice(r.ranks, func(i, j int) bool {
 		return r.ranks[i].Permission < r.ranks[j].Permission
