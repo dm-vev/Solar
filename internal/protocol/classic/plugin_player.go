@@ -17,7 +17,11 @@
 
 package classic
 
-import "github.com/solar-mc/solar/plugin"
+import (
+	"time"
+
+	"github.com/solar-mc/solar/plugin"
+)
 
 var _ plugin.Player = (*session)(nil)
 
@@ -157,6 +161,11 @@ func (s *session) SetAfk(afk bool) {
 	s.stateMu.Lock()
 	was := s.afk
 	s.afk = afk
+	if afk && !was {
+		s.afkSince = time.Now()
+	} else if !afk {
+		s.afkSince = time.Time{}
+	}
 	s.stateMu.Unlock()
 	if was == afk {
 		return
@@ -172,6 +181,26 @@ func (s *session) SetAfk(afk bool) {
 			Message: action,
 		})
 	}
+}
+
+func (s *session) LastAction() time.Time {
+	s.stateMu.RLock()
+	la := s.lastAction
+	s.stateMu.RUnlock()
+	return la
+}
+
+func (s *session) AfkSince() time.Time {
+	s.stateMu.RLock()
+	t := s.afkSince
+	s.stateMu.RUnlock()
+	return t
+}
+
+func (s *session) touchLastAction() {
+	s.stateMu.Lock()
+	s.lastAction = time.Now()
+	s.stateMu.Unlock()
 }
 
 // Kill triggers player death. Fires OnPlayerDying (cancelable); if not

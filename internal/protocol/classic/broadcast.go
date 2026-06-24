@@ -61,13 +61,14 @@ func (c *Codec) OnlinePlayers() []plugin.Player {
 	return out
 }
 
-// GetPlayerAFKState returns the player's last action time and AFK status.
-func (c *Codec) GetPlayerAFKState(name string) (time.Time, bool) {
+// GetPlayerAFKState returns the player's last action time, AFK-since time,
+// and AFK status.
+func (c *Codec) GetPlayerAFKState(name string) (time.Time, time.Time, bool) {
 	p, ok := c.room.FindByName(name)
 	if !ok {
-		return time.Time{}, false
+		return time.Time{}, time.Time{}, false
 	}
-	return p.lastAction, p.IsAfk()
+	return p.LastAction(), p.AfkSince(), p.IsAfk()
 }
 
 // GetPlayerRank returns the player's rank permission level.

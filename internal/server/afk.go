@@ -2,6 +2,7 @@
 //
 // On each server tick, checkAFK iterates all online players:
 //   - If the player hasn't moved for AutoAfkTime, mark them AFK automatically.
+//   - If the player is AFK and becomes active again, clear AFK automatically.
 //   - If the player is AFK for longer than KickTime (and their rank is below
 //     KickMaxRank), kick them with a message.
 //
@@ -11,11 +12,7 @@
 
 package server
 
-import (
-	"time"
-
-	"github.com/solar-mc/solar/plugin"
-)
+import "time"
 
 // checkAFK runs the auto-AFK and AFK kick logic on every server tick.
 func (s *Server) checkAFK() {
@@ -26,8 +23,7 @@ func (s *Server) checkAFK() {
 
 	now := time.Now()
 	for _, p := range s.codec.OnlinePlayers() {
-		// Get the player's last action time and AFK status.
-		la, afk := s.codec.GetPlayerAFKState(p.Name())
+		la, afkSince, afk := s.codec.GetPlayerAFKState(p.Name())
 		if la.IsZero() {
 			continue
 		}
@@ -41,6 +37,15 @@ func (s *Server) checkAFK() {
 			continue
 		}
 
+		if afk && cfg.AutoAfkTime > 0 {
+			// Auto-un-AFK: player became active again.
+			if now.Sub(la) < cfg.AutoAfkTime {
+				p.SetAfk(false)
+				s.codec.BroadcastMessage("&7" + p.Name() + " is no longer AFK")
+				continue
+			}
+		}
+
 		if afk && cfg.KickTime > 0 {
 			// AFK kick: kick if AFK for longer than KickTime.
 			// But only if the player's rank is below KickMaxRank.
@@ -48,10 +53,9 @@ func (s *Server) checkAFK() {
 			if rank >= cfg.KickMaxRank {
 				continue
 			}
-			if now.Sub(la) >= cfg.KickTime {
+			if !afkSince.IsZero() && now.Sub(afkSince) >= cfg.KickTime {
 				p.Kick("Auto-kick: AFK for too long")
 			}
 		}
 	}
-	_ = plugin.OnTick // ensure plugin import is used
 }

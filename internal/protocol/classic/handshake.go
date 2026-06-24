@@ -95,7 +95,9 @@ func (s *session) handleHandshake() error {
 		pdb.EnsureEntry(s.playerDB, username, ip)
 	}
 	s.loginTime = time.Now()
+	s.stateMu.Lock()
 	s.lastAction = s.loginTime
+	s.stateMu.Unlock()
 
 	// Assign BlockDB player ID.
 	if s.nameConv != nil {

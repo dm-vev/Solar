@@ -130,6 +130,7 @@ type session struct {
 	rankRegistry     *ranks.Registry
 	lastSpecialBlock [3]int    // last block coords checked for special blocks
 	lastAction       time.Time // last player activity (for AFK detection)
+	afkSince         time.Time // when the player became AFK (for AFK kick timing)
 }
 
 // markSelection tracks a multi-click block selection for drawing commands.
