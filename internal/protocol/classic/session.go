@@ -128,7 +128,8 @@ type session struct {
 	undoStack        *player.UndoStack
 	batchChanges     []player.BlockChange
 	rankRegistry     *ranks.Registry
-	lastSpecialBlock [3]int // last block coords checked for special blocks
+	lastSpecialBlock [3]int    // last block coords checked for special blocks
+	lastAction       time.Time // last player activity (for AFK detection)
 }
 
 // markSelection tracks a multi-click block selection for drawing commands.

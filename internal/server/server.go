@@ -300,6 +300,7 @@ func (s *Server) runTicks(ctx context.Context) {
 			}
 			s.codec.BroadcastEntityUpdates()
 			s.tickBlockPhysics()
+			s.checkAFK()
 			plugin.DefaultScheduler.Tick()
 			if plugin.OnTick.HasHandlers() {
 				plugin.OnTick.Fire(plugin.TickData{Tick: s.worlds.TickCount()})

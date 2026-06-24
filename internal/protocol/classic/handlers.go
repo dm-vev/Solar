@@ -77,6 +77,7 @@ func (s *session) handleSetBlock() error {
 
 	// If a drawing selection is active, intercept the click as a mark.
 	if s.markState != nil {
+		s.lastAction = time.Now()
 		s.RevertBlock(x, y, z) // don't actually place the block
 		s.markState.marks[s.markState.index] = markPos{x, y, z}
 		s.markState.index++
@@ -145,6 +146,9 @@ func (s *session) handleEntityTeleport() error {
 	if s.entities != nil {
 		s.entities.SetLocation(targetID, position, yaw, pitch)
 	}
+
+	// Update last activity for AFK detection.
+	s.lastAction = time.Now()
 
 	// Check for special blocks at the player's feet.
 	s.checkSpecialBlocks(position.X/32, (position.Y/32)-1, position.Z/32)
@@ -225,6 +229,9 @@ func (s *session) applyRelativeUpdate(targetID uint32, dx, dy, dz, yaw, pitch by
 		decodeClassicDelta(dx), decodeClassicDelta(dy), decodeClassicDelta(dz),
 		yaw, pitch)
 
+	// Update last activity for AFK detection.
+	s.lastAction = time.Now()
+
 	// Check special blocks for the moving player.
 	if targetID == s.currentEntityID() {
 		x, y, z := s.Position()
@@ -244,6 +251,9 @@ func (s *session) handleMessage() error {
 	if text == "" {
 		return nil
 	}
+
+	// Update last activity for AFK detection.
+	s.lastAction = time.Now()
 
 	// Anti-spam chat check.
 	if s.spamChecker != nil {

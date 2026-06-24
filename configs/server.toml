@@ -127,3 +127,14 @@ cmd_window = "5s"
 action = "kick"
 # How long to mute when action = "mute"
 mute_duration = "60s"
+
+[afk]
+# Auto-AFK: players who don't move for this duration are marked AFK.
+# 0 disables auto-AFK.
+auto_afk_time = "10m"
+# AFK kick: players who are AFK for this duration are kicked.
+# 0 disables AFK kick.
+kick_time = "45m"
+# Players with this rank or higher are exempt from AFK kick.
+# 80 = operator, 100 = admin, 120 = owner.
+kick_max_rank = 80

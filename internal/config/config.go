@@ -35,6 +35,7 @@ type Config struct {
 	Debug            DebugConfig     `toml:"debug"`
 	Heartbeat        HeartbeatConfig `toml:"heartbeat"`
 	AntiSpam         AntiSpamConfig  `toml:"antispam"`
+	AFK              AFKConfig       `toml:"afk"`
 	Log              LogConfig       `toml:"log"`
 	Plugins          PluginsConfig   `toml:"plugins"`
 	Lua              LuaConfig       `toml:"lua"`
@@ -93,6 +94,13 @@ type AntiSpamConfig struct {
 	Action string `toml:"action"`
 	// MuteDuration: how long to mute when action=mute.
 	MuteDuration time.Duration `toml:"mute_duration"`
+}
+
+// AFKConfig controls auto-AFK and AFK kick.
+type AFKConfig struct {
+	AutoAfkTime time.Duration `toml:"auto_afk_time"`
+	KickTime    time.Duration `toml:"kick_time"`
+	KickMaxRank int           `toml:"kick_max_rank"`
 }
 
 // LogConfig controls structured logging output.
@@ -205,6 +213,11 @@ func Load(path string) (Config, error) {
 			CmdWindow:    5 * time.Second,
 			Action:       "kick",
 			MuteDuration: 60 * time.Second,
+		},
+		AFK: AFKConfig{
+			AutoAfkTime: 10 * time.Minute,
+			KickTime:    45 * time.Minute,
+			KickMaxRank: 80, // operator+ exempt
 		},
 		Log: LogConfig{
 			Level:  "info",
