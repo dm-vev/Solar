@@ -51,7 +51,7 @@ func setBlockCommand(ctx Context, args []string) (string, bool) {
 		return ctx.tr("command.shared.invalid_z", err), true
 	}
 	blockValue, err := strconv.Atoi(args[3])
-	if err != nil {
+	if err != nil || blockValue < 0 || blockValue > 255 {
 		return ctx.tr("command.shared.invalid_block", err), true
 	}
 

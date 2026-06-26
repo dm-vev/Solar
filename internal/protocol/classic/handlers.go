@@ -438,13 +438,34 @@ func (s *session) checkSpecialBlocks(x, y, z int) {
 		switch entry.Type {
 		case blocks.SpecialMessage:
 			if entry.Message != "" {
-				s.Message(entry.Message)
+				msg := strings.ReplaceAll(entry.Message, "@p", s.currentUsername())
+				// MCGalaxy: if message starts with /, execute as command.
+				// Supports piped commands: "text |/cmd1 |/cmd2"
+				if strings.HasPrefix(msg, "/") {
+					s.handleCommand(msg)
+				} else if idx := strings.Index(msg, " |/"); idx >= 0 {
+					text := msg[:idx]
+					if text != "" {
+						s.Message(text)
+					}
+					rest := msg[idx+3:] // skip " |/"
+					for _, part := range strings.Split(rest, " |/") {
+						cmd := strings.TrimSpace(part)
+						if cmd != "" {
+							s.handleCommand("/" + cmd)
+						}
+					}
+				} else {
+					s.Message(msg)
+				}
 			}
 		case blocks.SpecialPortal:
 			if entry.PortalLevel != "" {
-				// Cross-level portal — use gotoLevel if available.
+				// Cross-level portal — switch level, then teleport to destination.
 				if s.gotoLevel != nil {
-					s.gotoLevel(s, entry.PortalLevel)
+					if s.gotoLevel(s, entry.PortalLevel) {
+						s.teleportSelf(entry.PortalDst[0], entry.PortalDst[1], entry.PortalDst[2], s.Yaw(), s.Pitch())
+					}
 				}
 			} else {
 				// Same-level portal — teleport.
@@ -510,16 +531,34 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 		return fmt.Errorf("block position out of bounds: %d %d %d", x, y, z)
 	}
 
-	// Register special blocks (message blocks, portals, doors).
-	if placing && s.specialBlocks != nil {
-		if blocks.IsSpecialBlock(blockID) && !blocks.IsTNT(blockID) {
-			s.specialBlocks.Set(x, y, z, &blocks.SpecialEntry{
-				Type: specialBlockType(blockID),
-			})
-		}
-		// Remove special block entry if overwriting one.
-		if !placing || !blocks.IsSpecialBlock(blockID) {
-			s.specialBlocks.Remove(x, y, z)
+	// Register/remove special blocks.
+	if s.specialBlocks != nil {
+		if placing {
+			if blocks.IsSpecialBlock(blockID) && !blocks.IsTNT(blockID) {
+				s.specialBlocks.Set(x, y, z, &blocks.SpecialEntry{
+					Type: specialBlockType(blockID),
+				})
+			}
+			// Remove special block entry if overwriting one with a non-special block.
+			// But preserve door entries — the door toggle places solid blocks (Log, etc.)
+			// which are not special, and we must not delete the door's registry entry.
+			if !blocks.IsSpecialBlock(blockID) {
+				if existing := s.specialBlocks.Get(x, y, z); existing != nil {
+					if existing.Type != blocks.SpecialDoor {
+						s.specialBlocks.Remove(x, y, z)
+					}
+				}
+			}
+		} else {
+			// Block deleted (air) — remove any special block entry at this position.
+			// Door toggle uses applyBlockChange with blockID=0, but door entries
+			// must survive the toggle. We detect the door toggle by checking if
+			// the existing entry is a door — if so, keep it.
+			if existing := s.specialBlocks.Get(x, y, z); existing != nil {
+				if existing.Type != blocks.SpecialDoor {
+					s.specialBlocks.Remove(x, y, z)
+				}
+			}
 		}
 	}
 

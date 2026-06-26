@@ -30,6 +30,8 @@ const (
 	Leaves       byte = 18
 	Sponge       byte = 19
 	Glass        byte = 20
+	CoalOre      byte = 16
+	Obsidian     byte = 49
 	Fire         byte = 54
 	FastLava     byte = 112
 	FloatWood    byte = 110
@@ -263,18 +265,21 @@ func (e *PhysicsEngine) activateNeighbours(idx int) {
 
 func (e *PhysicsEngine) doLiquid(c *checkEntry, x, y, z int, block byte, isLava, adv bool) {
 	// Lava delay: upper 3 bits of data must reach 4<<5 (128) before flowing.
-	// Bit 7 (0x80) is set once delay expires and preserved across ticks
-	// to prevent re-delaying.
+	// Matches MCGalaxy SimpleLiquidPhysics.DoLava.
 	if isLava && block != FastLava {
-		if c.data&0x80 == 0 {
+		if c.data < (4 << 5) {
 			c.data += 1 << 5
-			if c.data < 0x80 {
-				return
-			}
+			return
 		}
 	}
 
-	// Random flow: 5 directions, 25% chance each per tick.
+	// Sponge check: if near sponge, remove this liquid block.
+	if e.checkSponge(c.index, isLava) {
+		e.setBlock(c.index, Air)
+		c.data = removeFlag
+		return
+	}
+
 	const (
 		flowedXMax = 1 << 0
 		flowedXMin = 1 << 1
@@ -285,50 +290,50 @@ func (e *PhysicsEngine) doLiquid(c *checkEntry, x, y, z int, block byte, isLava,
 	)
 
 	flow := c.data & flowedAll
-	done := true
 
-	// Down (-Y) — always try first.
-	if flow&flowedYMin == 0 {
-		if e.rng.Intn(4) == 0 || !e.liquidBlocked(e.posToInt(x, y-1, z), isLava, adv) {
-			e.trySpread(e.posToInt(x, y-1, z), block, isLava, adv)
-			flow |= flowedYMin
-		}
+	// Pass 1: random spread — 25% chance per direction per tick.
+	// Matches MCGalaxy DoWaterRandowFlow / DoLavaRandowFlow.
+	type dirInfo struct {
+		flag byte
+		idx  int
 	}
-	if flow&flowedXMax == 0 {
-		if e.rng.Intn(4) == 0 || !e.liquidBlocked(e.posToInt(x+1, y, z), isLava, adv) {
-			e.trySpread(e.posToInt(x+1, y, z), block, isLava, adv)
-			flow |= flowedXMax
-		}
+	dirs := [5]dirInfo{
+		{flowedXMax, e.posToInt(x + 1, y, z)},
+		{flowedXMin, e.posToInt(x - 1, y, z)},
+		{flowedZMax, e.posToInt(x, y, z + 1)},
+		{flowedZMin, e.posToInt(x, y, z - 1)},
+		{flowedYMin, e.posToInt(x, y - 1, z)},
 	}
-	if flow&flowedXMin == 0 {
-		if e.rng.Intn(4) == 0 || !e.liquidBlocked(e.posToInt(x-1, y, z), isLava, adv) {
-			e.trySpread(e.posToInt(x-1, y, z), block, isLava, adv)
-			flow |= flowedXMin
-		}
-	}
-	if flow&flowedZMax == 0 {
-		if e.rng.Intn(4) == 0 || !e.liquidBlocked(e.posToInt(x, y, z+1), isLava, adv) {
-			e.trySpread(e.posToInt(x, y, z+1), block, isLava, adv)
-			flow |= flowedZMax
-		}
-	}
-	if flow&flowedZMin == 0 {
-		if e.rng.Intn(4) == 0 || !e.liquidBlocked(e.posToInt(x, y, z-1), isLava, adv) {
-			e.trySpread(e.posToInt(x, y, z-1), block, isLava, adv)
-			flow |= flowedZMin
+
+	for _, d := range dirs {
+		if flow&d.flag == 0 && e.rng.Intn(4) == 0 {
+			e.trySpread(d.idx, block, isLava, adv)
+			flow |= d.flag
 		}
 	}
 
-	if flow != flowedAll {
-		done = false
+	// Pass 2: mark blocked directions (no spread, just mark as done).
+	// Matches MCGalaxy: if not flowed and blocked, mark flowed without spreading.
+	for _, d := range dirs {
+		if flow&d.flag == 0 && e.liquidBlocked(d.idx, isLava, adv) {
+			flow |= d.flag
+		}
 	}
 
-	if done {
-		c.data = removeFlag
-	} else {
-		// Preserve lava delay-done flag (bit 7) across ticks.
+	if flow == flowedAll {
+		// All directions handled — remove from checks.
+		// For lava (non-fast): re-randomize upper 3 bits for re-delay.
+		// Matches MCGalaxy DoLavaRandowFlow: data &= mask; data |= rand.Next(3)<<5
 		if isLava && block != FastLava {
-			c.data = flow | 0x80
+			c.data = byte(e.rng.Intn(3)) << 5
+		} else {
+			c.data = removeFlag
+		}
+	} else {
+		// Not all directions handled — keep in checks with updated flow data.
+		// For lava (non-fast): re-randomize upper 3 bits for re-delay.
+		if isLava && block != FastLava {
+			c.data = flow | byte(e.rng.Intn(3))<<5
 		} else {
 			c.data = flow
 		}
@@ -346,8 +351,20 @@ func (e *PhysicsEngine) liquidBlocked(idx int, isLava, adv bool) bool {
 		return isLava
 	case Sand, Gravel, FloatWood:
 		return false
+	default:
+		// In advanced mode, blocks that water/lava kills are not blocked.
+		// Matches MCGalaxy WaterBlocked/LavaBlocked: if Props.WaterKills/LavaKills
+		// and physics > 1, the liquid can spread into the block.
+		if adv {
+			if isLava && e.lavaKills(b) {
+				return false
+			}
+			if !isLava && e.waterKills(b) {
+				return false
+			}
+		}
+		return true
 	}
-	return true
 }
 
 func (e *PhysicsEngine) trySpread(idx int, block byte, isLava, adv bool) {
@@ -406,56 +423,49 @@ func (e *PhysicsEngine) checkSponge(idx int, isLava bool) bool {
 }
 
 // ─── sand / gravel falling ───
+// Matches MCGalaxy OtherPhysics.DoFalling:
+// - Advanced: scans one block down, moves there (one block per tick).
+// - Normal: scans all the way down, lands one above first solid.
 
 func (e *PhysicsEngine) doFalling(c *checkEntry, x, y, z int, block byte, adv bool) {
 	idx := e.posToInt(x, y, z)
 	movedDown := false
+	landIdx := -1
 
 	for yCur := y - 1; yCur >= 0; yCur-- {
-		below := e.getBlock(e.posToInt(x, yCur, z))
-		if below == Invalid {
-			break
-		}
+		belowIdx := e.posToInt(x, yCur, z)
+		below := e.getBlock(belowIdx)
+		hitBlock := false
+
 		switch below {
 		case Air, Water, StillWater, Lava, StillLava:
 			movedDown = true
-			continue
+			landIdx = belowIdx
 		case Sapling:
 			if adv {
 				movedDown = true
-				continue
+				landIdx = belowIdx
+			} else {
+				hitBlock = true
 			}
+		default:
+			hitBlock = true
 		}
-		break
+
+		if hitBlock {
+			if !adv {
+				landIdx = e.posToInt(x, yCur+1, z)
+			}
+			break
+		}
+		if adv {
+			break
+		}
 	}
 
-	if movedDown {
+	if movedDown && landIdx >= 0 {
 		e.setBlock(idx, Air)
-		if adv {
-			// Advanced: land exactly at hit position.
-			landIdx := e.posToInt(x, y-1, z)
-			for yCur := y - 1; yCur >= 0; yCur-- {
-				below := e.getBlock(e.posToInt(x, yCur, z))
-				if below == Air || below == Water || below == StillWater || below == Lava || below == StillLava {
-					landIdx = e.posToInt(x, yCur, z)
-					continue
-				}
-				break
-			}
-			e.setBlock(landIdx, block)
-		} else {
-			// Normal: land one above the first solid block.
-			landY := y - 1
-			for yCur := y - 1; yCur >= 0; yCur-- {
-				below := e.getBlock(e.posToInt(x, yCur, z))
-				if below == Air || below == Water || below == StillWater || below == Lava || below == StillLava {
-					landY = yCur
-					continue
-				}
-				break
-			}
-			e.setBlock(e.posToInt(x, landY, z), block)
-		}
+		e.setBlock(landIdx, block)
 		e.activateNeighbours(idx)
 	}
 	c.data = removeFlag
@@ -496,6 +506,9 @@ func (e *PhysicsEngine) lightPasses(b byte) bool {
 }
 
 // ─── leaf decay ───
+// Matches MCGalaxy LeafPhysics.DoLeafDecay: flood-fill distance through
+// leaves. A leaf survives only if a log is reachable via a path of leaves
+// within 4 steps.
 
 func (e *PhysicsEngine) doLeafDecay(c *checkEntry, x, y, z int) {
 	if c.data < 5 {
@@ -504,27 +517,87 @@ func (e *PhysicsEngine) doLeafDecay(c *checkEntry, x, y, z int) {
 		}
 		return
 	}
-	// Search for log within range 4.
-	if !e.hasNearbyLog(x, y, z) {
+	if !e.leafConnectedToLog(x, y, z) {
 		e.setBlock(c.index, Air)
 	}
 	c.data = removeFlag
 }
 
-func (e *PhysicsEngine) hasNearbyLog(x, y, z int) bool {
-	for dy := -4; dy <= 4; dy++ {
-		for dz := -4; dz <= 4; dz++ {
-			for dx := -4; dx <= 4; dx++ {
-				if e.getBlock(e.posToInt(x+dx, y+dy, z+dz)) == Log {
-					return true
+// leafConnectedToLog implements MCGalaxy's DoLeafDecay flood-fill:
+//   - 9×9×9 grid centered on the leaf (range 4)
+//   - Log = distance 0, Leaves = unvisited (-2), Other = wall (-1)
+//   - Propagate distances from logs through adjacent leaves (BFS)
+//   - Leaf survives if its distance >= 0 (connected to a log through leaves)
+const leafRange = 4
+
+func (e *PhysicsEngine) leafConnectedToLog(x, y, z int) bool {
+	const size = leafRange*2 + 1 // 9
+	dists := make([]int, size*size*size)
+
+	idx := 0
+	for dy := -leafRange; dy <= leafRange; dy++ {
+		for dz := -leafRange; dz <= leafRange; dz++ {
+			for dx := -leafRange; dx <= leafRange; dx++ {
+				b := e.getBlock(e.posToInt(x+dx, y+dy, z+dz))
+				switch b {
+				case Log:
+					dists[idx] = 0
+				case Leaves:
+					dists[idx] = -2
+				default:
+					dists[idx] = -1
+				}
+				idx++
+			}
+		}
+	}
+
+	const oneX = 1
+	const oneZ = size
+	const oneY = size * size
+
+	for dist := 1; dist <= leafRange; dist++ {
+		idx = 0
+		for dy := -leafRange; dy <= leafRange; dy++ {
+			for dz := -leafRange; dz <= leafRange; dz++ {
+				for dx := -leafRange; dx <= leafRange; dx++ {
+					if dists[idx] != dist-1 {
+						idx++
+						continue
+					}
+					if dx > -leafRange && dists[idx-oneX] == -2 {
+						dists[idx-oneX] = dist
+					}
+					if dx < leafRange && dists[idx+oneX] == -2 {
+						dists[idx+oneX] = dist
+					}
+					if dy > -leafRange && dists[idx-oneY] == -2 {
+						dists[idx-oneY] = dist
+					}
+					if dy < leafRange && dists[idx+oneY] == -2 {
+						dists[idx+oneY] = dist
+					}
+					if dz > -leafRange && dists[idx-oneZ] == -2 {
+						dists[idx-oneZ] = dist
+					}
+					if dz < leafRange && dists[idx+oneZ] == -2 {
+						dists[idx+oneZ] = dist
+					}
+					idx++
 				}
 			}
 		}
 	}
-	return false
+
+	center := leafRange*oneX + leafRange*oneY + leafRange*oneZ
+	return dists[center] >= 0
 }
 
 // ─── fire spread ───
+// Matches MCGalaxy FirePhysics.Do:
+// - Spread chance: 1/19 per tick (rand.Next(1,20)==1)
+// - Advanced: diagonal expansion + direct neighbor expansion
+// - Burnout: CoalOre (20%), Obsidian (20%), Air (40%), keep burning (10%)
 
 func (e *PhysicsEngine) doFire(c *checkEntry, x, y, z int, adv bool) {
 	if c.data < 2 {
@@ -532,39 +605,50 @@ func (e *PhysicsEngine) doFire(c *checkEntry, x, y, z int, adv bool) {
 		return
 	}
 
-	// Random spread to adjacent air.
-	if e.rng.Intn(20) == 0 && c.data%2 == 0 {
-		dir := e.rng.Intn(6)
-		dx, dy, dz := 0, 0, 0
-		switch dir {
-		case 0:
-			dx = -1
-		case 1:
-			dx = 1
-		case 2:
-			dy = -1
-		case 3:
-			dy = 1
-		case 4:
-			dz = -1
-		case 5:
-			dz = 1
-		}
-		nidx := e.posToInt(x+dx, y+dy, z+dz)
-		if e.getBlock(nidx) == Air {
-			e.setBlock(nidx, Fire)
+	// Random spread to adjacent air (1/19 chance).
+	if e.rng.Intn(19) == 0 && c.data%2 == 0 {
+		max := e.rng.Intn(18) + 1 // 1..18, matching rand.Next(1, 19)
+		switch {
+		case max <= 3:
+			e.expandToAir(x-1, y, z)
+		case max <= 6:
+			e.expandToAir(x+1, y, z)
+		case max <= 9:
+			e.expandToAir(x, y-1, z)
+		case max <= 12:
+			e.expandToAir(x, y+1, z)
+		case max <= 15:
+			e.expandToAir(x, y, z-1)
+		case max <= 18:
+			e.expandToAir(x, y, z+1)
 		}
 	}
 
 	if adv {
-		// Spread to adjacent flammable blocks.
-		if c.data >= 4 {
-			for _, off := range [6][3]int{{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}} {
-				nidx := e.posToInt(x+off[0], y+off[1], z+off[2])
-				nb := e.getBlock(nidx)
-				if e.lavaKills(nb) && nb != Air {
-					e.setBlock(nidx, Fire)
+		// Diagonal expansion: check 12 diagonal positions for flammable blocks.
+		// If flammable, set fire to the axis-aligned blocks between.
+		for dy := -1; dy <= 1; dy++ {
+			for _, dz := range [2]int{-1, 1} {
+				for _, dx := range [2]int{-1, 1} {
+					e.expandDiagonal(x, y, z, dx, dy, dz)
 				}
+			}
+		}
+
+		// Delay before direct neighbor expansion.
+		if c.data < 4 {
+			c.data++
+			return
+		}
+
+		// Direct neighbor expansion: TNT → explosion, flammable → fire.
+		for _, off := range [6][3]int{{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}} {
+			nidx := e.posToInt(x+off[0], y+off[1], z+off[2])
+			nb := e.getBlock(nidx)
+			if nb == TNTSmall {
+				e.makeExplosion(x+off[0], y+off[1], z+off[2], 0)
+			} else if nb != Air && e.lavaKills(nb) {
+				e.setBlock(nidx, Fire)
 			}
 		}
 	}
@@ -572,14 +656,43 @@ func (e *PhysicsEngine) doFire(c *checkEntry, x, y, z int, adv bool) {
 	// Burnout.
 	c.data++
 	if c.data > 5 {
-		r := e.rng.Intn(10)
-		if r < 2 {
+		r := e.rng.Intn(9) + 1 // 1..9, matching rand.Next(1, 10)
+		switch {
+		case r <= 2:
+			e.setBlock(c.index, CoalOre)
+		case r <= 4:
+			e.setBlock(c.index, Obsidian)
+		case r <= 8:
 			e.setBlock(c.index, Air)
-		} else if r < 4 {
+		default:
 			c.data = 3 // keep burning
-		} else {
-			e.setBlock(c.index, Air)
 		}
+	}
+}
+
+func (e *PhysicsEngine) expandToAir(x, y, z int) {
+	idx := e.posToInt(x, y, z)
+	if e.getBlock(idx) == Air {
+		e.setBlock(idx, Fire)
+	}
+}
+
+// expandDiagonal checks if the block at the diagonal position is flammable.
+// If so, sets fire to the axis-aligned blocks between the fire and the diagonal.
+// Matches MCGalaxy FirePhysics.ExpandDiagonal.
+func (e *PhysicsEngine) expandDiagonal(x, y, z, dx, dy, dz int) {
+	b := e.getBlock(e.posToInt(x+dx, y+dy, z+dz))
+	if b == Air || !e.lavaKills(b) {
+		return
+	}
+	if dx != 0 {
+		e.setBlock(e.posToInt(x+dx, y, z), Fire)
+	}
+	if dy != 0 {
+		e.setBlock(e.posToInt(x, y+dy, z), Fire)
+	}
+	if dz != 0 {
+		e.setBlock(e.posToInt(x, y, z+dz), Fire)
 	}
 }
 
