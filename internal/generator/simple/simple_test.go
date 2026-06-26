@@ -33,6 +33,55 @@ func TestSimpleEmptyGenerator(t *testing.T) {
 	}
 }
 
+func TestSimplePixelGenerator(t *testing.T) {
+	gen := mustFind(t, "Pixel")
+	lvl, err := core.Generate(gen, "pixel", 4, 4, 4, core.Args{})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if got := lvl.Spawn.Y; got != 2 {
+		t.Fatalf("spawn y = %d, want 2", got)
+	}
+	if got := core.GetBlock(lvl, 0, 0, 0); got != core.Bedrock {
+		t.Fatalf("bottom block = %d, want bedrock", got)
+	}
+	if got := core.GetBlock(lvl, 0, 2, 2); got != core.WhiteWool {
+		t.Fatalf("wall block = %d, want white wool", got)
+	}
+}
+
+func TestSimpleSpaceGenerator(t *testing.T) {
+	gen := mustFind(t, "Space")
+	lvl, err := core.Generate(gen, "space", 4, 4, 4, core.Args{Seed: 1})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if got := lvl.Spawn.Y; got != 3 {
+		t.Fatalf("spawn y = %d, want 3", got)
+	}
+	if got := core.GetBlock(lvl, 0, 0, 0); got != core.Bedrock {
+		t.Fatalf("bottom block = %d, want bedrock", got)
+	}
+	if got := core.GetBlock(lvl, 1, 3, 1); got != core.Obsidian {
+		t.Fatalf("top block = %d, want obsidian", got)
+	}
+}
+
+func TestSimpleRainbowGenerator(t *testing.T) {
+	gen := mustFind(t, "Rainbow")
+	lvl, err := core.Generate(gen, "rainbow", 4, 4, 4, core.Args{Seed: 2})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if got := lvl.Spawn.Y; got != 2 {
+		t.Fatalf("spawn y = %d, want 2", got)
+	}
+	block := core.GetBlock(lvl, 0, 0, 0)
+	if block < core.RedWool || block > core.WhiteWool {
+		t.Fatalf("rainbow block = %d, want wool range", block)
+	}
+}
+
 func TestModuleRegistersGenerators(t *testing.T) {
 	registry := core.NewRegistry()
 	registry.RegisterModule(simple.Module)

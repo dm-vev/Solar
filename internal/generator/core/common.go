@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync/atomic"
 )
 
 const (
@@ -121,13 +122,17 @@ func NewLevel(name string, width, height, length int) *Level {
 
 // genMaxBlocks is the hard cap on generated world volume. Set once at
 // startup via SetMaxBlocks; defaults to 64M blocks.
-var genMaxBlocks int64 = 64 * 1024 * 1024
+var genMaxBlocks atomic.Int64
+
+func init() {
+	genMaxBlocks.Store(64 * 1024 * 1024)
+}
 
 // SetMaxBlocks updates the generator volume limit. Must be called
 // before any world is generated.
 func SetMaxBlocks(n int) {
 	if n > 0 {
-		genMaxBlocks = int64(n)
+		genMaxBlocks.Store(int64(n))
 	}
 }
 
@@ -137,8 +142,9 @@ func ValidateDimensions(width, height, length int) error {
 		return errors.New("dimensions must be positive")
 	}
 	volume := int64(width) * int64(height) * int64(length)
-	if volume > genMaxBlocks {
-		return fmt.Errorf("volume %d exceeds limit %d", volume, genMaxBlocks)
+	limit := genMaxBlocks.Load()
+	if volume > limit {
+		return fmt.Errorf("volume %d exceeds limit %d", volume, limit)
 	}
 	return nil
 }

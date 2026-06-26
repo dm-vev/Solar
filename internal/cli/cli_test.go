@@ -1,6 +1,9 @@
 package cli
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseStartConfig(t *testing.T) {
 	cmd, err := Parse([]string{"start", "--config", "tmp/server.toml"})
@@ -63,5 +66,19 @@ func TestParseLoadTest(t *testing.T) {
 	}
 	if !cmd.CPE {
 		t.Fatal("CPE = false, want true")
+	}
+}
+
+func TestHelpIncludesAllCommands(t *testing.T) {
+	help := Help()
+	for _, want := range []string{
+		"solar start",
+		"solar loadtest",
+		"solar version",
+		"solar help",
+	} {
+		if !strings.Contains(help, want) {
+			t.Fatalf("Help() missing %q in %q", want, help)
+		}
 	}
 }

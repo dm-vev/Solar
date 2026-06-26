@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/solar-mc/solar/internal/generator"
 )
 
 func TestLevelSaveLoadRoundTrip(t *testing.T) {
@@ -72,7 +74,7 @@ func TestLoadLevelRejectsOversizedBlockPayload(t *testing.T) {
 	_ = binary.Write(&data, binary.LittleEndian, int32(0))
 	data.WriteByte(0)
 	data.WriteByte(0)
-	_ = binary.Write(&data, binary.LittleEndian, uint32(maxBlocks+1))
+	_ = binary.Write(&data, binary.LittleEndian, uint32(MaxBlocks()+1))
 
 	path := filepath.Join(t.TempDir(), "oversized.world")
 	if err := os.WriteFile(path, data.Bytes(), 0o644); err != nil {
@@ -149,6 +151,41 @@ func TestManagerSetSpawn(t *testing.T) {
 	}
 	if got.Spawn.Yaw != 44 || got.Spawn.Pitch != 55 {
 		t.Fatalf("spawn rotation = %+v, want 44,55", got.Spawn)
+	}
+}
+
+func TestFromGeneratorLevelAndMaxBlocks(t *testing.T) {
+	t.Parallel()
+
+	oldMax := MaxBlocks()
+	t.Cleanup(func() { SetMaxBlocks(int(oldMax)) })
+
+	SetMaxBlocks(12345)
+	if got := MaxBlocks(); got != 12345 {
+		t.Fatalf("MaxBlocks = %d, want 12345", got)
+	}
+	SetMaxBlocks(0)
+	if got := MaxBlocks(); got != 12345 {
+		t.Fatalf("MaxBlocks after zero set = %d, want unchanged 12345", got)
+	}
+
+	src := &generator.Level{
+		Name:   "gen",
+		Width:  2,
+		Height: 2,
+		Length: 2,
+		Blocks: []byte{1, 2, 3},
+		Spawn:  generator.Spawn{X: 1, Y: 2, Z: 3, Yaw: 4, Pitch: 5},
+	}
+	got := FromGeneratorLevel(src)
+	if got.Name != src.Name || got.Width != src.Width || got.Height != src.Height || got.Length != src.Length {
+		t.Fatalf("converted dimensions = %+v", got)
+	}
+	if got.Spawn != (Spawn{X: 1, Y: 2, Z: 3, Yaw: 4, Pitch: 5}) {
+		t.Fatalf("converted spawn = %+v", got.Spawn)
+	}
+	if !bytes.Equal(got.Blocks, src.Blocks) {
+		t.Fatalf("converted blocks = %v, want %v", got.Blocks, src.Blocks)
 	}
 }
 

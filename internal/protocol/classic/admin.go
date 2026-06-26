@@ -23,6 +23,7 @@ package classic
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -101,6 +102,7 @@ func (s *session) TeleportToPlayer(name string) bool {
 	}
 	s.saveLastPos()
 	tx, ty, tz := target.Position()
+	tx, ty, tz = wireCoordsToBlocks(tx, ty, tz)
 	targetYaw, targetPitch := target.Yaw(), target.Pitch()
 	return s.teleportSelf(tx, ty, tz, targetYaw, targetPitch)
 }
@@ -112,6 +114,7 @@ func (s *session) SummonPlayer(name string) bool {
 	}
 	target.saveLastPos()
 	mx, my, mz := s.Position()
+	mx, my, mz = wireCoordsToBlocks(mx, my, mz)
 	myaw, mpitch := s.Yaw(), s.Pitch()
 	return target.teleportSelf(mx, my, mz, myaw, mpitch)
 }
@@ -138,6 +141,7 @@ func (s *session) BackToLastPos() bool {
 
 func (s *session) saveLastPos() {
 	x, y, z := s.Position()
+	x, y, z = wireCoordsToBlocks(x, y, z)
 	s.lastTeleportPos = [3]int{x, y, z}
 	s.lastTeleportValid = true
 }
@@ -352,17 +356,33 @@ func (s *session) RedoBatch() []command.UndoChange {
 // ─── Rank methods ───
 
 func (s *session) PlayerRank() int {
+	perm := ranks.PermGuest
 	if s.rankRegistry == nil {
-		return ranks.PermGuest
+		if s.players != nil && s.players.IsOperator(s.currentUsername()) {
+			return ranks.PermOperator
+		}
+		return perm
 	}
-	return s.rankRegistry.GetPlayerRank(s.currentUsername())
+	perm = s.rankRegistry.GetPlayerRank(s.currentUsername())
+	if perm < ranks.PermOperator && s.players != nil && s.players.IsOperator(s.currentUsername()) {
+		return ranks.PermOperator
+	}
+	return perm
 }
 
 func (s *session) RankGetPlayer(name string) int {
+	perm := ranks.PermGuest
 	if s.rankRegistry == nil {
-		return ranks.PermGuest
+		if s.players != nil && s.players.IsOperator(name) {
+			return ranks.PermOperator
+		}
+		return perm
 	}
-	return s.rankRegistry.GetPlayerRank(name)
+	perm = s.rankRegistry.GetPlayerRank(name)
+	if perm < ranks.PermOperator && s.players != nil && s.players.IsOperator(name) {
+		return ranks.PermOperator
+	}
+	return perm
 }
 
 func (s *session) RankGet(name string) *ranks.Rank {
@@ -777,6 +797,17 @@ func (s *session) generateWorld(name, theme string, width, height, length int, s
 	}
 
 	w := world.FromGeneratorLevel(lvl)
+	if s.worldPath != "" && s.loadLevel != nil {
+		mgr := world.NewManager()
+		mgr.SetCurrent(w)
+		path := filepath.Join(filepath.Dir(s.worldPath), name+filepath.Ext(s.worldPath))
+		if err := mgr.Save(path); err != nil {
+			s.logger.Debug("save generated level", "path", path, "error", err)
+			return false
+		}
+		return s.loadLevel(name)
+	}
+
 	s.worlds.SetCurrent(w)
 
 	if err := s.sendLevel(s.currentSupportsFastMap()); err != nil {
@@ -788,6 +819,10 @@ func (s *session) generateWorld(name, theme string, width, height, length int, s
 
 func entityPosition(x, y, z int) entity.Position {
 	return entity.Position{X: x * coordScale, Y: y * coordScale, Z: z * coordScale}
+}
+
+func wireCoordsToBlocks(x, y, z int) (int, int, int) {
+	return x / coordScale, y / coordScale, z / coordScale
 }
 
 // --- Block definition methods ---
@@ -965,6 +1000,7 @@ func (s *session) CurrentPhysicsMode() int {
 }
 
 func (s *session) SetCurrentPhysicsMode(mode int) {
+	_ = mode
 	// ponytail: physics mode is on pluginServer, not session. No-op for now.
 }
 

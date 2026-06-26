@@ -93,6 +93,30 @@ func TestJSONDB_Search(t *testing.T) {
 	}
 }
 
+func TestJSONDB_ListSortedCopy(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "playerdb.json")
+	db, err := New(path)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	db.Save(&playerdb.PlayerEntry{Name: "Charlie", LoginCount: 1})
+	db.Save(&playerdb.PlayerEntry{Name: "alice", LoginCount: 2})
+	db.Save(&playerdb.PlayerEntry{Name: "Bob", LoginCount: 3})
+
+	results := db.List()
+	if len(results) != 3 {
+		t.Fatalf("List = %d results, want 3", len(results))
+	}
+	if results[0].Name != "alice" || results[1].Name != "Bob" || results[2].Name != "Charlie" {
+		t.Fatalf("List order = %q, %q, %q", results[0].Name, results[1].Name, results[2].Name)
+	}
+	results[0].LoginCount = 99
+	if got := db.Get("alice").LoginCount; got != 2 {
+		t.Fatalf("List returned mutable entry, stored LoginCount = %d", got)
+	}
+}
+
 func TestJSONDB_Count(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "playerdb.json")
 	db, err := New(path)

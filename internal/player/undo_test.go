@@ -62,3 +62,16 @@ func TestMaxLimit(t *testing.T) {
 		t.Fatal("should only keep max batches")
 	}
 }
+
+func TestUndoClear(t *testing.T) {
+	u := NewUndoStack(10)
+	u.Push([]BlockChange{{0, 0, 0, 1, 2}})
+	u.Undo()
+	u.Push([]BlockChange{{1, 0, 0, 3, 4}})
+	u.Undo()
+
+	u.Clear()
+	if u.CanUndo() || u.CanRedo() {
+		t.Fatal("Clear should empty undo and redo stacks")
+	}
+}

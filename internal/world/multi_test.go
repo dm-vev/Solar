@@ -19,6 +19,9 @@ func TestMultiManagerBasic(t *testing.T) {
 	if mm.Get("MAIN") != main {
 		t.Fatal("Get(MAIN) should return main manager (case-insensitive)")
 	}
+	if got := mm.Path("MAIN"); got != "/tmp/main.swld" {
+		t.Fatalf("Path(MAIN) = %q", got)
+	}
 
 	second := NewManager()
 	mm.Add("Other", second, "/tmp/other.swld")

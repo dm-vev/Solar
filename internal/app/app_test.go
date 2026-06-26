@@ -2,9 +2,12 @@ package app
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/solar-mc/solar/internal/config"
 )
@@ -88,5 +91,96 @@ func TestLoadBlockDefinitionsRejectsInvalidJSON(t *testing.T) {
 	}
 	if _, err := loadBlockDefinitions(cfg); err == nil {
 		t.Fatal("expected invalid block definitions to fail startup")
+	}
+}
+
+func TestBuildServerWiresBootstrapSystems(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cfg := bootstrapTestConfig(t)
+	srv, err := buildServer(ctx, cfg)
+	if err != nil {
+		t.Fatalf("buildServer returned error: %v", err)
+	}
+	if srv == nil {
+		t.Fatal("buildServer returned nil server")
+	}
+}
+
+func TestLoadTranslationsFallbackForMissingFile(t *testing.T) {
+	t.Parallel()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	translations := loadTranslations(config.Config{
+		Language: config.LanguageConfig{Default: "en", File: filepath.Join(t.TempDir(), "missing.toml")},
+	}, logger)
+	if translations.Get("en", "missing.key") != "missing.key" {
+		t.Fatal("missing translation did not fall back to key")
+	}
+}
+
+func bootstrapTestConfig(t *testing.T) config.Config {
+	t.Helper()
+
+	dataDir := t.TempDir()
+	languagePath := filepath.Join(dataDir, "language.toml")
+	if err := os.WriteFile(languagePath, []byte(`[en]
+"server.shutdown.msg" = "bye"
+`), 0o644); err != nil {
+		t.Fatalf("write language file: %v", err)
+	}
+
+	return config.Config{
+		ListenAddress:    "127.0.0.1:0",
+		DataDir:          dataDir,
+		Workers:          1,
+		MaxPlayers:       4,
+		ConnectRate:      1,
+		Autosave:         0,
+		DefaultGenerator: "Classic",
+		Name:             "Solar",
+		MOTD:             "Test",
+		Network: config.NetworkConfig{
+			ReadTimeout:     time.Second,
+			WriteTimeout:    time.Second,
+			TCPNoDelay:      true,
+			SessionOutbox:   8,
+			WriteBatchSize:  4,
+			SendTimeout:     time.Millisecond,
+			SendTimeoutMode: "fixed",
+		},
+		Simulation: config.SimConfig{TickInterval: time.Millisecond},
+		World: config.WorldConfig{
+			DefaultWidth:  4,
+			DefaultHeight: 4,
+			DefaultLength: 4,
+			MaxBlocks:     1024,
+		},
+		Storage: config.StorageConfig{
+			WorldsDir:     "worlds",
+			PlayersDir:    "players",
+			PolicyFile:    "policy.json",
+			WorldFileExt:  ".swld",
+			MainWorldName: "main",
+			BlockDefsDir:  "blockdefs",
+		},
+		Player: config.PlayerConfig{
+			MaxUsernameLength: 32,
+		},
+		Plugins: config.PluginsConfig{
+			Enabled: true,
+			Dir:     "plugins",
+		},
+		Lua: config.LuaConfig{
+			Enabled: true,
+			Dir:     "lua",
+		},
+		Language: config.LanguageConfig{
+			Default: "en",
+			File:    languagePath,
+		},
 	}
 }

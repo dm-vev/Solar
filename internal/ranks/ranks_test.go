@@ -1,6 +1,10 @@
 package ranks
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/solar-mc/solar/plugin/playerdb"
+)
 
 func TestDefaultRanks(t *testing.T) {
 	r := NewRegistry()
@@ -55,3 +59,51 @@ func TestDefaultRank(t *testing.T) {
 		t.Fatal("default rank should be guest")
 	}
 }
+
+func TestPlayerRankPersistence(t *testing.T) {
+	db := &rankTestDB{entries: make(map[string]*playerdb.PlayerEntry)}
+	r := NewRegistry()
+	r.SetPlayerDB(db)
+
+	if got := r.GetPlayerRank("alice"); got != PermGuest {
+		t.Fatalf("initial rank = %d, want guest", got)
+	}
+	if !r.SetPlayerRank("alice", PermOperator) {
+		t.Fatal("SetPlayerRank returned false")
+	}
+	if got := r.GetPlayerRank("alice"); got != PermOperator {
+		t.Fatalf("rank = %d, want operator", got)
+	}
+
+	db.entries["bad"] = &playerdb.PlayerEntry{Name: "bad", Data: map[string]string{"rank": "not-int"}}
+	if got := r.GetPlayerRank("bad"); got != PermGuest {
+		t.Fatalf("bad rank = %d, want guest", got)
+	}
+}
+
+type rankTestDB struct {
+	entries map[string]*playerdb.PlayerEntry
+}
+
+func (d *rankTestDB) Get(name string) *playerdb.PlayerEntry {
+	return d.entries[name]
+}
+
+func (d *rankTestDB) Save(entry *playerdb.PlayerEntry) {
+	d.entries[entry.Name] = entry
+}
+
+func (d *rankTestDB) Delete(name string) bool {
+	if _, ok := d.entries[name]; !ok {
+		return false
+	}
+	delete(d.entries, name)
+	return true
+}
+
+func (d *rankTestDB) List() []*playerdb.PlayerEntry { return nil }
+func (d *rankTestDB) Search(string) []*playerdb.PlayerEntry {
+	return nil
+}
+func (d *rankTestDB) Count() int   { return len(d.entries) }
+func (d *rankTestDB) Flush() error { return nil }

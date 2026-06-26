@@ -139,7 +139,14 @@ func TestFileDB_Disabled(t *testing.T) {
 	db.SetEnabled(false)
 	db.Add(blockdb.Entry{PlayerID: 1, Time: time.Now(), X: 1, Y: 1, Z: 1, OldBlock: 0, NewBlock: 7})
 
+	if db.Enabled() {
+		t.Fatal("Enabled returned true after SetEnabled(false)")
+	}
 	if db.Count() != 0 {
 		t.Fatalf("Count when disabled = %d, want 0", db.Count())
+	}
+	db.SetEnabled(true)
+	if !db.Enabled() {
+		t.Fatal("Enabled returned false after SetEnabled(true)")
 	}
 }

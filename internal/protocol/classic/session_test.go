@@ -6,7 +6,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"log/slog"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
+	"github.com/solar-mc/solar/internal/generator"
 	"github.com/solar-mc/solar/internal/player"
 	"github.com/solar-mc/solar/internal/ranks"
 	"github.com/solar-mc/solar/internal/worker"
@@ -756,6 +759,104 @@ func TestServeConnExecutesTeleportAndSetSpawnCommands(t *testing.T) {
 		t.Fatalf("close client: %v", err)
 	}
 	<-done
+}
+
+func TestServeConnPolicyOperatorCanUseRankedCommand(t *testing.T) {
+	t.Parallel()
+
+	worlds := world.NewManager()
+	players := player.NewRegistry()
+	players.AddOperators("tester")
+	entities := entity.NewManager()
+
+	server, client := net.Pipe()
+	done := make(chan struct{})
+	go func() {
+		codec := NewCodec("Solar", "CLI-only classic server", worlds, players, entities, command.NewRegistry())
+		codec.SetCommandContextBuilder(func(backend SessionBackend) command.Context {
+			position, yaw, pitch := backend.CurrentLocation()
+			return command.Context{
+				Username: backend.CurrentUsername(),
+				Position: command.Position{
+					X: position.X,
+					Y: position.Y,
+					Z: position.Z,
+				},
+				Yaw:       yaw,
+				Pitch:     pitch,
+				Authority: testAuthority{backend: backend},
+				World:     testWorldSvc{backend: backend},
+				Tr:        backend.Translate,
+				RankLevel: func() int { return backend.PlayerRank() },
+			}
+		})
+		codec.ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	loginAndDrain(t, client, 5, "tester", opcodePing)
+
+	if _, err := client.Write(encodeClientMessage("/tp 24 32 40")); err != nil {
+		t.Fatalf("write tp command: %v", err)
+	}
+
+	reply := make([]byte, 66)
+	for {
+		if _, err := io.ReadFull(client, reply[:1]); err != nil {
+			t.Fatalf("read tp reply opcode: %v", err)
+		}
+		switch reply[0] {
+		case opcodeMessage:
+			if _, err := io.ReadFull(client, reply[1:]); err != nil {
+				t.Fatalf("read tp reply: %v", err)
+			}
+			text := strings.TrimRight(string(reply[2:66]), " \x00")
+			if strings.Contains(text, "command.shared.permission_denied") {
+				t.Fatalf("tp reply = %q, want policy operator to pass rank check", text)
+			}
+			if !strings.Contains(text, "command.teleport.done") {
+				t.Fatalf("tp reply = %q, want command.teleport.done", text)
+			}
+			if err := client.Close(); err != nil {
+				t.Fatalf("close client: %v", err)
+			}
+			<-done
+			return
+		case opcodeEntityTeleport:
+			if _, err := io.ReadFull(client, make([]byte, 9)); err != nil {
+				t.Fatalf("read teleport packet: %v", err)
+			}
+		default:
+			t.Fatalf("tp packet opcode = %d, want message or teleport", reply[0])
+		}
+	}
+}
+
+func TestGenerateWorldPersistsAndLoadsNamedLevel(t *testing.T) {
+	t.Parallel()
+
+	generator.RegisterDefaults()
+	dir := t.TempDir()
+	loaded := ""
+	s := &session{
+		worlds:    world.NewManager(),
+		worldPath: filepath.Join(dir, "main.swld"),
+		loadLevel: func(name string) bool {
+			loaded = name
+			return true
+		},
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+
+	if !s.generateWorld("test", "Flat", 16, 16, 16, "") {
+		t.Fatal("generateWorld returned false")
+	}
+	if loaded != "test" {
+		t.Fatalf("loaded level = %q, want test", loaded)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "test.swld")); err != nil {
+		t.Fatalf("generated level file: %v", err)
+	}
 }
 
 func TestServeConnKicksPlayerByName(t *testing.T) {

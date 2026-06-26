@@ -5,41 +5,27 @@ import (
 	"testing"
 )
 
-func TestLocalStorePaths(t *testing.T) {
-	t.Parallel()
-
+func TestLocalStoreConfigureAndBlockDBPaths(t *testing.T) {
 	root := t.TempDir()
 	store := NewLocalStore(root)
+	store.Configure("maps", "users", "policy-custom.json", ".cw")
 
-	if got := store.WorldsDir(); got != filepath.Join(root, "worlds") {
-		t.Fatalf("WorldsDir = %q, want %q", got, filepath.Join(root, "worlds"))
+	if got := store.WorldsDir(); got != filepath.Join(root, "maps") {
+		t.Fatalf("WorldsDir = %q", got)
 	}
-	if got := store.PlayersDir(); got != filepath.Join(root, "players") {
-		t.Fatalf("PlayersDir = %q, want %q", got, filepath.Join(root, "players"))
+	if got := store.PlayersDir(); got != filepath.Join(root, "users") {
+		t.Fatalf("PlayersDir = %q", got)
 	}
-}
-
-func TestWorldFile(t *testing.T) {
-	t.Parallel()
-
-	root := t.TempDir()
-	store := NewLocalStore(root)
-
-	if got := store.WorldFile("main"); got != filepath.Join(root, "worlds", "main.swld") {
-		t.Fatalf("WorldFile(main) = %q, want %q", got, filepath.Join(root, "worlds", "main.swld"))
+	if got := store.WorldFile("main"); got != filepath.Join(root, "maps", "main.cw") {
+		t.Fatalf("WorldFile = %q", got)
 	}
-	if got := store.WorldFile("arena"); got != filepath.Join(root, "worlds", "arena.swld") {
-		t.Fatalf("WorldFile(arena) = %q, want %q", got, filepath.Join(root, "worlds", "arena.swld"))
+	if got := store.PlayerPolicyFile(); got != filepath.Join(root, "users", "policy-custom.json") {
+		t.Fatalf("PlayerPolicyFile = %q", got)
 	}
-}
-
-func TestPlayerPolicyFile(t *testing.T) {
-	t.Parallel()
-
-	root := t.TempDir()
-	store := NewLocalStore(root)
-
-	if got := store.PlayerPolicyFile(); got != filepath.Join(root, "players", "policy.json") {
-		t.Fatalf("PlayerPolicyFile = %q, want %q", got, filepath.Join(root, "players", "policy.json"))
+	if got := store.BlockDBsDir(); got != filepath.Join(root, "blockdb") {
+		t.Fatalf("BlockDBsDir = %q", got)
+	}
+	if got := store.BlockDBFile("main"); got != filepath.Join(root, "blockdb", "main.cbdb") {
+		t.Fatalf("BlockDBFile = %q", got)
 	}
 }

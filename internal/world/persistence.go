@@ -321,8 +321,9 @@ func readBlocks(reader *bytes.Reader, dims [3]int) ([]byte, error) {
 	}
 	width, height, length := dims[0], dims[1], dims[2]
 	volume := int64(width) * int64(height) * int64(length)
-	if volume < 1 || volume > maxBlocks {
-		return nil, fmt.Errorf("world volume %d exceeds limit %d", volume, maxBlocks)
+	limit := MaxBlocks()
+	if volume < 1 || volume > limit {
+		return nil, fmt.Errorf("world volume %d exceeds limit %d", volume, limit)
 	}
 	if int64(blockLen) != volume {
 		return nil, fmt.Errorf("block length %d does not match volume %d", blockLen, volume)

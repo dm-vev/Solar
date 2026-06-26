@@ -49,7 +49,7 @@ func CuboidWalls(min, max Vec3, place PlaceFunc) {
 	for y := min.Y; y <= max.Y; y++ {
 		for z := min.Z; z <= max.Z; z++ {
 			for x := min.X; x <= max.X; x++ {
-				if (x == min.X || x == max.X) && (z == min.Z || z == max.Z) {
+				if x == min.X || x == max.X || z == min.Z || z == max.Z {
 					place(x, y, z)
 				}
 			}

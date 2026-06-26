@@ -227,6 +227,9 @@
 
 # ─── command.blocks ───
 "command.blocks.stats" = "&a%s: &7%d placed, %d deleted"
+"command.blocks.current" = "physics mode: %d"
+"command.blocks.set" = "physics mode set to %d"
+"command.blocks.usage" = "usage: /physics [off|basic|advanced|custom]"
 
 # ─── command.mapinfo ───
 "command.mapinfo.levels" = "&aLoaded levels: &7%d"
@@ -295,10 +298,6 @@
 
 # ─── command.fill ───
 "command.fill.usage" = "usage: /fill <block>"
-
-# ─── command.undo (drawing) ───
-"command.undo.none" = "&7Nothing to undo"
-"command.undo.done" = "&aUndone %d block changes"
 
 # ─── command.redo ───
 "command.redo.none" = "&7Nothing to redo"
@@ -544,6 +543,9 @@
 "command.whois.deaths" = "&aСмертей: &7%d"
 "command.whois.blocks" = "&aБлоков: &7%d поставлено, %d сломано"
 "command.blocks.stats" = "&a%s: &7%d поставлено, %d сломано"
+"command.blocks.current" = "режим физики: %d"
+"command.blocks.set" = "режим физики установлен на %d"
+"command.blocks.usage" = "использование: /physics [off|basic|advanced|custom]"
 "command.mapinfo.levels" = "&aЗагружено уровней: &7%d"
 "command.mapinfo.blockdb" = "&aЗаписей BlockDB: &7%d"
 "command.mapinfo.weather" = "&aПогода: &7%s"
@@ -590,8 +592,6 @@
 "command.line.usage" = "использование: /line <блок>"
 "command.sphere.usage" = "использование: /sphere <блок> [hollow] [радиус]"
 "command.fill.usage" = "использование: /fill <блок>"
-"command.undo.none" = "&7Нечего отменять"
-"command.undo.done" = "&aОтменено %d изменений блоков"
 "command.redo.none" = "&7Нечего повторить"
 "command.redo.done" = "&aПовторено %d изменений блоков"
 "command.rank.unavailable" = "система рангов недоступна"

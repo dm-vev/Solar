@@ -8,7 +8,11 @@ import (
 func TestRegistryAddGetRemove(t *testing.T) {
 	t.Parallel()
 
-	r := NewRegistry(t.TempDir())
+	dir := t.TempDir()
+	r := NewRegistry(dir)
+	if got := r.Dir(); got != dir {
+		t.Fatalf("Dir = %q, want %q", got, dir)
+	}
 	def := Default(100)
 	def.Name = "test_block"
 	r.Add(def)
@@ -182,6 +186,31 @@ func TestRawSpeed(t *testing.T) {
 	}
 }
 
+func TestBlockDefinitionWireHelpers(t *testing.T) {
+	t.Parallel()
+
+	def := Default(66)
+	if got := def.BrightnessByte(); got != 0 {
+		t.Fatalf("default BrightnessByte = %d, want 0", got)
+	}
+	def.Brightness = 9
+	if got := def.BrightnessByte(); got != 0x89 {
+		t.Fatalf("BrightnessByte = %#x, want 0x89", got)
+	}
+	def.FullBright = true
+	if got := def.BrightnessByte(); got != 0 {
+		t.Fatalf("fullbright BrightnessByte = %d, want 0", got)
+	}
+
+	if def.IsSprite() {
+		t.Fatal("default block reported sprite")
+	}
+	def.Shape = 0
+	if !def.IsSprite() {
+		t.Fatal("shape 0 block did not report sprite")
+	}
+}
+
 func TestSetAllTex(t *testing.T) {
 	t.Parallel()
 
@@ -222,6 +251,50 @@ func TestCollideTypeName(t *testing.T) {
 	for _, tc := range cases {
 		if got := CollideTypeName(tc.v); got != tc.want {
 			t.Fatalf("CollideTypeName(%d) = %q, want %q", tc.v, got, tc.want)
+		}
+	}
+}
+
+func TestDrawAndSoundTypeNames(t *testing.T) {
+	t.Parallel()
+
+	drawCases := []struct {
+		value byte
+		want  string
+	}{
+		{DrawOpaque, "opaque"},
+		{DrawTransparent, "transparent"},
+		{DrawTransparentThick, "transparent_thick"},
+		{DrawTranslucent, "translucent"},
+		{DrawGas, "gas"},
+		{DrawSprite, "sprite"},
+		{99, "unknown"},
+	}
+	for _, tc := range drawCases {
+		if got := DrawTypeName(tc.value); got != tc.want {
+			t.Fatalf("DrawTypeName(%d) = %q, want %q", tc.value, got, tc.want)
+		}
+	}
+
+	soundCases := []struct {
+		value byte
+		want  string
+	}{
+		{SoundNone, "none"},
+		{SoundWood, "wood"},
+		{SoundGravel, "gravel"},
+		{SoundGrass, "grass"},
+		{SoundStone, "stone"},
+		{SoundMetal, "metal"},
+		{SoundGlass, "glass"},
+		{SoundCloth, "cloth"},
+		{SoundSand, "sand"},
+		{SoundSnow, "snow"},
+		{99, "unknown"},
+	}
+	for _, tc := range soundCases {
+		if got := SoundTypeName(tc.value); got != tc.want {
+			t.Fatalf("SoundTypeName(%d) = %q, want %q", tc.value, got, tc.want)
 		}
 	}
 }

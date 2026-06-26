@@ -58,21 +58,24 @@ const (
 	fileVersion = 1
 )
 
-// maxBlocks is the hard cap on world volume. Set once at startup via
-// SetMaxBlocks; defaults to 64M blocks.
-var maxBlocks int64 = 64 * 1024 * 1024
+// maxBlocks is the hard cap on world volume. Defaults to 64M blocks.
+var maxBlocks atomic.Int64
+
+func init() {
+	maxBlocks.Store(64 * 1024 * 1024)
+}
 
 // SetMaxBlocks updates the global world volume limit. Must be called
 // before any world is loaded or generated.
 func SetMaxBlocks(n int) {
 	if n > 0 {
-		maxBlocks = int64(n)
+		maxBlocks.Store(int64(n))
 	}
 }
 
 // MaxBlocks returns the current world volume limit.
 func MaxBlocks() int64 {
-	return maxBlocks
+	return maxBlocks.Load()
 }
 
 // Spawn describes the spawn point for a world.
@@ -379,8 +382,9 @@ func normalizeLevel(level Level) Level {
 		level.Length = 1
 	}
 	volume := level.Volume()
-	if int64(volume) > maxBlocks {
-		volume = int(maxBlocks)
+	limit := MaxBlocks()
+	if int64(volume) > limit {
+		volume = int(limit)
 	}
 	if len(level.Blocks) != volume {
 		blocks := make([]byte, volume)
@@ -395,11 +399,12 @@ func validateLevelBounds(level Level) error {
 		return fmt.Errorf("world dimensions must be positive")
 	}
 	volume := int64(level.Width) * int64(level.Height) * int64(level.Length)
-	if volume < 1 || volume > maxBlocks {
-		return fmt.Errorf("world volume %d exceeds limit %d", volume, maxBlocks)
+	limit := MaxBlocks()
+	if volume < 1 || volume > limit {
+		return fmt.Errorf("world volume %d exceeds limit %d", volume, limit)
 	}
-	if int64(len(level.Blocks)) > maxBlocks {
-		return fmt.Errorf("block payload length %d exceeds limit %d", len(level.Blocks), maxBlocks)
+	if int64(len(level.Blocks)) > limit {
+		return fmt.Errorf("block payload length %d exceeds limit %d", len(level.Blocks), limit)
 	}
 	return nil
 }

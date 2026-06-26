@@ -21,6 +21,22 @@ func TestCuboidHollow(t *testing.T) {
 	}
 }
 
+func TestCuboidWalls(t *testing.T) {
+	placed := map[Vec3]bool{}
+	CuboidWalls(Vec3{0, 0, 0}, Vec3{2, 2, 2}, func(x, y, z int) {
+		placed[Vec3{x, y, z}] = true
+	})
+	if len(placed) != 24 {
+		t.Fatalf("CuboidWalls count = %d, want 24", len(placed))
+	}
+	if !placed[Vec3{1, 1, 0}] || !placed[Vec3{0, 1, 1}] {
+		t.Fatalf("CuboidWalls missed vertical face blocks: %v", placed)
+	}
+	if placed[Vec3{1, 1, 1}] || placed[Vec3{1, 0, 1}] || placed[Vec3{1, 2, 1}] {
+		t.Fatalf("CuboidWalls placed interior or floor/ceiling blocks: %v", placed)
+	}
+}
+
 func TestLine(t *testing.T) {
 	var points []Vec3
 	Line(Vec3{0, 0, 0}, Vec3{5, 0, 0}, func(x, y, z int) {

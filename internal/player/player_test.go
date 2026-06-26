@@ -95,6 +95,12 @@ func TestPolicyOperators(t *testing.T) {
 	if allowed, _ := p.CanJoin("root"); !allowed {
 		t.Fatal("operator should always be allowed to join")
 	}
+	if !p.RemoveOperator("root") {
+		t.Fatal("RemoveOperator root should return true")
+	}
+	if p.IsOperator("root") {
+		t.Fatal("root should not be operator after remove")
+	}
 }
 
 func TestPolicyOperatorBypassesWhitelist(t *testing.T) {
@@ -192,6 +198,49 @@ func TestRegistryOnlinePlayers(t *testing.T) {
 	r.Remove("alice")
 	if r.Count() != 1 {
 		t.Fatalf("Count after remove = %d, want 1", r.Count())
+	}
+}
+
+func TestRegistryPolicyWrappers(t *testing.T) {
+	t.Parallel()
+
+	r := NewRegistry()
+	if r.Policy() == nil {
+		t.Fatal("Policy returned nil")
+	}
+	if r.WhitelistEnabled() {
+		t.Fatal("whitelist should be disabled by default")
+	}
+	r.SetWhitelistEnabled(true)
+	if !r.WhitelistEnabled() {
+		t.Fatal("whitelist should be enabled")
+	}
+	r.WhitelistAdd("bob")
+	if got := r.WhitelistNames(); len(got) != 1 || got[0] != "bob" {
+		t.Fatalf("WhitelistNames = %v", got)
+	}
+	r.WhitelistRemove("bob")
+	if got := r.WhitelistNames(); len(got) != 0 {
+		t.Fatalf("WhitelistNames after remove = %v", got)
+	}
+
+	r.Ban("alice", "bad")
+	if got := r.BanNames(); len(got) != 1 || got[0] != "alice" {
+		t.Fatalf("BanNames = %v", got)
+	}
+
+	r.AddOperators("root")
+	if !r.IsOperator("root") {
+		t.Fatal("root should be operator")
+	}
+	if got := r.OperatorNames(); len(got) != 1 || got[0] != "root" {
+		t.Fatalf("OperatorNames = %v", got)
+	}
+	if !r.RemoveOperator("root") {
+		t.Fatal("RemoveOperator root should return true")
+	}
+	if r.IsOperator("root") {
+		t.Fatal("root should not be operator after remove")
 	}
 }
 

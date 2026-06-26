@@ -79,3 +79,13 @@ a = "y"
 		t.Fatalf("Languages = %v, want 2", langs)
 	}
 }
+
+func TestRepositoryLanguageFileLoads(t *testing.T) {
+	i := New("en")
+	if err := i.Load("../../configs/language.toml"); err != nil {
+		t.Fatalf("Load repository language file: %v", err)
+	}
+	if got := i.Get("en", "command.players.list", "alice, bob"); got != "players: alice, bob" {
+		t.Fatalf("players list translation = %q", got)
+	}
+}

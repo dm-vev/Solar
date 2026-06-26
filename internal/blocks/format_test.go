@@ -107,3 +107,14 @@ func TestNameConverter(t *testing.T) {
 		t.Fatalf("case-insensitive: alice=%d, Alice=%d", id1Again, id1)
 	}
 }
+
+func TestNameConverterSet(t *testing.T) {
+	nc := NewNameConverter()
+	nc.Set("Alice", 42)
+	if got := nc.Get("alice"); got != 42 {
+		t.Fatalf("Get after Set = %d, want 42", got)
+	}
+	if got := nc.Get("Bob"); got != 43 {
+		t.Fatalf("next assigned ID = %d, want 43", got)
+	}
+}
