@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/solar-mc/solar/internal/blocks"
-	"github.com/solar-mc/solar/plugin/playerdb"
 )
 
 func TestBlockDefCommands(t *testing.T) {
@@ -502,12 +501,4 @@ func (coverageRanks) GetPlayerRank(name string) int {
 
 func (coverageRanks) SetPlayerRank(name string, perm int) bool {
 	return name != "" && perm >= 0
-}
-
-type testPlayerDB struct {
-	entries map[string]*playerdb.PlayerEntry
-}
-
-func (db testPlayerDB) Lookup(name string) *playerdb.PlayerEntry {
-	return db.entries[strings.ToLower(name)]
 }

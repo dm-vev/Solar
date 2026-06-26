@@ -2,12 +2,12 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/solar-mc/solar/internal/config"
 )
@@ -100,7 +100,7 @@ func TestBuildServerWiresBootstrapSystems(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cfg := bootstrapTestConfig(t)
+	cfg := loadBootstrapTestConfig(t)
 	srv, err := buildServer(ctx, cfg)
 	if err != nil {
 		t.Fatalf("buildServer returned error: %v", err)
@@ -122,65 +122,24 @@ func TestLoadTranslationsFallbackForMissingFile(t *testing.T) {
 	}
 }
 
-func bootstrapTestConfig(t *testing.T) config.Config {
+func loadBootstrapTestConfig(t *testing.T) config.Config {
 	t.Helper()
 
-	dataDir := t.TempDir()
-	languagePath := filepath.Join(dataDir, "language.toml")
-	if err := os.WriteFile(languagePath, []byte(`[en]
-"server.shutdown.msg" = "bye"
-`), 0o644); err != nil {
-		t.Fatalf("write language file: %v", err)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "server.toml")
+	dataDir := filepath.Join(dir, "data")
+	if err := os.WriteFile(path, []byte(fmt.Sprintf(`
+listen = "127.0.0.1:0"
+data_dir = %q
+workers = 1
+max_players = 4
+`, dataDir)), 0o600); err != nil {
+		t.Fatalf("write test config: %v", err)
 	}
 
-	return config.Config{
-		ListenAddress:    "127.0.0.1:0",
-		DataDir:          dataDir,
-		Workers:          1,
-		MaxPlayers:       4,
-		ConnectRate:      1,
-		Autosave:         0,
-		DefaultGenerator: "Classic",
-		Name:             "Solar",
-		MOTD:             "Test",
-		Network: config.NetworkConfig{
-			ReadTimeout:     time.Second,
-			WriteTimeout:    time.Second,
-			TCPNoDelay:      true,
-			SessionOutbox:   8,
-			WriteBatchSize:  4,
-			SendTimeout:     time.Millisecond,
-			SendTimeoutMode: "fixed",
-		},
-		Simulation: config.SimConfig{TickInterval: time.Millisecond},
-		World: config.WorldConfig{
-			DefaultWidth:  4,
-			DefaultHeight: 4,
-			DefaultLength: 4,
-			MaxBlocks:     1024,
-		},
-		Storage: config.StorageConfig{
-			WorldsDir:     "worlds",
-			PlayersDir:    "players",
-			PolicyFile:    "policy.json",
-			WorldFileExt:  ".swld",
-			MainWorldName: "main",
-			BlockDefsDir:  "blockdefs",
-		},
-		Player: config.PlayerConfig{
-			MaxUsernameLength: 32,
-		},
-		Plugins: config.PluginsConfig{
-			Enabled: true,
-			Dir:     "plugins",
-		},
-		Lua: config.LuaConfig{
-			Enabled: true,
-			Dir:     "lua",
-		},
-		Language: config.LanguageConfig{
-			Default: "en",
-			File:    languagePath,
-		},
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("load test config: %v", err)
 	}
+	return cfg
 }

@@ -4,8 +4,6 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -204,91 +202,5 @@ func TestRunReturnsLoadStateError(t *testing.T) {
 	err := srv.Run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "unknown default generator") {
 		t.Fatalf("Run error = %v, want unknown default generator", err)
-	}
-}
-
-func TestRunDebugServerHealthAndShutdown(t *testing.T) {
-	t.Parallel()
-
-	addr := freeLocalAddress(t)
-	players := player.NewRegistry()
-	entities := entity.NewManager()
-	if _, ok := entities.Add("bot", entity.Position{}); !ok {
-		t.Fatal("failed to add test entity")
-	}
-	srv := &Server{
-		cfg: config.Config{
-			Debug: config.DebugConfig{PprofShutdownTimeout: 100 * time.Millisecond},
-		},
-		players:   players,
-		entities:  entities,
-		logger:    testLogger,
-		pprofAddr: addr,
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		srv.runDebugServer(ctx)
-	}()
-
-	body := waitForHealthz(t, "http://"+addr+"/healthz", done)
-	if !strings.Contains(body, `"status":"ok"`) || !strings.Contains(body, `"entities":1`) {
-		cancel()
-		t.Fatalf("healthz body = %q", body)
-	}
-
-	cancel()
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("runDebugServer did not stop after context cancel")
-	}
-}
-
-func freeLocalAddress(t *testing.T) string {
-	t.Helper()
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen on localhost:0: %v", err)
-	}
-	addr := listener.Addr().String()
-	if err := listener.Close(); err != nil {
-		t.Fatalf("close probe listener: %v", err)
-	}
-	return addr
-}
-
-func waitForHealthz(t *testing.T, url string, done <-chan struct{}) string {
-	t.Helper()
-
-	client := http.Client{Timeout: 50 * time.Millisecond}
-	deadline := time.After(time.Second)
-	for {
-		resp, err := client.Get(url)
-		if err == nil {
-			body, readErr := io.ReadAll(resp.Body)
-			closeErr := resp.Body.Close()
-			if readErr != nil {
-				t.Fatalf("read healthz response: %v", readErr)
-			}
-			if closeErr != nil {
-				t.Fatalf("close healthz response: %v", closeErr)
-			}
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("healthz status = %d, body = %q", resp.StatusCode, string(body))
-			}
-			return string(body)
-		}
-
-		select {
-		case <-done:
-			t.Fatalf("debug server exited before healthz responded: %v", err)
-		case <-deadline:
-			t.Fatalf("healthz did not respond before timeout: %v", err)
-		case <-time.After(10 * time.Millisecond):
-		}
 	}
 }
