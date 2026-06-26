@@ -19,7 +19,7 @@ type Pool struct {
 }
 
 // NewPool starts a fixed-size worker pool derived from ctx. When ctx is
-// canceled, the pool stops accepting jobs and workers exit.
+// canceled, the pool stops accepting jobs and drains jobs already accepted.
 func NewPool(ctx context.Context, size int) *Pool {
 	if ctx == nil {
 		ctx = context.Background()
@@ -38,6 +38,10 @@ func NewPool(ctx context.Context, size int) *Pool {
 		p.wg.Add(1)
 		go p.loop()
 	}
+	go func() {
+		<-ctx.Done()
+		p.Close()
+	}()
 	return p
 }
 
@@ -69,6 +73,7 @@ func (p *Pool) Close() {
 	p.once.Do(func() {
 		p.mu.Lock()
 		p.closed = true
+		close(p.jobs)
 		p.mu.Unlock()
 		p.cancel()
 	})
@@ -77,17 +82,9 @@ func (p *Pool) Close() {
 
 func (p *Pool) loop() {
 	defer p.wg.Done()
-	for {
-		select {
-		case <-p.ctx.Done():
-			return
-		case job, ok := <-p.jobs:
-			if !ok {
-				return
-			}
-			if job != nil {
-				job()
-			}
+	for job := range p.jobs {
+		if job != nil {
+			job()
 		}
 	}
 }

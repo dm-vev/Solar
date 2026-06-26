@@ -1,6 +1,7 @@
 package event
 
 import (
+	"log/slog"
 	"sort"
 	"sync"
 )
@@ -81,10 +82,18 @@ func (e *Event[T]) Unregister(fn func(*Context, T)) {
 func (e *Event[T]) Fire(data T) *Context {
 	ctx := &Context{}
 	e.mu.RLock()
-	handlers := e.handlers
+	handlers := append([]handlerEntry[T](nil), e.handlers...)
 	e.mu.RUnlock()
 	for _, h := range handlers {
-		h.fn(ctx, data)
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Default().Error("plugin event handler panicked", "panic", r)
+					ctx.Cancel()
+				}
+			}()
+			h.fn(ctx, data)
+		}()
 		if ctx.Cancelled() {
 			break
 		}
