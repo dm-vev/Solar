@@ -1,6 +1,9 @@
 package session
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 type testParticipant struct {
 	id   uint32
@@ -70,5 +73,24 @@ func TestRoomLookupAndLeave(t *testing.T) {
 	}
 	if _, ok := room.FindByName("alice"); ok {
 		t.Fatal("Leave did not remove participant")
+	}
+}
+
+func TestRoomCallbacksRunWithoutLock(t *testing.T) {
+	room := NewRoom[testParticipant]()
+	room.Join(testParticipant{id: 1, name: "alice"})
+
+	done := make(chan struct{})
+	go func() {
+		room.ForEachPeer(func(testParticipant) {
+			room.Join(testParticipant{id: 2, name: "bob"})
+		})
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("ForEachPeer held room lock while running callback")
 	}
 }

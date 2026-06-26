@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/solar-mc/solar/internal/entity"
 )
 
 func TestLoadParsesConfigFile(t *testing.T) {
@@ -134,6 +136,39 @@ func TestAutosaveIntervalRejectsNegative(t *testing.T) {
 	}
 	if _, err := Load(path); err == nil {
 		t.Fatal("Load returned nil error for negative autosave interval")
+	}
+}
+
+func TestValidateRejectsMaxPlayersAboveClassicLimit(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		ListenAddress:    "127.0.0.1:25565",
+		DataDir:          t.TempDir(),
+		Workers:          1,
+		MaxPlayers:       int(entity.MaxClassicEntityID) + 1,
+		ConnectRate:      1,
+		DefaultGenerator: "Classic",
+		Name:             "Solar",
+		MOTD:             "Test",
+		Network: NetworkConfig{
+			SessionOutbox:   1,
+			WriteBatchSize:  1,
+			SendTimeoutMode: "fixed",
+		},
+		Storage: StorageConfig{
+			Backend:       "local",
+			WorldsDir:     "worlds",
+			PlayersDir:    "players",
+			PolicyFile:    "policy.json",
+			WorldFileExt:  ".swld",
+			MainWorldName: "main",
+		},
+		Player: PlayerConfig{MaxUsernameLength: 32},
+		Log:    LogConfig{Level: "info", Format: "text"},
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate returned nil error for max_players above Classic limit")
 	}
 }
 

@@ -54,6 +54,26 @@ func TestPluginPhysics(t *testing.T) {
 	}
 }
 
+func TestPluginConfigRejectsMaxPlayersAboveClassicLimit(t *testing.T) {
+	host, _ := newPluginHostFixture(t)
+	cfg := host.Config()
+
+	cfg.SetMaxPlayers(int(entity.MaxClassicEntityID))
+	if cfg.MaxPlayers() != int(entity.MaxClassicEntityID) {
+		t.Fatalf("MaxPlayers = %d, want %d", cfg.MaxPlayers(), entity.MaxClassicEntityID)
+	}
+
+	cfg.SetMaxPlayers(int(entity.MaxClassicEntityID) + 1)
+	if cfg.MaxPlayers() != int(entity.MaxClassicEntityID) {
+		t.Fatalf("MaxPlayers changed to %d after invalid update", cfg.MaxPlayers())
+	}
+
+	cfg.SetMaxPlayers(0)
+	if cfg.MaxPlayers() != int(entity.MaxClassicEntityID) {
+		t.Fatalf("MaxPlayers changed to %d after zero update", cfg.MaxPlayers())
+	}
+}
+
 func newPluginHostFixture(t *testing.T) (*pluginServer, *Server) {
 	t.Helper()
 

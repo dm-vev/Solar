@@ -91,16 +91,18 @@ func (c *Codec) FindPlayer(name string) plugin.Player {
 
 // BroadcastPacket sends a raw packet to all online players.
 func (c *Codec) BroadcastPacket(packet []byte) {
+	packet = append([]byte(nil), packet...)
 	c.room.ForEachPeerExcept(0, func(peer *session) {
-		_ = peer.writePacket(packet)
+		_ = peer.writePacketNoCopy(packet)
 	})
 }
 
 // BroadcastPacketToLevel sends a raw packet only to players on the given level.
 func (c *Codec) BroadcastPacketToLevel(mgr *world.Manager, packet []byte) {
+	packet = append([]byte(nil), packet...)
 	c.room.ForEachPeerExcept(0, func(peer *session) {
 		if peer.CurrentWorldManager() == mgr {
-			_ = peer.writePacket(packet)
+			_ = peer.writePacketNoCopy(packet)
 		}
 	})
 }

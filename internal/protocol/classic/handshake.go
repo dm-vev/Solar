@@ -77,9 +77,10 @@ func (s *session) handleHandshake() error {
 			Y: spawn.Y * coordScale,
 			Z: spawn.Z * coordScale,
 		})
-		if ok {
-			entityID = id
+		if !ok {
+			return s.writeKick("server full")
 		}
+		entityID = id
 	}
 	if s.players != nil {
 		tracked = s.players.Add(username, entityID)

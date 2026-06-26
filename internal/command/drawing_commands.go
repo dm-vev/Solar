@@ -53,8 +53,8 @@ func cuboidCommand(ctx Context, args []string) (string, bool) {
 	}
 
 	ctx.Draw.StartSelection(2, func(marks [][3]int) {
-		min := blocks.Vec3{marks[0][0], marks[0][1], marks[0][2]}
-		max := blocks.Vec3{marks[1][0], marks[1][1], marks[1][2]}
+		min := blocks.Vec3{X: marks[0][0], Y: marks[0][1], Z: marks[0][2]}
+		max := blocks.Vec3{X: marks[1][0], Y: marks[1][1], Z: marks[1][2]}
 		if min.X > max.X {
 			min.X, max.X = max.X, min.X
 		}
@@ -106,8 +106,8 @@ func lineCommand(ctx Context, args []string) (string, bool) {
 		return ctx.tr("command.draw.cannot_place", block), true
 	}
 	ctx.Draw.StartSelection(2, func(marks [][3]int) {
-		p1 := blocks.Vec3{marks[0][0], marks[0][1], marks[0][2]}
-		p2 := blocks.Vec3{marks[1][0], marks[1][1], marks[1][2]}
+		p1 := blocks.Vec3{X: marks[0][0], Y: marks[0][1], Z: marks[0][2]}
+		p2 := blocks.Vec3{X: marks[1][0], Y: marks[1][1], Z: marks[1][2]}
 		ctx.Draw.BeginBatch()
 		blocks.Line(p1, p2, func(x, y, z int) {
 			old, _ := ctx.Draw.GetBlockAt(x, y, z)
@@ -145,7 +145,7 @@ func sphereCommand(ctx Context, args []string) (string, bool) {
 		}
 	}
 	ctx.Draw.StartSelection(1, func(marks [][3]int) {
-		center := blocks.Vec3{marks[0][0], marks[0][1], marks[0][2]}
+		center := blocks.Vec3{X: marks[0][0], Y: marks[0][1], Z: marks[0][2]}
 		// Check draw limit: sphere volume ≈ (2R+1)³
 		estVol := (2*radius + 1) * (2*radius + 1) * (2*radius + 1)
 		limit := ctx.Draw.DrawLimit()

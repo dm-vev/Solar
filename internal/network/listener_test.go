@@ -46,6 +46,20 @@ func TestSetConnectRateClampsToMinimum(t *testing.T) {
 	}
 }
 
+func TestAcceptIntervalNeverReturnsZero(t *testing.T) {
+	t.Parallel()
+
+	if got := acceptInterval(0); got != time.Second {
+		t.Fatalf("acceptInterval(0) = %s, want 1s", got)
+	}
+	if got := acceptInterval(2); got != 500*time.Millisecond {
+		t.Fatalf("acceptInterval(2) = %s, want 500ms", got)
+	}
+	if got := acceptInterval(int(time.Second) + 1); got != time.Nanosecond {
+		t.Fatalf("acceptInterval(huge) = %s, want 1ns", got)
+	}
+}
+
 func TestListenerAcceptsAndHandlesConnection(t *testing.T) {
 	t.Parallel()
 

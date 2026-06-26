@@ -322,7 +322,7 @@ func (c *pluginConfig) MaxPlayers() int { return c.server.cfg.MaxPlayers }
 // SetMaxPlayers takes effect on restart; the live semaphore is not resized.
 // ponytail: semaphore resize needs a coordinated swap; restart covers it.
 func (c *pluginConfig) SetMaxPlayers(n int) {
-	if n >= 1 {
+	if n >= 1 && n <= int(entity.MaxClassicEntityID) {
 		c.server.cfg.MaxPlayers = n
 		c.fireConfigUpdated()
 	}
@@ -958,12 +958,8 @@ func (ph *pluginPhysics) Tick() {
 	ph.mu.Unlock()
 }
 
-// entityManager implements plugin.EntityManager, bridging the plugin byte-ID
-// space (1-254) to the internal entity.Manager uint32 IDs and broadcasting
-// wire packets via the codec.
-// ponytail: plugin entity byte slots share the 1-254 wire ID space with
-// players; a slot may collide with a later-joining player's wire ID. A unified
-// byte-ID allocator shared with handshake entity assignment fixes this.
+// entityManager implements plugin.EntityManager, broadcasting plugin-owned
+// entities with IDs allocated by the shared Classic entity manager.
 type entityManager struct {
 	codec    *classic.Codec
 	entities *entity.Manager
@@ -985,16 +981,10 @@ func (e *entityManager) Spawn(info plugin.EntityInfo) byte {
 	if !ok {
 		return 0
 	}
+	slot := byte(id)
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	var slot byte
-	for b := byte(1); b <= 254; b++ {
-		if _, exists := e.slots[b]; !exists {
-			slot = b
-			break
-		}
-	}
-	if slot == 0 {
+	if _, exists := e.slots[slot]; exists {
 		e.entities.Remove(id)
 		return 0
 	}

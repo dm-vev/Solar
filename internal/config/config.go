@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/solar-mc/solar/internal/entity"
 )
 
 // Config holds the server bootstrap settings.
@@ -293,6 +294,9 @@ func (c Config) Validate() error {
 	}
 	if c.MaxPlayers < 1 {
 		return fmt.Errorf("max players must be at least 1")
+	}
+	if c.MaxPlayers > int(entity.MaxClassicEntityID) {
+		return fmt.Errorf("max players must be at most %d for Classic protocol", entity.MaxClassicEntityID)
 	}
 	if c.ConnectRate < 1 {
 		return fmt.Errorf("connect rate must be at least 1")

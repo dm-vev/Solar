@@ -286,7 +286,10 @@ func TestInfoAndMiscCommands(t *testing.T) {
 	if got, _ := summonCommand(ctx, []string{"bob"}); got != "command.summon.done" {
 		t.Fatalf("summonCommand = %q", got)
 	}
-	if got := cuboidVolume(blocks.Vec3{0, 0, 0}, blocks.Vec3{2, 3, 4}); got != 60 {
+	if got := cuboidVolume(
+		blocks.Vec3{X: 0, Y: 0, Z: 0},
+		blocks.Vec3{X: 2, Y: 3, Z: 4},
+	); got != 60 {
 		t.Fatalf("cuboidVolume = %d, want 60", got)
 	}
 	if got, _ := viewRanksCommand(ctx, nil); !strings.Contains(got, "Guest(0)") || !strings.Contains(got, "Op(100)") {

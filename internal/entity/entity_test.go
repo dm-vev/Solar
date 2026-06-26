@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 )
@@ -47,6 +48,77 @@ func TestManagerRemove(t *testing.T) {
 	}
 	if mgr.Count() != 0 {
 		t.Fatalf("Count = %d, want 0", mgr.Count())
+	}
+}
+
+func TestManagerAllocatesClassicWireIDs(t *testing.T) {
+	t.Parallel()
+
+	mgr := NewManager()
+	seen := make(map[uint32]bool, MaxClassicEntityID)
+	for i := uint32(0); i < MaxClassicEntityID; i++ {
+		id, ok := mgr.Add(fmt.Sprintf("entity-%d", i), Position{})
+		if !ok {
+			t.Fatalf("Add(%d) returned false", i)
+		}
+		if id == 0 || id > MaxClassicEntityID {
+			t.Fatalf("id = %d, want 1..%d", id, MaxClassicEntityID)
+		}
+		if seen[id] {
+			t.Fatalf("duplicate id %d", id)
+		}
+		seen[id] = true
+	}
+
+	if id, ok := mgr.Add("overflow", Position{}); ok {
+		t.Fatalf("Add returned id %d after entity space was full", id)
+	}
+
+	const removedID = 17
+	mgr.Remove(removedID)
+	id, ok := mgr.Add("reused", Position{})
+	if !ok {
+		t.Fatal("Add did not reuse freed entity ID")
+	}
+	if id != removedID {
+		t.Fatalf("reused id = %d, want %d", id, removedID)
+	}
+}
+
+func TestManagerConcurrentAddDoesNotDuplicateIDs(t *testing.T) {
+	t.Parallel()
+
+	mgr := NewManager()
+	const total = 64
+	ids := make(chan uint32, total)
+	var wg sync.WaitGroup
+	wg.Add(total)
+	for i := 0; i < total; i++ {
+		go func(i int) {
+			defer wg.Done()
+			id, ok := mgr.Add(fmt.Sprintf("entity-%d", i), Position{})
+			if !ok {
+				t.Errorf("Add(%d) returned false", i)
+				return
+			}
+			ids <- id
+		}(i)
+	}
+	wg.Wait()
+	close(ids)
+
+	seen := make(map[uint32]bool, total)
+	for id := range ids {
+		if id == 0 || id > MaxClassicEntityID {
+			t.Fatalf("id = %d, want 1..%d", id, MaxClassicEntityID)
+		}
+		if seen[id] {
+			t.Fatalf("duplicate id %d", id)
+		}
+		seen[id] = true
+	}
+	if len(seen) != total {
+		t.Fatalf("allocated %d IDs, want %d", len(seen), total)
 	}
 }
 

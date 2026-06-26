@@ -50,3 +50,24 @@ func TestEntityManagerSpawnDespawnTeleport(t *testing.T) {
 		t.Fatal("Teleport on missing id returned true")
 	}
 }
+
+func TestEntityManagerSpawnUsesSharedEntityIDSpace(t *testing.T) {
+	entities := entity.NewManager()
+	playerID, ok := entities.Add("player", entity.Position{})
+	if !ok {
+		t.Fatal("player Add returned false")
+	}
+
+	codec := classic.NewCodec("test", "", nil, nil, entities, nil)
+	em := newEntityManager(codec, entities)
+	npcID := em.Spawn(plugin.EntityInfo{Name: "NPC", X: 32, Y: 64, Z: 96, Model: "humanoid"})
+	if npcID == 0 {
+		t.Fatal("Spawn returned 0")
+	}
+	if npcID == byte(playerID) {
+		t.Fatalf("plugin entity ID %d collided with player ID %d", npcID, playerID)
+	}
+	if _, ok := entities.Get(uint32(npcID)); !ok {
+		t.Fatalf("shared entity manager does not contain plugin ID %d", npcID)
+	}
+}

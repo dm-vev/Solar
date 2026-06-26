@@ -81,9 +81,11 @@ func TestCodecBroadcastAndChangeMap(t *testing.T) {
 	codec.room.Join(alice)
 	codec.room.Join(bob)
 
-	codec.BroadcastPacket([]byte{0x01})
-	assertPacketCount(t, alice, 1)
-	assertPacketCount(t, bob, 1)
+	packet := []byte{0x01}
+	codec.BroadcastPacket(packet)
+	packet[0] = 0x02
+	assertNextPacketByte(t, alice, 0x01)
+	assertNextPacketByte(t, bob, 0x01)
 
 	next := world.NewManager()
 	next.SetCurrent(world.Level{
@@ -150,6 +152,18 @@ func assertPacketCount(t *testing.T, s *session, want int) {
 	got := drainPackets(s)
 	if got != want {
 		t.Fatalf("drained packets = %d, want %d", got, want)
+	}
+}
+
+func assertNextPacketByte(t *testing.T, s *session, want byte) {
+	t.Helper()
+	select {
+	case packet := <-s.outbox:
+		if len(packet) != 1 || packet[0] != want {
+			t.Fatalf("packet = %v, want [%d]", packet, want)
+		}
+	default:
+		t.Fatal("outbox is empty")
 	}
 }
 

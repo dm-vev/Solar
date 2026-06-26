@@ -27,6 +27,17 @@ func (l *Listener) SetConnectRate(rate int) {
 	l.connectRate = rate
 }
 
+func acceptInterval(rate int) time.Duration {
+	if rate < 1 {
+		rate = 1
+	}
+	interval := time.Second / time.Duration(rate)
+	if interval < time.Nanosecond {
+		return time.Nanosecond
+	}
+	return interval
+}
+
 // Serve starts accepting clients until the context is canceled.
 func (l *Listener) Serve(ctx context.Context, handle func(net.Conn)) error {
 	ln, err := net.Listen("tcp", l.address)
@@ -40,7 +51,7 @@ func (l *Listener) Serve(ctx context.Context, handle func(net.Conn)) error {
 		_ = ln.Close()
 	}()
 
-	limiter := time.NewTicker(time.Second / time.Duration(l.connectRate))
+	limiter := time.NewTicker(acceptInterval(l.connectRate))
 	defer limiter.Stop()
 
 	for {

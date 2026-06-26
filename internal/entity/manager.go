@@ -1,12 +1,19 @@
 package entity
 
-import "sync/atomic"
+import (
+	"sync"
+	"sync/atomic"
+)
+
+// MaxClassicEntityID is the highest non-self entity ID that fits in Classic packets.
+const MaxClassicEntityID uint32 = 254
 
 // Manager owns the current set of active entities.
 type Manager struct {
-	nextID atomic.Uint32
-	tick   atomic.Uint64
-	shards [entityShardCount]entityShard
+	allocMu sync.Mutex
+	nextID  uint32
+	tick    atomic.Uint64
+	shards  [entityShardCount]entityShard
 }
 
 // NewManager creates an empty entity manager.
@@ -24,12 +31,23 @@ func (m *Manager) Add(name string, pos Position) (uint32, bool) {
 		return 0, false
 	}
 
-	id := m.nextID.Add(1)
-	shard := &m.shards[m.shardIndex(id)]
-	shard.mu.Lock()
-	shard.entities[id] = &Entity{Name: name, Pos: pos}
-	shard.mu.Unlock()
-	return id, true
+	m.allocMu.Lock()
+	defer m.allocMu.Unlock()
+
+	for attempts := uint32(0); attempts < MaxClassicEntityID; attempts++ {
+		m.nextID = (m.nextID % MaxClassicEntityID) + 1
+		id := m.nextID
+		shard := &m.shards[m.shardIndex(id)]
+		shard.mu.Lock()
+		if _, exists := shard.entities[id]; !exists {
+			shard.entities[id] = &Entity{Name: name, Pos: pos}
+			shard.mu.Unlock()
+			return id, true
+		}
+		shard.mu.Unlock()
+	}
+
+	return 0, false
 }
 
 // Remove deletes an entity by ID.

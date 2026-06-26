@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -209,6 +210,57 @@ func TestServeConnKicksUsernameWithControlCharacters(t *testing.T) {
 		t.Fatalf("close client: %v", err)
 	}
 	<-done
+}
+
+func TestServeConnKicksWhenEntityIDSpaceIsFull(t *testing.T) {
+	t.Parallel()
+
+	entities := entity.NewManager()
+	for i := uint32(0); i < entity.MaxClassicEntityID; i++ {
+		if _, ok := entities.Add(fmt.Sprintf("entity-%d", i), entity.Position{}); !ok {
+			t.Fatalf("fill entity space at %d returned false", i)
+		}
+	}
+
+	players := player.NewRegistry()
+	codec := NewCodec(
+		"Solar",
+		"CLI-only classic server",
+		world.NewManager(),
+		players,
+		entities,
+		command.NewRegistry(),
+	)
+	server, client := net.Pipe()
+	done := make(chan struct{})
+
+	go func() {
+		codec.ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	if _, err := client.Write(encodeClientHandshake(7, "tester", 0)); err != nil {
+		t.Fatalf("write handshake: %v", err)
+	}
+
+	kick := make([]byte, 65)
+	if _, err := io.ReadFull(client, kick); err != nil {
+		t.Fatalf("read kick: %v", err)
+	}
+	if kick[0] != opcodeKick {
+		t.Fatalf("kick opcode = %d, want %d", kick[0], opcodeKick)
+	}
+	if got := bytes.TrimRight(kick[1:65], " \x00"); string(got) != "server full" {
+		t.Fatalf("kick message = %q, want server full", got)
+	}
+
+	if err := client.Close(); err != nil {
+		t.Fatalf("close client: %v", err)
+	}
+	<-done
+	if players.Count() != 0 {
+		t.Fatalf("players.Count = %d, want 0", players.Count())
+	}
 }
 
 func TestServeConnUsesWorldSnapshot(t *testing.T) {
