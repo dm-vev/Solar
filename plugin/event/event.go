@@ -2,6 +2,7 @@ package event
 
 import (
 	"log/slog"
+	"reflect"
 	"sort"
 	"sync"
 )
@@ -55,6 +56,9 @@ func NewEvent[T any]() *Event[T] {
 // Register adds a handler at the given priority. Higher-priority
 // handlers are called first. Registration is safe for concurrent use.
 func (e *Event[T]) Register(fn func(*Context, T), priority Priority) {
+	if fn == nil {
+		return
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.handlers = append(e.handlers, handlerEntry[T]{fn, priority})
@@ -66,10 +70,14 @@ func (e *Event[T]) Register(fn func(*Context, T), priority Priority) {
 // Unregister removes a handler. The fn must match the function
 // registered previously by pointer identity.
 func (e *Event[T]) Unregister(fn func(*Context, T)) {
+	if fn == nil {
+		return
+	}
+	target := reflect.ValueOf(fn).Pointer()
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for i, h := range e.handlers {
-		if &h.fn == &fn {
+		if reflect.ValueOf(h.fn).Pointer() == target {
 			e.handlers = append(e.handlers[:i], e.handlers[i+1:]...)
 			return
 		}

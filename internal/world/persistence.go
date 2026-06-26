@@ -63,11 +63,22 @@ func (l Level) Save(path string) error {
 	if _, err := tmp.Write(data); err != nil {
 		return fmt.Errorf("write world temp %s: %w", tmpPath, err)
 	}
+	if err := tmp.Sync(); err != nil {
+		return fmt.Errorf("sync world temp %s: %w", tmpPath, err)
+	}
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("close world temp %s: %w", tmpPath, err)
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
 		return fmt.Errorf("replace world %s: %w", path, err)
+	}
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return fmt.Errorf("open world directory for sync %s: %w", path, err)
+	}
+	defer dir.Close()
+	if err := dir.Sync(); err != nil {
+		return fmt.Errorf("sync world directory for %s: %w", path, err)
 	}
 	return nil
 }

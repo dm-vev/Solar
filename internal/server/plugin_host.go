@@ -15,6 +15,7 @@ import (
 	"github.com/solar-mc/solar/internal/generator"
 	"github.com/solar-mc/solar/internal/playerdb"
 	"github.com/solar-mc/solar/internal/protocol/classic"
+	"github.com/solar-mc/solar/internal/storage"
 	"github.com/solar-mc/solar/internal/world"
 	"github.com/solar-mc/solar/plugin"
 )
@@ -454,6 +455,9 @@ func (w *pluginWorld) Message(msg string) {
 }
 
 func (w *pluginWorld) Rename(newName string) error {
+	if err := validateLevelName(newName); err != nil {
+		return err
+	}
 	oldName := w.Name()
 	dest := w.levelPath(newName)
 	if err := os.Rename(w.worldPath, dest); err != nil {
@@ -470,6 +474,9 @@ func (w *pluginWorld) Rename(newName string) error {
 }
 
 func (w *pluginWorld) Copy(destName string) error {
+	if err := validateLevelName(destName); err != nil {
+		return err
+	}
 	if err := copyFile(w.worldPath, w.levelPath(destName)); err != nil {
 		return err
 	}
@@ -480,6 +487,9 @@ func (w *pluginWorld) Copy(destName string) error {
 }
 
 func (w *pluginWorld) Backup(backupName string) error {
+	if err := validateLevelName(backupName); err != nil {
+		return err
+	}
 	return copyFile(w.worldPath, w.levelPath(backupName))
 }
 
@@ -538,13 +548,38 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	defer in.Close()
-	out, err := os.Create(dst)
+
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	out, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".*.tmp")
 	if err != nil {
 		return err
 	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
+	tmpPath := out.Name()
+	defer func() {
+		_ = out.Close()
+		_ = os.Remove(tmpPath)
+	}()
+
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	if err := out.Sync(); err != nil {
+		return err
+	}
+	if err := out.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, dst); err != nil {
+		return err
+	}
+	dir, err := os.Open(filepath.Dir(dst))
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
 }
 
 // pluginLevel implements plugin.Level for a loaded level in the MultiManager.
@@ -616,6 +651,9 @@ func (l *pluginLevel) Message(msg string) {
 }
 
 func (l *pluginLevel) Rename(newName string) error {
+	if err := validateLevelName(newName); err != nil {
+		return err
+	}
 	oldName := l.name
 	dest := l.levelPath(newName)
 	if err := os.Rename(l.path, dest); err != nil {
@@ -633,6 +671,9 @@ func (l *pluginLevel) Rename(newName string) error {
 }
 
 func (l *pluginLevel) Copy(destName string) error {
+	if err := validateLevelName(destName); err != nil {
+		return err
+	}
 	if err := copyFile(l.path, l.levelPath(destName)); err != nil {
 		return err
 	}
@@ -643,6 +684,9 @@ func (l *pluginLevel) Copy(destName string) error {
 }
 
 func (l *pluginLevel) Backup(backupName string) error {
+	if err := validateLevelName(backupName); err != nil {
+		return err
+	}
 	return copyFile(l.path, l.levelPath(backupName))
 }
 
@@ -729,6 +773,9 @@ func (m *pluginLevelManager) Find(name string) plugin.Level {
 }
 
 func (m *pluginLevelManager) Create(name string, width, height, length int, generatorName, seed string) (plugin.Level, error) {
+	if err := validateLevelName(name); err != nil {
+		return nil, err
+	}
 	gen, ok := generator.Find(generatorName)
 	if !ok {
 		return nil, fmt.Errorf("generator %q not found", generatorName)
@@ -760,6 +807,9 @@ func (m *pluginLevelManager) Create(name string, width, height, length int, gene
 }
 
 func (m *pluginLevelManager) Load(name string) (plugin.Level, error) {
+	if err := validateLevelName(name); err != nil {
+		return nil, err
+	}
 	if m.srv.multiMgr.Has(name) {
 		return nil, fmt.Errorf("level %q already loaded", name)
 	}
@@ -849,19 +899,47 @@ func (m *pluginLevelManager) ListFiles() []string {
 }
 
 func (m *pluginLevelManager) RenameLevel(oldName, newName string) error {
+	if err := validateLevelName(oldName); err != nil {
+		return err
+	}
+	if err := validateLevelName(newName); err != nil {
+		return err
+	}
 	return os.Rename(m.srv.server.store.WorldFile(oldName), m.srv.server.store.WorldFile(newName))
 }
 
 func (m *pluginLevelManager) DeleteLevel(name string) error {
+	if err := validateLevelName(name); err != nil {
+		return err
+	}
 	return os.Remove(m.srv.server.store.WorldFile(name))
 }
 
 func (m *pluginLevelManager) CopyLevel(srcName, destName string) error {
+	if err := validateLevelName(srcName); err != nil {
+		return err
+	}
+	if err := validateLevelName(destName); err != nil {
+		return err
+	}
 	return copyFile(m.srv.server.store.WorldFile(srcName), m.srv.server.store.WorldFile(destName))
 }
 
 func (m *pluginLevelManager) BackupLevel(name, backupName string) error {
+	if err := validateLevelName(name); err != nil {
+		return err
+	}
+	if err := validateLevelName(backupName); err != nil {
+		return err
+	}
 	return copyFile(m.srv.server.store.WorldFile(name), m.srv.server.store.WorldFile(backupName))
+}
+
+func validateLevelName(name string) error {
+	if !storage.ValidName(name) {
+		return fmt.Errorf("invalid level name %q", name)
+	}
+	return nil
 }
 
 // pluginPhysics implements plugin.Physics. Scheduled blocks are pumped

@@ -2,6 +2,27 @@ package event
 
 import "testing"
 
+func TestUnregisterRemovesHandler(t *testing.T) {
+	t.Parallel()
+
+	ev := NewEvent[int]()
+	calls := 0
+	handler := func(*Context, int) {
+		calls++
+	}
+	ev.Register(handler, PriorityNormal)
+	ev.Fire(1)
+	ev.Unregister(handler)
+	ev.Fire(1)
+
+	if calls != 1 {
+		t.Fatalf("calls = %d, want 1", calls)
+	}
+	if ev.HasHandlers() {
+		t.Fatal("HasHandlers returned true after Unregister")
+	}
+}
+
 func TestFireRecoversHandlerPanic(t *testing.T) {
 	t.Parallel()
 

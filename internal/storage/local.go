@@ -1,6 +1,9 @@
 package storage
 
-import "path/filepath"
+import (
+	"path/filepath"
+	"strings"
+)
 
 // LocalStore owns files on disk.
 type LocalStore struct {
@@ -50,7 +53,7 @@ func (s *LocalStore) PlayersDir() string {
 
 // WorldFile returns the storage path for a named world snapshot.
 func (s *LocalStore) WorldFile(name string) string {
-	return filepath.Join(s.WorldsDir(), name+s.worldFileExt)
+	return filepath.Join(s.WorldsDir(), safeName(name)+s.worldFileExt)
 }
 
 // PlayerPolicyFile returns the persisted whitelist/ban policy path.
@@ -65,5 +68,29 @@ func (s *LocalStore) BlockDBsDir() string {
 
 // BlockDBFile returns the path for a level's block change log.
 func (s *LocalStore) BlockDBFile(levelName string) string {
-	return filepath.Join(s.BlockDBsDir(), levelName+".cbdb")
+	return filepath.Join(s.BlockDBsDir(), safeName(levelName)+".cbdb")
+}
+
+// ValidName reports whether name is safe to use as a single storage filename stem.
+func ValidName(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" || name == "." || name == ".." {
+		return false
+	}
+	if strings.ContainsAny(name, `/\`) {
+		return false
+	}
+	return filepath.Clean(name) == name && filepath.Base(name) == name
+}
+
+func safeName(name string) string {
+	name = strings.TrimSpace(name)
+	if ValidName(name) {
+		return name
+	}
+	name = filepath.Base(filepath.Clean(name))
+	if !ValidName(name) {
+		return "_"
+	}
+	return name
 }

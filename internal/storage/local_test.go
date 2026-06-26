@@ -29,3 +29,21 @@ func TestLocalStoreConfigureAndBlockDBPaths(t *testing.T) {
 		t.Fatalf("BlockDBFile = %q", got)
 	}
 }
+
+func TestLocalStoreFileNamesCannotEscapeRoot(t *testing.T) {
+	root := t.TempDir()
+	store := NewLocalStore(root)
+
+	if got := store.WorldFile("../evil"); got != filepath.Join(root, "worlds", "evil.swld") {
+		t.Fatalf("WorldFile escaped or sanitized incorrectly: %q", got)
+	}
+	if got := store.BlockDBFile("../evil"); got != filepath.Join(root, "blockdb", "evil.cbdb") {
+		t.Fatalf("BlockDBFile escaped or sanitized incorrectly: %q", got)
+	}
+	if ValidName("../evil") {
+		t.Fatal("ValidName accepted traversal")
+	}
+	if !ValidName("main") {
+		t.Fatal("ValidName rejected main")
+	}
+}

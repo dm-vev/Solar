@@ -39,3 +39,61 @@ func TestLoggerAndFormatStringSlice(t *testing.T) {
 		t.Fatalf("formatStringSlice = %q", got)
 	}
 }
+
+func TestValidateRejectsEscapingStoragePaths(t *testing.T) {
+	t.Parallel()
+
+	cfg := minimalValidConfig(t)
+	cfg.Storage.MainWorldName = "../main"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate accepted escaping main world name")
+	}
+
+	cfg = minimalValidConfig(t)
+	cfg.Storage.WorldsDir = "../worlds"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate accepted escaping worlds dir")
+	}
+
+	cfg = minimalValidConfig(t)
+	cfg.Storage.PolicyFile = "players/policy.json"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate accepted policy file path")
+	}
+
+	cfg = minimalValidConfig(t)
+	cfg.Storage.PlayersDir = `players\..\evil`
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate accepted backslash storage path")
+	}
+}
+
+func minimalValidConfig(t *testing.T) Config {
+	t.Helper()
+	return Config{
+		ListenAddress:    "127.0.0.1:25565",
+		DataDir:          t.TempDir(),
+		Workers:          1,
+		MaxPlayers:       8,
+		ConnectRate:      1,
+		DefaultGenerator: "Classic",
+		Name:             "Solar",
+		MOTD:             "Test",
+		Network: NetworkConfig{
+			SessionOutbox:   1,
+			WriteBatchSize:  1,
+			SendTimeoutMode: "fixed",
+		},
+		Storage: StorageConfig{
+			Backend:       "local",
+			WorldsDir:     "worlds",
+			PlayersDir:    "players",
+			PolicyFile:    "policy.json",
+			WorldFileExt:  ".swld",
+			MainWorldName: "main",
+			BlockDefsDir:  "blockdefs",
+		},
+		Player: PlayerConfig{MaxUsernameLength: 32},
+		Log:    LogConfig{Level: "info", Format: "text"},
+	}
+}

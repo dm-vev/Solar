@@ -161,11 +161,22 @@ func (db *jsonDB) Flush() error {
 	if _, err := tmp.Write(data); err != nil {
 		return fmt.Errorf("write playerdb temp: %w", err)
 	}
+	if err := tmp.Sync(); err != nil {
+		return fmt.Errorf("sync playerdb temp: %w", err)
+	}
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("close playerdb temp: %w", err)
 	}
 	if err := os.Rename(tmpPath, db.path); err != nil {
 		return fmt.Errorf("replace playerdb: %w", err)
+	}
+	dir, err := os.Open(filepath.Dir(db.path))
+	if err != nil {
+		return fmt.Errorf("open playerdb dir for sync: %w", err)
+	}
+	defer dir.Close()
+	if err := dir.Sync(); err != nil {
+		return fmt.Errorf("sync playerdb dir: %w", err)
 	}
 	return nil
 }

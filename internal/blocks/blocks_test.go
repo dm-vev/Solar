@@ -166,6 +166,17 @@ func TestLevelPersistence(t *testing.T) {
 	}
 }
 
+func TestLevelFileCannotEscapeDirectory(t *testing.T) {
+	t.Parallel()
+
+	if got := LevelFile("../evil"); got != "lvl__.json" {
+		t.Fatalf("LevelFile traversal = %q, want lvl__.json", got)
+	}
+	if got := LevelFile("main"); got != "lvl_main.json" {
+		t.Fatalf("LevelFile main = %q, want lvl_main.json", got)
+	}
+}
+
 func TestRawSpeed(t *testing.T) {
 	t.Parallel()
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/solar-mc/solar/internal/entity"
+	"github.com/solar-mc/solar/internal/storage"
 )
 
 // Config holds the server bootstrap settings.
@@ -361,20 +362,57 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.Storage.WorldsDir) == "" {
 		return fmt.Errorf("storage.worlds_dir is empty")
 	}
+	if err := validateStoragePath("storage.worlds_dir", c.Storage.WorldsDir); err != nil {
+		return err
+	}
 	if strings.TrimSpace(c.Storage.PlayersDir) == "" {
 		return fmt.Errorf("storage.players_dir is empty")
+	}
+	if err := validateStoragePath("storage.players_dir", c.Storage.PlayersDir); err != nil {
+		return err
 	}
 	if strings.TrimSpace(c.Storage.PolicyFile) == "" {
 		return fmt.Errorf("storage.policy_file is empty")
 	}
+	if !storage.ValidName(c.Storage.PolicyFile) {
+		return fmt.Errorf("storage.policy_file must be a file name, not a path")
+	}
 	if strings.TrimSpace(c.Storage.WorldFileExt) == "" {
 		return fmt.Errorf("storage.world_file_ext is empty")
+	}
+	if strings.ContainsAny(c.Storage.WorldFileExt, `/\`) {
+		return fmt.Errorf("storage.world_file_ext cannot contain path separators")
 	}
 	if strings.TrimSpace(c.Storage.MainWorldName) == "" {
 		return fmt.Errorf("storage.main_world_name is empty")
 	}
+	if !storage.ValidName(c.Storage.MainWorldName) {
+		return fmt.Errorf("storage.main_world_name must be a file name, not a path")
+	}
+	if strings.TrimSpace(c.Storage.BlockDefsDir) != "" {
+		if err := validateStoragePath("storage.blockdefs_dir", c.Storage.BlockDefsDir); err != nil {
+			return err
+		}
+	}
 	if c.Player.MaxUsernameLength < 1 || c.Player.MaxUsernameLength > 64 {
 		return fmt.Errorf("player.max_username_length must be 1..64")
+	}
+	return nil
+}
+
+func validateStoragePath(field, path string) error {
+	path = strings.TrimSpace(path)
+	if strings.Contains(path, `\`) {
+		return fmt.Errorf("%s cannot contain path separators: %s", field, path)
+	}
+	cleaned := filepath.Clean(path)
+	if filepath.IsAbs(cleaned) {
+		return fmt.Errorf("%s must be relative", field)
+	}
+	for _, part := range strings.Split(filepath.ToSlash(cleaned), "/") {
+		if part == ".." {
+			return fmt.Errorf("%s escapes data directory: %s", field, path)
+		}
 	}
 	return nil
 }

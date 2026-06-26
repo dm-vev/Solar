@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // GlobalFile is the JSON filename for global block definitions.
@@ -13,7 +14,7 @@ const GlobalFile = "global.json"
 
 // LevelFile returns the JSON filename for a named level's block definitions.
 func LevelFile(levelName string) string {
-	return "lvl_" + levelName + ".json"
+	return "lvl_" + safeLevelName(levelName) + ".json"
 }
 
 // LoadGlobal reads global.json from the registry directory.
@@ -60,6 +61,18 @@ func (r *Registry) loadFile(path string) error {
 	return nil
 }
 
+func safeLevelName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" || strings.ContainsAny(name, `/\`) {
+		return "_"
+	}
+	name = filepath.Base(filepath.Clean(name))
+	if name == "." || name == ".." {
+		return "_"
+	}
+	return name
+}
+
 func (r *Registry) saveFile(path string) error {
 	r.mu.RLock()
 	defs := make([]BlockDefinition, 0, len(r.defs))
@@ -92,11 +105,22 @@ func (r *Registry) saveFile(path string) error {
 	if _, err := tmp.Write(data); err != nil {
 		return fmt.Errorf("write block defs temp: %w", err)
 	}
+	if err := tmp.Sync(); err != nil {
+		return fmt.Errorf("sync block defs temp: %w", err)
+	}
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("close block defs temp: %w", err)
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
 		return fmt.Errorf("replace block defs: %w", err)
+	}
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return fmt.Errorf("open block defs dir for sync: %w", err)
+	}
+	defer dir.Close()
+	if err := dir.Sync(); err != nil {
+		return fmt.Errorf("sync block defs dir: %w", err)
 	}
 	return nil
 }
