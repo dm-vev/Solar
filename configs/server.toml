@@ -112,6 +112,13 @@ file = "configs/language.toml"
 enabled = false
 public = false
 
+[auth]
+# Verify ClassiCube usernames with Classic mppass.
+# Enable for public servers. If heartbeat is enabled, salt can be empty and
+# Solar will generate a runtime salt. Without heartbeat, set a fixed salt.
+enabled = false
+salt = ""
+
 [antispam]
 # Anti-spam protection: rate limiting for chat, blocks, and commands.
 # When a player exceeds the max count in the time window, the configured

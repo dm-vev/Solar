@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/solar-mc/solar/internal/auth"
 	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/config"
@@ -28,6 +29,9 @@ import (
 
 func buildServer(ctx context.Context, cfg config.Config) (*server.Server, error) {
 	logger := cfg.Logger(os.Stderr)
+	if err := prepareAuthentication(&cfg, logger); err != nil {
+		return nil, err
+	}
 
 	blockDefinitions, err := loadBlockDefinitions(cfg)
 	if err != nil {
@@ -139,6 +143,7 @@ func buildCodec(
 	codec.SetBlockDefinitions(blockDefinitions)
 	codec.SetI18n(translations)
 	codec.SetMaxPlayers(cfg.MaxPlayers)
+	codec.SetAuthentication(cfg.Auth.Enabled, cfg.Auth.Salt)
 	codec.SetSpamChecker(player.NewChecker(player.SpamConfig{
 		Enabled:      cfg.AntiSpam.Enabled,
 		ChatMax:      cfg.AntiSpam.ChatMax,
@@ -151,6 +156,22 @@ func buildCodec(
 		MuteDuration: cfg.AntiSpam.MuteDuration,
 	}))
 	return codec
+}
+
+func prepareAuthentication(cfg *config.Config, logger *slog.Logger) error {
+	if cfg.Auth.Salt != "" || (!cfg.Auth.Enabled && !cfg.Heartbeat.Enabled) {
+		return nil
+	}
+
+	salt, err := auth.GenerateSalt()
+	if err != nil {
+		return fmt.Errorf("generate auth salt: %w", err)
+	}
+	cfg.Auth.Salt = salt
+	if cfg.Auth.Enabled {
+		logger.Info("generated runtime auth salt")
+	}
+	return nil
 }
 
 func loadRuntimeExtensions(cfg config.Config, logger *slog.Logger) {

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/solar-mc/solar/internal/auth"
 	"github.com/solar-mc/solar/internal/protocol/wire"
 )
 
@@ -18,7 +19,7 @@ func runClient(ctx context.Context, cfg Config, index int) error {
 		return fmt.Errorf("dial: %w", err)
 	}
 
-	if err := login(conn, username, cfg.CPE); err != nil {
+	if err := login(conn, username, cfg.CPE, cfg.AuthSalt); err != nil {
 		_ = conn.Close()
 		return err
 	}
@@ -38,8 +39,8 @@ func runClient(ctx context.Context, cfg Config, index int) error {
 	return nil
 }
 
-func login(conn net.Conn, username string, cpe bool) error {
-	if _, err := conn.Write(encodeHandshake(7, username, cpe)); err != nil {
+func login(conn net.Conn, username string, cpe bool, authSalt string) error {
+	if _, err := conn.Write(encodeHandshake(7, username, cpe, authSalt)); err != nil {
 		return fmt.Errorf("write handshake: %w", err)
 	}
 
@@ -58,12 +59,16 @@ func login(conn net.Conn, username string, cpe bool) error {
 	return nil
 }
 
-func encodeHandshake(version byte, username string, cpe bool) []byte {
+func encodeHandshake(version byte, username string, cpe bool, authSalt string) []byte {
 	packet := make([]byte, 131)
 	packet[0] = wire.OpcodeHandshake
 	packet[1] = version
 	wire.WriteFixedString(packet[2:66], username)
-	wire.WriteFixedString(packet[66:130], "password")
+	if authSalt != "" {
+		wire.WriteFixedString(packet[66:130], auth.Mppass(username, authSalt))
+	} else {
+		wire.WriteFixedString(packet[66:130], "password")
+	}
 	if cpe {
 		packet[130] = 0x42
 	}

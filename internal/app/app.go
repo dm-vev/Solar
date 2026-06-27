@@ -39,6 +39,7 @@ func Run(ctx context.Context, args []string) error {
 			UsernamePrefix: cmd.UsernamePrefix,
 			Scenario:       cmd.Scenario,
 			CPE:            cmd.CPE,
+			AuthSalt:       cmd.AuthSalt,
 		})
 	case "version":
 		_, _ = fmt.Fprintln(os.Stdout, "solar pre-alpha")

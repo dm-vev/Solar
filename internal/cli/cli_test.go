@@ -42,6 +42,8 @@ func TestParseLoadTest(t *testing.T) {
 		"--scenario",
 		"mixed",
 		"--cpe",
+		"--auth-salt",
+		"1234567890abcdef",
 	})
 	if err != nil {
 		t.Fatalf("Parse returned error: %v", err)
@@ -66,6 +68,9 @@ func TestParseLoadTest(t *testing.T) {
 	}
 	if !cmd.CPE {
 		t.Fatal("CPE = false, want true")
+	}
+	if cmd.AuthSalt != "1234567890abcdef" {
+		t.Fatalf("AuthSalt = %q, want 1234567890abcdef", cmd.AuthSalt)
 	}
 }
 

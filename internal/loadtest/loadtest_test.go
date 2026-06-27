@@ -22,7 +22,7 @@ func TestLoginClassicAndCPE(t *testing.T) {
 			readHandshake(t, server)
 			writeMOTDAndLevel(t, server, false)
 		}()
-		if err := login(client, "bot", false); err != nil {
+		if err := login(client, "bot", false, ""); err != nil {
 			t.Fatalf("login classic: %v", err)
 		}
 		<-done
@@ -43,7 +43,7 @@ func TestLoginClassicAndCPE(t *testing.T) {
 			readClientCPE(t, server)
 			writeMOTDAndLevel(t, server, true)
 		}()
-		if err := login(client, "bot", true); err != nil {
+		if err := login(client, "bot", true, ""); err != nil {
 			t.Fatalf("login cpe: %v", err)
 		}
 		<-done
@@ -51,8 +51,11 @@ func TestLoginClassicAndCPE(t *testing.T) {
 }
 
 func TestRunScenariosAndEncoders(t *testing.T) {
-	if got := encodeHandshake(7, "bot", true); got[0] != wire.OpcodeHandshake || got[130] != 0x42 {
+	if got := encodeHandshake(7, "bot", true, ""); got[0] != wire.OpcodeHandshake || got[130] != 0x42 {
 		t.Fatalf("encodeHandshake = %v", got[:2])
+	}
+	if got := wire.ReadFixedString(encodeHandshake(7, "alice", false, "salt")[66:130]); got != "36264c5ce84d59a4da2a6716eb0f3ff0" {
+		t.Fatalf("auth mppass = %q", got)
 	}
 	if got := encodeExtEntry("FastMap", 1); got[0] != wire.OpcodeExtEntry {
 		t.Fatalf("encodeExtEntry opcode = %d", got[0])

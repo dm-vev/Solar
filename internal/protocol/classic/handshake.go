@@ -28,6 +28,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/solar-mc/solar/internal/auth"
 	"github.com/solar-mc/solar/internal/entity"
 	pdb "github.com/solar-mc/solar/internal/playerdb"
 	"github.com/solar-mc/solar/internal/world"
@@ -42,6 +43,7 @@ func (s *session) handleHandshake() error {
 
 	version := payload[0]
 	username := readFixedString(payload[1:65])
+	mppass := readFixedString(payload[65:129])
 	cpeRequested := false
 
 	if version >= 6 {
@@ -57,6 +59,9 @@ func (s *session) handleHandshake() error {
 	}
 	if !s.validUsername(username) {
 		return s.writeKick("invalid username")
+	}
+	if s.authEnabled && !auth.ValidMppass(username, s.authSalt, mppass) {
+		return s.writeKick("authentication failed")
 	}
 	if s.players != nil {
 		if allowed, reason := s.players.CanJoin(username); !allowed {

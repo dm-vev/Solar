@@ -128,6 +128,8 @@ type session struct {
 	undoStack        *player.UndoStack
 	batchChanges     []player.BlockChange
 	rankRegistry     *ranks.Registry
+	authEnabled      bool
+	authSalt         string
 	lastSpecialBlock [3]int    // last block coords checked for special blocks
 	lastAction       time.Time // last player activity (for AFK detection)
 	afkSince         time.Time // when the player became AFK (for AFK kick timing)

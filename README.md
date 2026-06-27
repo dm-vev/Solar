@@ -69,6 +69,10 @@ ext_player_list = true
 fast_map = true
 two_way_ping = true
 
+[auth]
+enabled = false
+salt = ""
+
 [debug]
 pprof_address = ""
 pprof_shutdown_timeout = "5s"
@@ -83,6 +87,11 @@ Negative values are rejected.
 
 Operators can also be seeded with `SOLAR_OPERATORS="alice,bob"` or the legacy
 `SOLAR_ADMIN` variable.
+
+Set `[auth].enabled = true` to require ClassiCube/Classic mppass name
+verification. Public servers should also enable `[heartbeat]`; Solar uses the
+same salt for heartbeat and login verification. For synthetic clients, pass the
+configured salt to `solar loadtest --auth-salt <salt>`.
 
 `[network]` — `read_timeout` / `write_timeout` set per-session TCP deadlines
 (0 disables); `session_outbox_size` is the per-client packet queue depth

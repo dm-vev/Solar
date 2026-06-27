@@ -22,6 +22,7 @@ type Command struct {
 	UsernamePrefix string
 	Scenario       string
 	CPE            bool
+	AuthSalt       string
 }
 
 // Parse converts argv into a command.
@@ -53,5 +54,5 @@ func Parse(args []string) (Command, error) {
 
 // Help returns the CLI usage text.
 func Help() string {
-	return "usage:\n  solar start [--config path] [--pprof host:port]\n  solar loadtest [--address host:port] [--clients n] [--duration 30s] [--prefix bot] [--scenario idle|chat|move|blocks|mixed] [--cpe]\n  solar version\n  solar help\n"
+	return "usage:\n  solar start [--config path] [--pprof host:port]\n  solar loadtest [--address host:port] [--clients n] [--duration 30s] [--prefix bot] [--scenario idle|chat|move|blocks|mixed] [--cpe] [--auth-salt salt]\n  solar version\n  solar help\n"
 }

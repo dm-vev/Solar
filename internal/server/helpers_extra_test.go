@@ -96,7 +96,11 @@ func TestHeartbeatHelpers(t *testing.T) {
 	if got := parseHeartbeatError(`not-json`); got != "not-json" {
 		t.Fatalf("parseHeartbeatError invalid = %q", got)
 	}
-	if salt := generateSalt(); len(salt) != 16 || strings.Trim(salt, "0123456789abcdef") != "" {
+	salt, err := generateSalt()
+	if err != nil {
+		t.Fatalf("generateSalt returned error: %v", err)
+	}
+	if len(salt) != 32 || strings.Trim(salt, "0123456789abcdef") != "" {
 		t.Fatalf("generateSalt = %q", salt)
 	}
 

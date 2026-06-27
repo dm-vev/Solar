@@ -212,6 +212,9 @@ func TestLoadParsesNestedTables(t *testing.T) {
 			"ext_player_list = false\n" +
 			"fast_map = false\n" +
 			"two_way_ping = false\n" +
+			"\n[auth]\n" +
+			"enabled = true\n" +
+			"salt = \"1234567890abcdef\"\n" +
 			"\n[debug]\n" +
 			"pprof_address = \"127.0.0.1:6060\"\n" +
 			"pprof_shutdown_timeout = \"10s\"\n" +
@@ -275,6 +278,9 @@ func TestLoadParsesNestedTables(t *testing.T) {
 	if cfg.CPE.ExtPlayerList || cfg.CPE.FastMap || cfg.CPE.TwoWayPing {
 		t.Fatalf("CPE = %+v, want all false", cfg.CPE)
 	}
+	if !cfg.Auth.Enabled || cfg.Auth.Salt != "1234567890abcdef" {
+		t.Fatalf("Auth = %+v", cfg.Auth)
+	}
 }
 
 func TestLoadAppliesNestedDefaults(t *testing.T) {
@@ -323,6 +329,59 @@ func TestLoadAppliesNestedDefaults(t *testing.T) {
 	}
 	if !cfg.CPE.ExtPlayerList || !cfg.CPE.FastMap || !cfg.CPE.TwoWayPing {
 		t.Fatalf("default CPE = %+v, want all true", cfg.CPE)
+	}
+	if cfg.Auth.Enabled || cfg.Auth.Salt != "" {
+		t.Fatalf("default Auth = %+v", cfg.Auth)
+	}
+}
+
+func TestLoadRejectsAuthWithoutSaltOrHeartbeat(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "server.toml")
+	dataDir := filepath.Join(dir, "data")
+	contents := []byte(
+		"listen = \"127.0.0.1:25566\"\n" +
+			"data_dir = \"" + dataDir + "\"\n" +
+			"server_name = \"Test\"\n" +
+			"motd = \"Test\"\n" +
+			"\n[auth]\n" +
+			"enabled = true\n",
+	)
+	if err := os.WriteFile(path, contents, 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load returned nil error for auth without salt or heartbeat")
+	}
+}
+
+func TestLoadAllowsAuthWithHeartbeatGeneratedSalt(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "server.toml")
+	dataDir := filepath.Join(dir, "data")
+	contents := []byte(
+		"listen = \"127.0.0.1:25566\"\n" +
+			"data_dir = \"" + dataDir + "\"\n" +
+			"server_name = \"Test\"\n" +
+			"motd = \"Test\"\n" +
+			"\n[auth]\n" +
+			"enabled = true\n" +
+			"\n[heartbeat]\n" +
+			"enabled = true\n",
+	)
+	if err := os.WriteFile(path, contents, 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if !cfg.Auth.Enabled || !cfg.Heartbeat.Enabled || cfg.Auth.Salt != "" {
+		t.Fatalf("Auth/Heartbeat = %+v/%+v", cfg.Auth, cfg.Heartbeat)
 	}
 }
 

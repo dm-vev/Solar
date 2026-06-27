@@ -82,6 +82,8 @@ type Codec struct {
 	maxPlayers          int
 	spamChecker         *player.SpamChecker
 	rankRegistry        *ranks.Registry
+	authEnabled         bool
+	authSalt            string
 }
 
 // NewCodec creates the bootstrap protocol codec.
@@ -266,6 +268,12 @@ func (c *Codec) SetRankRegistry(rr *ranks.Registry) {
 	c.rankRegistry = rr
 }
 
+// SetAuthentication configures Classic mppass name verification.
+func (c *Codec) SetAuthentication(enabled bool, salt string) {
+	c.authEnabled = enabled
+	c.authSalt = salt
+}
+
 // StartTime records when the server started, for uptime calculation.
 var StartTime time.Time
 
@@ -341,6 +349,8 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		specialBlocks:       blocks.NewSpecialRegistry(),
 		spamChecker:         c.spamChecker,
 		rankRegistry:        c.rankRegistry,
+		authEnabled:         c.authEnabled,
+		authSalt:            c.authSalt,
 		undoStack:           player.NewUndoStack(200),
 	}
 

@@ -18,6 +18,7 @@ type Config struct {
 	UsernamePrefix string
 	Scenario       string
 	CPE            bool
+	AuthSalt       string
 	Logger         *slog.Logger
 }
 

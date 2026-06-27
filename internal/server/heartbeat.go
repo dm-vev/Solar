@@ -28,11 +28,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/solar-mc/solar/internal/auth"
 )
 
 const (
@@ -50,6 +51,7 @@ type HeartbeatConfig struct {
 	Name        string
 	Public      bool
 	Software    string
+	Salt        string
 	OnlineCount func() int
 }
 
@@ -57,7 +59,15 @@ type HeartbeatConfig struct {
 // It posts server info every 15 seconds until ctx is canceled.
 // The public URL is sent to urlCh (buffered, size 1) when received.
 func StartHeartbeat(ctx context.Context, cfg HeartbeatConfig, logger *slog.Logger, urlCh chan<- string) {
-	salt := generateSalt()
+	salt := cfg.Salt
+	if salt == "" {
+		var err error
+		salt, err = generateSalt()
+		if err != nil {
+			logger.Warn("heartbeat disabled; failed to generate auth salt", "error", err)
+			return
+		}
+	}
 
 	go func() {
 		ticker := time.NewTicker(heartbeatInterval)
@@ -161,12 +171,7 @@ func parseHeartbeatError(jsonStr string) string {
 	return "unknown heartbeat error"
 }
 
-// generateSalt produces a random 16-character hex salt for name verification.
-func generateSalt() string {
-	const hexChars = "0123456789abcdef"
-	b := make([]byte, 16)
-	for i := range b {
-		b[i] = hexChars[rand.Intn(len(hexChars))]
-	}
-	return string(b)
+// generateSalt produces a random salt for name verification.
+func generateSalt() (string, error) {
+	return auth.GenerateSalt()
 }

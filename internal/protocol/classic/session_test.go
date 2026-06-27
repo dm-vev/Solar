@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/solar-mc/solar/internal/auth"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/generator"
@@ -176,6 +177,74 @@ func TestServeConnKicksInvalidUsername(t *testing.T) {
 	if got := bytes.TrimRight(kick[1:65], " \x00"); string(got) != "invalid username" {
 		t.Fatalf("kick message = %q, want invalid username", got)
 	}
+
+	if err := client.Close(); err != nil {
+		t.Fatalf("close client: %v", err)
+	}
+	<-done
+}
+
+func TestServeConnKicksInvalidMppass(t *testing.T) {
+	t.Parallel()
+
+	codec := newTestCodec()
+	codec.SetAuthentication(true, "1234567890abcdef")
+	server, client := net.Pipe()
+	done := make(chan struct{})
+
+	go func() {
+		codec.ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	if _, err := client.Write(encodeClientHandshakeWithVerification(7, "tester", "wrong-token", 0)); err != nil {
+		t.Fatalf("write handshake: %v", err)
+	}
+
+	kick := make([]byte, 65)
+	if _, err := io.ReadFull(client, kick); err != nil {
+		t.Fatalf("read kick: %v", err)
+	}
+	if kick[0] != opcodeKick {
+		t.Fatalf("kick opcode = %d, want %d", kick[0], opcodeKick)
+	}
+	if got := bytes.TrimRight(kick[1:65], " \x00"); string(got) != "authentication failed" {
+		t.Fatalf("kick message = %q, want authentication failed", got)
+	}
+
+	if err := client.Close(); err != nil {
+		t.Fatalf("close client: %v", err)
+	}
+	<-done
+}
+
+func TestServeConnAcceptsValidMppass(t *testing.T) {
+	t.Parallel()
+
+	const salt = "1234567890abcdef"
+	codec := newTestCodec()
+	codec.SetAuthentication(true, salt)
+	server, client := net.Pipe()
+	done := make(chan struct{})
+
+	go func() {
+		codec.ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	mppass := auth.Mppass("tester", salt)
+	if _, err := client.Write(encodeClientHandshakeWithVerification(7, "tester", mppass, 0)); err != nil {
+		t.Fatalf("write handshake: %v", err)
+	}
+
+	motd := make([]byte, 131)
+	if _, err := io.ReadFull(client, motd); err != nil {
+		t.Fatalf("read motd: %v", err)
+	}
+	if motd[0] != opcodeHandshake {
+		t.Fatalf("motd opcode = %d, want %d", motd[0], opcodeHandshake)
+	}
+	_ = readLevelStream(t, client, false)
 
 	if err := client.Close(); err != nil {
 		t.Fatalf("close client: %v", err)
@@ -360,11 +429,15 @@ func TestServeConnUsesWorldSnapshot(t *testing.T) {
 }
 
 func encodeClientHandshake(version byte, username string, userType byte) []byte {
+	return encodeClientHandshakeWithVerification(version, username, "password", userType)
+}
+
+func encodeClientHandshakeWithVerification(version byte, username, verification string, userType byte) []byte {
 	packet := make([]byte, 131)
 	packet[0] = opcodeHandshake
 	packet[1] = version
 	writeFixedString(packet[2:66], username)
-	writeFixedString(packet[66:130], "password")
+	writeFixedString(packet[66:130], verification)
 	packet[130] = userType
 	return packet
 }

@@ -150,6 +150,7 @@ func (s *Server) Run(ctx context.Context) error {
 			Name:        s.cfg.Name,
 			Public:      s.cfg.Heartbeat.Public,
 			Software:    "Solar",
+			Salt:        s.cfg.Auth.Salt,
 			OnlineCount: func() int { return s.players.Count() },
 		}, s.logger, nil)
 		s.logger.Info("heartbeat started", "public", s.cfg.Heartbeat.Public)

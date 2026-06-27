@@ -18,8 +18,9 @@ func parseLoadTest(args []string) (Command, error) {
 	prefix := fs.String("prefix", "bot", "username prefix")
 	scenario := fs.String("scenario", "idle", "scenario name")
 	cpe := fs.Bool("cpe", false, "enable CPE")
+	authSalt := fs.String("auth-salt", "", "Classic mppass salt")
 	if err := fs.Parse(args[1:]); err != nil {
-		return Command{}, fmt.Errorf("%w: loadtest [--address host:port] [--clients n] [--duration 30s] [--prefix bot] [--scenario idle|chat|move|blocks|mixed] [--cpe]", ErrUsage)
+		return Command{}, fmt.Errorf("%w: loadtest [--address host:port] [--clients n] [--duration 30s] [--prefix bot] [--scenario idle|chat|move|blocks|mixed] [--cpe] [--auth-salt salt]", ErrUsage)
 	}
 	parsedScenario := strings.ToLower(strings.TrimSpace(*scenario))
 	switch parsedScenario {
@@ -44,5 +45,6 @@ func parseLoadTest(args []string) (Command, error) {
 		UsernamePrefix: *prefix,
 		Scenario:       parsedScenario,
 		CPE:            *cpe,
+		AuthSalt:       *authSalt,
 	}, nil
 }

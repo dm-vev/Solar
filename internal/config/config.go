@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/solar-mc/solar/internal/auth"
 	"github.com/solar-mc/solar/internal/entity"
 	"github.com/solar-mc/solar/internal/storage"
 )
@@ -34,6 +35,7 @@ type Config struct {
 	Commands         CommandsConfig  `toml:"commands"`
 	Player           PlayerConfig    `toml:"player"`
 	CPE              CPEConfig       `toml:"cpe"`
+	Auth             AuthConfig      `toml:"auth"`
 	Debug            DebugConfig     `toml:"debug"`
 	Heartbeat        HeartbeatConfig `toml:"heartbeat"`
 	AntiSpam         AntiSpamConfig  `toml:"antispam"`
@@ -141,6 +143,12 @@ type CPEConfig struct {
 	TwoWayPing    bool `toml:"two_way_ping"`
 }
 
+// AuthConfig controls Classic mppass name verification.
+type AuthConfig struct {
+	Enabled bool   `toml:"enabled"`
+	Salt    string `toml:"salt"`
+}
+
 // PluginsConfig controls runtime .so plugin loading.
 // The server scans dir (relative to data_dir) for *.so files and opens
 // each with the Go plugin package. Each .so's init() should call
@@ -245,6 +253,10 @@ func Load(path string) (Config, error) {
 			ExtPlayerList: true,
 			FastMap:       true,
 			TwoWayPing:    true,
+		},
+		Auth: AuthConfig{
+			Enabled: false,
+			Salt:    "",
 		},
 		Plugins: PluginsConfig{
 			Enabled: false,
@@ -397,6 +409,19 @@ func (c Config) Validate() error {
 	if c.Player.MaxUsernameLength < 1 || c.Player.MaxUsernameLength > 64 {
 		return fmt.Errorf("player.max_username_length must be 1..64")
 	}
+	if strings.TrimSpace(c.Auth.Salt) != c.Auth.Salt {
+		return fmt.Errorf("auth.salt cannot have leading or trailing whitespace")
+	}
+	if c.Auth.Salt != "" && !auth.ValidSalt(c.Auth.Salt) {
+		return fmt.Errorf(
+			"auth.salt must be %d..%d ASCII alphanumeric characters",
+			auth.MinSaltLength,
+			auth.MaxSaltLength,
+		)
+	}
+	if c.Auth.Enabled && c.Auth.Salt == "" && !c.Heartbeat.Enabled {
+		return fmt.Errorf("auth.salt is required when auth.enabled=true and heartbeat.enabled=false")
+	}
 	return nil
 }
 
@@ -491,6 +516,10 @@ ext_player_list = %v
 fast_map = %v
 two_way_ping = %v
 
+[auth]
+enabled = %v
+salt = "%s"
+
 [debug]
 pprof_address = "%s"
 pprof_shutdown_timeout = "%s"
@@ -512,6 +541,7 @@ format = "%s"
 		formatStringSlice(cfg.Commands.AdminCommands),
 		cfg.Player.WhitelistEnabled, cfg.Player.MaxUsernameLength,
 		cfg.CPE.ExtPlayerList, cfg.CPE.FastMap, cfg.CPE.TwoWayPing,
+		cfg.Auth.Enabled, cfg.Auth.Salt,
 		cfg.Debug.PprofAddress, cfg.Debug.PprofShutdownTimeout.String(),
 		cfg.Log.Level, cfg.Log.Format)
 
