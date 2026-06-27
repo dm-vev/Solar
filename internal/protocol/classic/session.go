@@ -301,7 +301,6 @@ func (s *session) Message(msg string) {
 		}
 		msg = m
 	}
-	msg = applyServerChatColor(msg)
 	for _, line := range splitClassicMessage(msg) {
 		_ = s.writePacket(s.encodeNormalMessage(line))
 	}
@@ -312,13 +311,6 @@ func (s *session) encodeNormalMessage(msg string) []byte {
 		return encodeMessage(0, msg)
 	}
 	return encodeMessage(selfID, msg)
-}
-
-func applyServerChatColor(msg string) string {
-	if msg == "" || strings.HasPrefix(msg, "&") || strings.HasPrefix(msg, "%") {
-		return msg
-	}
-	return "&S" + msg
 }
 
 func splitClassicMessage(msg string) []string {

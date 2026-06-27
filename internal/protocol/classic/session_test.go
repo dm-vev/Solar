@@ -729,7 +729,7 @@ func TestServeConnUsesNormalMessageTypeForCPECommandReply(t *testing.T) {
 func TestSplitClassicMessageKeepsLongTail(t *testing.T) {
 	t.Parallel()
 
-	msg := "&SThis is a deliberately long normal chat line that must be split before the classic packet writer truncates the tail"
+	msg := "This is a deliberately long normal chat line that must be split before the classic packet writer truncates the tail"
 	parts := splitClassicMessage(msg)
 	if len(parts) < 2 {
 		t.Fatalf("parts = %d, want split long message", len(parts))
