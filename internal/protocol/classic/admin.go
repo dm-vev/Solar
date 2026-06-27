@@ -150,9 +150,16 @@ func (s *session) saveLastPos() {
 
 func (s *session) MeAction(action string) {
 	msg := "* " + s.currentUsername() + " " + action
-	pkt := s.encodeNormalMessage(msg)
-	_ = s.writePacket(pkt)
-	s.broadcastToPeers(pkt)
+	s.Message(msg)
+	s.room.ForEachPeerExcept(s.currentEntityID(), func(peer *session) {
+		if peer.CurrentWorldManager() != s.CurrentWorldManager() {
+			return
+		}
+		if peer.isIgnoring(s.currentUsername()) {
+			return
+		}
+		peer.Message(msg)
+	})
 }
 
 func (s *session) WhisperTo(targetName, msg string) bool {

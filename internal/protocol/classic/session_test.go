@@ -726,6 +726,65 @@ func TestServeConnUsesNormalMessageTypeForCPECommandReply(t *testing.T) {
 	<-done
 }
 
+func TestSplitClassicMessageKeepsLongTail(t *testing.T) {
+	t.Parallel()
+
+	msg := "&SThis is a deliberately long normal chat line that must be split before the classic packet writer truncates the tail"
+	parts := splitClassicMessage(msg)
+	if len(parts) < 2 {
+		t.Fatalf("parts = %d, want split long message", len(parts))
+	}
+	for _, part := range parts {
+		if len(part) > classicMessagePayloadSize {
+			t.Fatalf("part length = %d, want <= %d: %q", len(part), classicMessagePayloadSize, part)
+		}
+	}
+	if joined := strings.Join(parts, " "); !strings.Contains(joined, "truncates the tail") {
+		t.Fatalf("joined parts = %q, want non-truncated tail", joined)
+	}
+}
+
+func TestServeConnDoubleSlashEscapesChatCommand(t *testing.T) {
+	t.Parallel()
+
+	server, client := net.Pipe()
+	done := make(chan struct{})
+
+	go func() {
+		newTestCodec().ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	loginAndDrain(t, client, 5, "tester", opcodePing)
+
+	if _, err := client.Write(encodeClientMessage("//where")); err != nil {
+		t.Fatalf("write escaped chat command: %v", err)
+	}
+
+	reply := make([]byte, 66)
+	if _, err := io.ReadFull(client, reply); err != nil {
+		t.Fatalf("read escaped chat reply: %v", err)
+	}
+	if reply[0] != opcodeMessage {
+		t.Fatalf("reply opcode = %d, want %d", reply[0], opcodeMessage)
+	}
+	if reply[1] != selfID {
+		t.Fatalf("reply type = %d, want %d", reply[1], selfID)
+	}
+	text := readFixedString(reply[2:66])
+	if !strings.Contains(text, "<tester> /where") {
+		t.Fatalf("reply text = %q, want escaped /where chat", text)
+	}
+	if strings.Contains(text, "command.where") {
+		t.Fatalf("reply text = %q, command was executed instead of escaped", text)
+	}
+
+	if err := client.Close(); err != nil {
+		t.Fatalf("close client: %v", err)
+	}
+	<-done
+}
+
 func TestServeConnBroadcastsJoinAndBlockChanges(t *testing.T) {
 	t.Parallel()
 

@@ -285,7 +285,9 @@ func (s *session) handleMessage() error {
 		return nil
 	}
 
-	if strings.HasPrefix(text, "/") {
+	if strings.HasPrefix(text, "//") {
+		text = text[1:]
+	} else if strings.HasPrefix(text, "/") {
 		return s.handleCommand(text)
 	}
 
@@ -301,20 +303,15 @@ func (s *session) handleMessage() error {
 		text = msg
 	}
 
-	packet := s.encodeNormalMessage(fmt.Sprintf("<%s> %s", s.currentUsername(), text))
-	formatted := readFixedString(packet[2:])
+	formatted := fmt.Sprintf("<%s> %s", s.currentUsername(), text)
 	if plugin.OnChatFrom.HasHandlers() {
 		plugin.OnChatFrom.Fire(plugin.ChatFromData{Source: s, Message: &formatted})
 	}
 	if plugin.OnChat.HasHandlers() {
 		plugin.OnChat.Fire(plugin.ChatData{Source: s, Message: &formatted})
 	}
-	if formatted != readFixedString(packet[2:]) {
-		packet = s.encodeNormalMessage(formatted)
-	}
-	if err := s.writePacket(packet); err != nil {
-		return err
-	}
+	s.Message(formatted)
+
 	// Broadcast to peers, respecting ignore lists and level filtering.
 	s.room.ForEachPeerExcept(s.currentEntityID(), func(peer *session) {
 		if peer.CurrentWorldManager() != s.CurrentWorldManager() {
@@ -323,8 +320,7 @@ func (s *session) handleMessage() error {
 		if peer.isIgnoring(s.currentUsername()) {
 			return
 		}
-		// Use Message() so OnMessageReceived fires for each recipient.
-		peer.Message(readFixedString(packet[2:]))
+		peer.Message(formatted)
 	})
 	return nil
 }
@@ -391,7 +387,8 @@ func (s *session) handleCommand(line string) error {
 	if !handled || reply == "" {
 		return nil
 	}
-	return s.writePacket(s.encodeNormalMessage(reply))
+	s.Message(reply)
+	return nil
 }
 
 // buildCommandContextFn assembles the command execution context. It uses

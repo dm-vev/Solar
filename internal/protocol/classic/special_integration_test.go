@@ -66,8 +66,8 @@ func TestSpecial_MessageBlockAtPReplacement(t *testing.T) {
 		t.Fatalf("opcode = %d, want %d", msg[0], wire.OpcodeMessage)
 	}
 	text := string(bytesTrimRight(msg[2:66], " \x00"))
-	if text != "Hello tester, welcome!" {
-		t.Fatalf("message = %q, want 'Hello tester, welcome!'", text)
+	if text != "&SHello tester, welcome!" {
+		t.Fatalf("message = %q, want '&SHello tester, welcome!'", text)
 	}
 }
 
@@ -96,8 +96,8 @@ func TestSpecial_MessageBlockPlain(t *testing.T) {
 		t.Fatalf("read message: %v", err)
 	}
 	text := string(bytesTrimRight(msg[2:66], " \x00"))
-	if text != "Welcome to the zone!" {
-		t.Fatalf("message = %q, want 'Welcome to the zone!'", text)
+	if text != "&SWelcome to the zone!" {
+		t.Fatalf("message = %q, want '&SWelcome to the zone!'", text)
 	}
 }
 
@@ -319,8 +319,8 @@ func TestSpecial_MessageBlockPipedCommands(t *testing.T) {
 		t.Fatalf("first packet opcode = %d, want Message", msg1[0])
 	}
 	text1 := bytesTrimRight(msg1[2:66], " \x00")
-	if string(text1) != "Hello" {
-		t.Fatalf("first message = %q, want 'Hello'", text1)
+	if string(text1) != "&SHello" {
+		t.Fatalf("first message = %q, want '&SHello'", text1)
 	}
 
 	// Second packet: the /where command reply.

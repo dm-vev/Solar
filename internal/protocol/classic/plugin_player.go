@@ -25,14 +25,25 @@ import (
 
 var _ plugin.Player = (*session)(nil)
 
+const (
+	cpeMessageNormal       byte = 0
+	cpeMessageAnnouncement byte = 100
+)
+
 // ─── remaining plugin.Player methods on *session ───
 //
 // Backing state lives on the session struct (color, model, hidden, muted,
 // frozen, afk, allowBuild) under stateMu. Defaults are set in ServeConn.
 
 func (s *session) SendCpeMessage(messageType byte, msg string) {
+	if messageType == cpeMessageNormal {
+		s.Message(msg)
+		return
+	}
 	if !s.supportsExt(cpeExtMessageTypes) {
-		_ = s.writePacket(s.encodeNormalMessage(msg))
+		if messageType == cpeMessageAnnouncement {
+			s.Message(msg)
+		}
 		return
 	}
 	_ = s.writePacket(encodeMessage(messageType, msg))

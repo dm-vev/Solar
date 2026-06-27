@@ -24,6 +24,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -40,6 +41,8 @@ import (
 	"github.com/solar-mc/solar/plugin"
 	"github.com/solar-mc/solar/plugin/playerdb"
 )
+
+const classicMessagePayloadSize = 64
 
 type session struct {
 	conn                net.Conn
@@ -298,7 +301,10 @@ func (s *session) Message(msg string) {
 		}
 		msg = m
 	}
-	_ = s.writePacket(s.encodeNormalMessage(msg))
+	msg = applyServerChatColor(msg)
+	for _, line := range splitClassicMessage(msg) {
+		_ = s.writePacket(s.encodeNormalMessage(line))
+	}
 }
 
 func (s *session) encodeNormalMessage(msg string) []byte {
@@ -306,6 +312,46 @@ func (s *session) encodeNormalMessage(msg string) []byte {
 		return encodeMessage(0, msg)
 	}
 	return encodeMessage(selfID, msg)
+}
+
+func applyServerChatColor(msg string) string {
+	if msg == "" || strings.HasPrefix(msg, "&") || strings.HasPrefix(msg, "%") {
+		return msg
+	}
+	return "&S" + msg
+}
+
+func splitClassicMessage(msg string) []string {
+	if msg == "" {
+		return nil
+	}
+
+	lines := strings.Split(msg, "\n")
+	parts := make([]string, 0, len(lines))
+	for _, line := range lines {
+		parts = append(parts, splitClassicLine(line)...)
+	}
+	return parts
+}
+
+func splitClassicLine(line string) []string {
+	if line == "" {
+		return nil
+	}
+
+	parts := make([]string, 0, (len(line)/classicMessagePayloadSize)+1)
+	for len(line) > classicMessagePayloadSize {
+		cut := strings.LastIndex(line[:classicMessagePayloadSize+1], " ")
+		if cut <= 0 {
+			cut = classicMessagePayloadSize
+		}
+		parts = append(parts, strings.TrimRight(line[:cut], " "))
+		line = strings.TrimLeft(line[cut:], " ")
+	}
+	if line != "" {
+		parts = append(parts, line)
+	}
+	return parts
 }
 
 func (s *session) Teleport(x, y, z int, yaw, pitch byte) bool {
