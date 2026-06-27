@@ -460,7 +460,7 @@ func (w *pluginWorld) Rename(newName string) error {
 	}
 	oldName := w.Name()
 	dest := w.levelPath(newName)
-	if err := os.Rename(w.worldPath, dest); err != nil {
+	if err := renameFileSync(w.worldPath, dest); err != nil {
 		return err
 	}
 	w.worldPath = dest
@@ -495,7 +495,7 @@ func (w *pluginWorld) Backup(backupName string) error {
 
 func (w *pluginWorld) Delete() error {
 	name := w.Name()
-	if err := os.Remove(w.worldPath); err != nil {
+	if err := removeFileSync(w.worldPath); err != nil {
 		return err
 	}
 	if plugin.OnLevelDeleted.HasHandlers() {
@@ -582,6 +582,29 @@ func copyFile(src, dst string) error {
 	return dir.Sync()
 }
 
+func syncDir(path string) error {
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
+}
+
+func renameFileSync(src, dst string) error {
+	if err := os.Rename(src, dst); err != nil {
+		return err
+	}
+	return syncDir(dst)
+}
+
+func removeFileSync(path string) error {
+	if err := os.Remove(path); err != nil {
+		return err
+	}
+	return syncDir(path)
+}
+
 // pluginLevel implements plugin.Level for a loaded level in the MultiManager.
 // Unlike pluginWorld (which assumes all players are on the same level),
 // pluginLevel tracks players per-level via codec.PlayersOnLevel.
@@ -656,7 +679,7 @@ func (l *pluginLevel) Rename(newName string) error {
 	}
 	oldName := l.name
 	dest := l.levelPath(newName)
-	if err := os.Rename(l.path, dest); err != nil {
+	if err := renameFileSync(l.path, dest); err != nil {
 		return err
 	}
 	l.path = dest
@@ -692,7 +715,7 @@ func (l *pluginLevel) Backup(backupName string) error {
 
 func (l *pluginLevel) Delete() error {
 	name := l.name
-	if err := os.Remove(l.path); err != nil {
+	if err := removeFileSync(l.path); err != nil {
 		return err
 	}
 	if plugin.OnLevelDeleted.HasHandlers() {
@@ -905,14 +928,31 @@ func (m *pluginLevelManager) RenameLevel(oldName, newName string) error {
 	if err := validateLevelName(newName); err != nil {
 		return err
 	}
-	return os.Rename(m.srv.server.store.WorldFile(oldName), m.srv.server.store.WorldFile(newName))
+	dest := m.srv.server.store.WorldFile(newName)
+	if err := renameFileSync(m.srv.server.store.WorldFile(oldName), dest); err != nil {
+		return err
+	}
+	m.srv.multiMgr.Rename(oldName, newName, dest)
+	if plugin.OnLevelRenamed.HasHandlers() {
+		plugin.OnLevelRenamed.Fire(plugin.LevelRenamedData{Source: oldName, Dest: newName})
+	}
+	return nil
 }
 
 func (m *pluginLevelManager) DeleteLevel(name string) error {
 	if err := validateLevelName(name); err != nil {
 		return err
 	}
-	return os.Remove(m.srv.server.store.WorldFile(name))
+	if err := removeFileSync(m.srv.server.store.WorldFile(name)); err != nil {
+		return err
+	}
+	if !strings.EqualFold(name, m.srv.multiMgr.MainName()) {
+		m.srv.multiMgr.Remove(name)
+	}
+	if plugin.OnLevelRemoved.HasHandlers() {
+		plugin.OnLevelRemoved.Fire(plugin.LevelRemovedData{Name: name})
+	}
+	return nil
 }
 
 func (m *pluginLevelManager) CopyLevel(srcName, destName string) error {

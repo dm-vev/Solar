@@ -107,6 +107,58 @@ func TestPluginLevelAPIsRejectEscapingNames(t *testing.T) {
 	}
 }
 
+func TestPluginLevelManagerRenameUpdatesLoadedLevel(t *testing.T) {
+	host, srv := newPluginHostFixture(t)
+	levels := host.Levels()
+
+	manager := world.NewManager()
+	manager.SetCurrent(world.Level{Name: "old", Width: 4, Height: 4, Length: 4, Blocks: make([]byte, 64)})
+	if err := manager.Save(srv.store.WorldFile("old")); err != nil {
+		t.Fatalf("save old level: %v", err)
+	}
+	if _, err := levels.Load("old"); err != nil {
+		t.Fatalf("load old level: %v", err)
+	}
+	if err := levels.RenameLevel("old", "new"); err != nil {
+		t.Fatalf("rename level: %v", err)
+	}
+	if host.multiMgr.Has("old") {
+		t.Fatal("old level stayed loaded after rename")
+	}
+	if !host.multiMgr.Has("new") {
+		t.Fatal("new level was not loaded after rename")
+	}
+	if _, err := os.Stat(srv.store.WorldFile("new")); err != nil {
+		t.Fatalf("stat renamed level: %v", err)
+	}
+	if _, err := os.Stat(srv.store.WorldFile("old")); !os.IsNotExist(err) {
+		t.Fatalf("old level file still exists or stat failed: %v", err)
+	}
+}
+
+func TestPluginLevelManagerDeleteRemovesLoadedNonMainLevel(t *testing.T) {
+	host, srv := newPluginHostFixture(t)
+	levels := host.Levels()
+
+	manager := world.NewManager()
+	manager.SetCurrent(world.Level{Name: "delete-me", Width: 4, Height: 4, Length: 4, Blocks: make([]byte, 64)})
+	if err := manager.Save(srv.store.WorldFile("delete-me")); err != nil {
+		t.Fatalf("save level: %v", err)
+	}
+	if _, err := levels.Load("delete-me"); err != nil {
+		t.Fatalf("load level: %v", err)
+	}
+	if err := levels.DeleteLevel("delete-me"); err != nil {
+		t.Fatalf("delete level: %v", err)
+	}
+	if host.multiMgr.Has("delete-me") {
+		t.Fatal("deleted level stayed loaded")
+	}
+	if _, err := os.Stat(srv.store.WorldFile("delete-me")); !os.IsNotExist(err) {
+		t.Fatalf("deleted level file still exists or stat failed: %v", err)
+	}
+}
+
 func TestCopyFileWritesDestination(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "src.swld")

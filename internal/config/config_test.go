@@ -172,6 +172,45 @@ func TestValidateRejectsMaxPlayersAboveClassicLimit(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsDefaultWorldAboveMaxBlocks(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		ListenAddress:    "127.0.0.1:25565",
+		DataDir:          t.TempDir(),
+		Workers:          1,
+		MaxPlayers:       8,
+		ConnectRate:      1,
+		Name:             "Solar",
+		MOTD:             "Test",
+		DefaultGenerator: "Classic",
+		World: WorldConfig{
+			DefaultWidth:  8,
+			DefaultHeight: 8,
+			DefaultLength: 8,
+			MaxBlocks:     511,
+		},
+		Network: NetworkConfig{
+			SessionOutbox:   1,
+			WriteBatchSize:  1,
+			SendTimeoutMode: "fixed",
+		},
+		Storage: StorageConfig{
+			Backend:       "local",
+			WorldsDir:     "worlds",
+			PlayersDir:    "players",
+			PolicyFile:    "policy.json",
+			WorldFileExt:  ".swld",
+			MainWorldName: "main",
+		},
+		Log: LogConfig{Level: "info", Format: "text"},
+	}
+
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate returned nil error for default world above max_blocks")
+	}
+}
+
 func TestLoadParsesNestedTables(t *testing.T) {
 	t.Parallel()
 

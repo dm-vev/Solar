@@ -1,5 +1,5 @@
 .SHELL := /bin/bash
-.PHONY: all build test test-race vet lint fmt ci clean docker
+.PHONY: all build test test-race vet lint fmt ci production-gate clean docker
 
 all: build
 
@@ -23,6 +23,9 @@ fmt:
 	goimports -w -local github.com/solar-mc/solar ./internal/... ./cmd/...
 
 ci: vet test-race lint build
+
+production-gate:
+	scripts/production-gate.sh
 
 clean:
 	rm -rf bin/

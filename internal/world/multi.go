@@ -74,6 +74,25 @@ func (m *MultiManager) Add(name string, mgr *Manager, path string) {
 	m.levels[strings.ToLower(name)] = &managedLevel{manager: mgr, name: name, path: path}
 }
 
+// Rename updates a loaded level name and path.
+func (m *MultiManager) Rename(oldName, newName, path string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	oldKey := strings.ToLower(oldName)
+	ml, ok := m.levels[oldKey]
+	if !ok {
+		return false
+	}
+	delete(m.levels, oldKey)
+	ml.name = newName
+	ml.path = path
+	m.levels[strings.ToLower(newName)] = ml
+	if strings.EqualFold(m.main, oldName) {
+		m.main = newName
+	}
+	return true
+}
+
 // Remove removes a level by name. Returns false if not found.
 func (m *MultiManager) Remove(name string) bool {
 	m.mu.Lock()

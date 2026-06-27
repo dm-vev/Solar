@@ -355,6 +355,10 @@ func (c Config) Validate() error {
 	if c.World.MaxBlocks < 1 {
 		return fmt.Errorf("world.max_blocks must be at least 1")
 	}
+	defaultVolume := int64(c.World.DefaultWidth) * int64(c.World.DefaultHeight) * int64(c.World.DefaultLength)
+	if defaultVolume > int64(c.World.MaxBlocks) {
+		return fmt.Errorf("world default volume %d exceeds world.max_blocks %d", defaultVolume, c.World.MaxBlocks)
+	}
 	if c.Debug.PprofShutdownTimeout < 0 {
 		return fmt.Errorf("debug.pprof_shutdown_timeout cannot be negative")
 	}

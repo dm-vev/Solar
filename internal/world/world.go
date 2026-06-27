@@ -382,10 +382,6 @@ func normalizeLevel(level Level) Level {
 		level.Length = 1
 	}
 	volume := level.Volume()
-	limit := MaxBlocks()
-	if int64(volume) > limit {
-		volume = int(limit)
-	}
 	if len(level.Blocks) != volume {
 		blocks := make([]byte, volume)
 		copy(blocks, level.Blocks)
