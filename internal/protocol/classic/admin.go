@@ -171,7 +171,7 @@ func (s *session) WhisperTo(targetName, msg string) bool {
 	if target.isIgnoring(s.currentUsername()) {
 		return false
 	}
-	target.Message("&7[whisper] &e" + s.currentUsername() + "&7: &f" + msg)
+	target.Message("&7[whisper] " + s.Color() + s.currentUsername() + "&7: &f" + msg)
 	s.Message("&7[to " + targetName + "] &f" + msg)
 	return true
 }

@@ -39,7 +39,7 @@ func (s *Server) checkAFK() {
 
 		if afk && cfg.AutoAfkTime > 0 {
 			// Auto-un-AFK: player became active again.
-			if now.Sub(la) < cfg.AutoAfkTime {
+			if la.After(afkSince) && now.Sub(la) < cfg.AutoAfkTime {
 				p.SetAfk(false)
 				s.codec.BroadcastMessage("&7" + p.Name() + " is no longer AFK")
 				continue

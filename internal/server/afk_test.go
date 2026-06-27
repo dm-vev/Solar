@@ -289,6 +289,29 @@ func TestCheckAFKAutoUnmark(t *testing.T) {
 	}
 }
 
+func TestCheckAFKDoesNotClearManualAFKWithoutNewActivity(t *testing.T) {
+	t.Parallel()
+
+	srv, codec, _ := newAFKTestServer(t, config.AFKConfig{
+		AutoAfkTime: time.Hour,
+	})
+	client, done := connectPlayer(t, codec, "bob")
+	defer func() {
+		client.Close()
+		<-done
+	}()
+
+	p := codec.FindPlayer("bob")
+	if p == nil {
+		t.Fatal("player not found")
+	}
+	p.SetAfk(true)
+	srv.checkAFK()
+	if !p.IsAfk() {
+		t.Fatal("manual AFK should not clear without activity after afkSince")
+	}
+}
+
 // TestCheckAFKKickFromAfkSince verifies that the AFK kick timer is
 // measured from afkSince (the moment the player became AFK), not from
 // lastAction. Regression test for the kick-timing bug.
