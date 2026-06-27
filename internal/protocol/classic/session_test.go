@@ -772,7 +772,7 @@ func TestServeConnDoubleSlashEscapesChatCommand(t *testing.T) {
 		t.Fatalf("reply type = %d, want %d", reply[1], selfID)
 	}
 	text := readFixedString(reply[2:66])
-	if !strings.Contains(text, "<tester> /where") {
+	if !strings.Contains(text, "&e<tester> &f/where") {
 		t.Fatalf("reply text = %q, want escaped /where chat", text)
 	}
 	if strings.Contains(text, "command.where") {

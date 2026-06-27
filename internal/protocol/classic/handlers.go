@@ -303,7 +303,7 @@ func (s *session) handleMessage() error {
 		text = msg
 	}
 
-	formatted := fmt.Sprintf("<%s> %s", s.currentUsername(), text)
+	formatted := fmt.Sprintf("%s<%s> &f%s", s.Color(), s.currentUsername(), text)
 	if plugin.OnChatFrom.HasHandlers() {
 		plugin.OnChatFrom.Fire(plugin.ChatFromData{Source: s, Message: &formatted})
 	}

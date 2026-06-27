@@ -149,7 +149,7 @@ func (s *session) saveLastPos() {
 // ─── ChatService methods ───
 
 func (s *session) MeAction(action string) {
-	msg := "* " + s.currentUsername() + " " + action
+	msg := s.Color() + "* " + s.currentUsername() + " " + action
 	s.Message(msg)
 	s.room.ForEachPeerExcept(s.currentEntityID(), func(peer *session) {
 		if peer.CurrentWorldManager() != s.CurrentWorldManager() {
