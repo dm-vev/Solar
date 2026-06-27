@@ -692,6 +692,40 @@ func TestServeConnExecutesChatCommand(t *testing.T) {
 	<-done
 }
 
+func TestServeConnUsesNormalMessageTypeForCPECommandReply(t *testing.T) {
+	t.Parallel()
+
+	server, client := net.Pipe()
+	done := make(chan struct{})
+
+	go func() {
+		newTestCodec().ServeConn(context.Background(), server)
+		close(done)
+	}()
+
+	loginWithCPE(t, client, "tester", true, cpeExtMessageTypes, cpeExtFastMapName)
+
+	if _, err := client.Write(encodeClientMessage("/where")); err != nil {
+		t.Fatalf("write chat command: %v", err)
+	}
+
+	reply := make([]byte, 66)
+	if _, err := io.ReadFull(client, reply); err != nil {
+		t.Fatalf("read command reply: %v", err)
+	}
+	if reply[0] != opcodeMessage {
+		t.Fatalf("reply opcode = %d, want %d", reply[0], opcodeMessage)
+	}
+	if reply[1] != 0 {
+		t.Fatalf("reply message type = %d, want normal CPE type 0", reply[1])
+	}
+
+	if err := client.Close(); err != nil {
+		t.Fatalf("close client: %v", err)
+	}
+	<-done
+}
+
 func TestServeConnBroadcastsJoinAndBlockChanges(t *testing.T) {
 	t.Parallel()
 

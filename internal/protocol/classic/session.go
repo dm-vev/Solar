@@ -298,7 +298,14 @@ func (s *session) Message(msg string) {
 		}
 		msg = m
 	}
-	_ = s.writePacket(encodeMessage(selfID, msg))
+	_ = s.writePacket(s.encodeNormalMessage(msg))
+}
+
+func (s *session) encodeNormalMessage(msg string) []byte {
+	if s.supportsExt(cpeExtMessageTypes) {
+		return encodeMessage(0, msg)
+	}
+	return encodeMessage(selfID, msg)
 }
 
 func (s *session) Teleport(x, y, z int, yaw, pitch byte) bool {

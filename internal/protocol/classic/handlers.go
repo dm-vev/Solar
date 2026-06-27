@@ -301,7 +301,7 @@ func (s *session) handleMessage() error {
 		text = msg
 	}
 
-	packet := encodeMessage(selfID, fmt.Sprintf("<%s> %s", s.currentUsername(), text))
+	packet := s.encodeNormalMessage(fmt.Sprintf("<%s> %s", s.currentUsername(), text))
 	formatted := readFixedString(packet[2:])
 	if plugin.OnChatFrom.HasHandlers() {
 		plugin.OnChatFrom.Fire(plugin.ChatFromData{Source: s, Message: &formatted})
@@ -310,7 +310,7 @@ func (s *session) handleMessage() error {
 		plugin.OnChat.Fire(plugin.ChatData{Source: s, Message: &formatted})
 	}
 	if formatted != readFixedString(packet[2:]) {
-		packet = encodeMessage(selfID, formatted)
+		packet = s.encodeNormalMessage(formatted)
 	}
 	if err := s.writePacket(packet); err != nil {
 		return err
@@ -391,7 +391,7 @@ func (s *session) handleCommand(line string) error {
 	if !handled || reply == "" {
 		return nil
 	}
-	return s.writePacket(encodeMessage(selfID, reply))
+	return s.writePacket(s.encodeNormalMessage(reply))
 }
 
 // buildCommandContextFn assembles the command execution context. It uses

@@ -31,6 +31,10 @@ var _ plugin.Player = (*session)(nil)
 // frozen, afk, allowBuild) under stateMu. Defaults are set in ServeConn.
 
 func (s *session) SendCpeMessage(messageType byte, msg string) {
+	if !s.supportsExt(cpeExtMessageTypes) {
+		_ = s.writePacket(s.encodeNormalMessage(msg))
+		return
+	}
 	_ = s.writePacket(encodeMessage(messageType, msg))
 }
 

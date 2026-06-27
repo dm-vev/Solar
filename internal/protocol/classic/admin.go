@@ -150,7 +150,7 @@ func (s *session) saveLastPos() {
 
 func (s *session) MeAction(action string) {
 	msg := "* " + s.currentUsername() + " " + action
-	pkt := encodeMessage(selfID, msg)
+	pkt := s.encodeNormalMessage(msg)
 	_ = s.writePacket(pkt)
 	s.broadcastToPeers(pkt)
 }
