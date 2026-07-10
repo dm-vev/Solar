@@ -5,6 +5,25 @@ package player
 
 import "github.com/solar-mc/solar/plugin/cpe"
 
+// Built-in rank permission levels used by Player.Rank and plugin commands.
+const (
+	RankBanned     = -20
+	RankGuest      = 0
+	RankBuilder    = 30
+	RankAdvBuilder = 50
+	RankOperator   = 80
+	RankAdmin      = 100
+	RankOwner      = 120
+)
+
+// BlockPos is an integer block coordinate returned by mark selections.
+type BlockPos struct {
+	X, Y, Z int
+}
+
+// SelectionHandler runs after the player has clicked all requested marks.
+type SelectionHandler func(marks []BlockPos)
+
 // Player is the interface plugins use to interact with an online player.
 // The concrete implementation is the server's internal session type;
 // plugins only see this interface.
@@ -24,6 +43,9 @@ type Player interface {
 
 	// IsOperator reports whether the player has admin privileges.
 	IsOperator() bool
+
+	// Rank returns the player's numeric permission level.
+	Rank() int
 
 	// Position returns the player's current position in wire units
 	// (1/32 block). Divide by 32 for block coordinates.
@@ -111,6 +133,25 @@ type Player interface {
 
 	// SetAllowBuild controls whether the player can place/break blocks.
 	SetAllowBuild(allowed bool)
+
+	// DrawLimit returns the maximum number of blocks a drawing command may change.
+	DrawLimit() int
+
+	// CanPlaceBlock reports whether the player's rank may place this block.
+	CanPlaceBlock(block byte) bool
+
+	// CanDeleteBlock reports whether the player's rank may delete this block.
+	CanDeleteBlock(block byte) bool
+
+	// LevelName returns the name of the player's current level.
+	LevelName() string
+
+	// SelectBlocks intercepts the next markCount block clicks and passes their
+	// coordinates to handler. It returns false for invalid requests.
+	SelectBlocks(markCount int, handler SelectionHandler) bool
+
+	// CancelSelection cancels the active block-mark selection.
+	CancelSelection() bool
 
 	// CPE returns the CPE packet sender for this player.
 	// Returns nil if the player doesn't support any CPE extensions.

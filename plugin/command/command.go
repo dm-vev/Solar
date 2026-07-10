@@ -10,3 +10,14 @@ import "github.com/solar-mc/solar/plugin/player"
 //
 //nolint:revive // intentional: re-exported as plugin.X
 type CommandHandler func(p player.Player, args []string) string
+
+// CommandSpec describes a plugin command and its permission metadata.
+// Name and Aliases omit the leading slash. MinRank uses Solar permission
+// levels (guest=0, builder=30, advbuilder=50, operator=80, admin=100, owner=120).
+type CommandSpec struct {
+	Name    string
+	Aliases []string
+	Help    string
+	MinRank int
+	Handler CommandHandler
+}

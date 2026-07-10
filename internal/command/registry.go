@@ -17,6 +17,23 @@ type Position struct {
 	Z int
 }
 
+// TPAStatus describes the result of a teleport request operation.
+type TPAStatus byte
+
+const (
+	TPARequestSent TPAStatus = iota
+	TPAAccepted
+	TPADenied
+	TPAPlayerNotFound
+	TPASelf
+	TPAAlreadyPending
+	TPATargetBusy
+	TPAAmbiguous
+	TPANoPending
+	TPARequesterOffline
+	TPAFailed
+)
+
 // Authority checks command permissions.
 type Authority interface {
 	CanAdmin() bool
@@ -34,8 +51,10 @@ type WorldService interface {
 type TeleportService interface {
 	// SpawnPoint returns the world spawn coordinates.
 	SpawnPoint() (x, y, z int, yaw, pitch byte)
-	// TeleportToPlayer teleports the caller to the named player.
-	TeleportToPlayer(name string) bool
+	// RequestTeleport asks the named player for permission to teleport.
+	RequestTeleport(name string) (TPAStatus, string)
+	// RespondTeleport accepts or denies the caller's pending request.
+	RespondTeleport(accept bool) (TPAStatus, string)
 	// SummonPlayer teleports the named player to the caller.
 	SummonPlayer(name string) bool
 	// Back teleports the caller to their last position.
@@ -263,6 +282,7 @@ type Handler func(Context, []string) (string, bool)
 type cmdEntry struct {
 	handler Handler
 	minRank int // minimum rank permission level to use this command
+	help    string
 }
 
 // Registry stores the available chat commands.
@@ -375,6 +395,56 @@ func (r *Registry) RegisterWithRank(name string, minRank int, handler Handler) {
 	r.mu.Unlock()
 }
 
+// RegisterManyIfAbsent atomically registers a command and all aliases.
+// It returns false without modifying the registry if a name is invalid,
+// duplicated, or already registered.
+func (r *Registry) RegisterManyIfAbsent(names []string, minRank int, help string, handler Handler) bool {
+	if handler == nil || len(names) == 0 {
+		return false
+	}
+	normalized := make([]string, 0, len(names))
+	seen := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name == "" || strings.ContainsAny(name, "/\\ \t\r\n") {
+			return false
+		}
+		if _, exists := seen[name]; exists {
+			return false
+		}
+		seen[name] = struct{}{}
+		normalized = append(normalized, name)
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, name := range normalized {
+		if _, exists := r.handlers[name]; exists {
+			return false
+		}
+	}
+	entry := cmdEntry{handler: handler, minRank: minRank, help: strings.TrimSpace(help)}
+	for _, name := range normalized {
+		r.handlers[name] = entry
+	}
+	return true
+}
+
+// UnregisterMany removes all provided command names as one operation.
+func (r *Registry) UnregisterMany(names []string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	removed := false
+	for _, name := range names {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if _, exists := r.handlers[name]; exists {
+			delete(r.handlers, name)
+			removed = true
+		}
+	}
+	return removed
+}
+
 // SetCommandRank sets the minimum rank for an existing command.
 func (r *Registry) SetCommandRank(name string, minRank int) bool {
 	r.mu.Lock()
@@ -419,6 +489,11 @@ func (r *Registry) Execute(ctx Context, line string) (string, bool) {
 
 	name := strings.ToLower(fields[0])
 	args := fields[1:]
+	if name == "tpaccept" || name == "tpdeny" {
+		action := strings.TrimPrefix(name, "tp")
+		name = "tpa"
+		args = append([]string{action}, args...)
+	}
 
 	r.mu.RLock()
 	entry, ok := r.handlers[name]
@@ -429,14 +504,12 @@ func (r *Registry) Execute(ctx Context, line string) (string, bool) {
 	}
 
 	// Check rank permission.
-	if entry.minRank > 0 {
-		playerRank := 0 // default to guest
-		if ctx.RankLevel != nil {
-			playerRank = ctx.RankLevel()
-		}
-		if playerRank < entry.minRank {
-			return ctx.tr("command.shared.permission_denied"), true
-		}
+	playerRank := 0 // default to guest
+	if ctx.RankLevel != nil {
+		playerRank = ctx.RankLevel()
+	}
+	if entry.minRank > 0 && playerRank < entry.minRank {
+		return ctx.tr("command.shared.permission_denied"), true
 	}
 
 	// Check admin commands (legacy binary operator check).

@@ -83,6 +83,8 @@ func (s *Server) generateDefaultWorld(worldPath string) error {
 }
 
 func (s *Server) saveState(worldPath, policyPath string) {
+	s.saveMu.Lock()
+	defer s.saveMu.Unlock()
 	if worldPath != "" {
 		skipSave := false
 		if plugin.OnLevelSave.HasHandlers() {
@@ -90,7 +92,11 @@ func (s *Server) saveState(worldPath, policyPath string) {
 			skipSave = ctx.Cancelled()
 		}
 		if !skipSave {
-			if err := s.worlds.Save(worldPath); err != nil {
+			if s.saveLevelsFn != nil {
+				if err := s.saveLevelsFn(); err != nil {
+					s.logger.Error("save levels", "error", err)
+				}
+			} else if err := s.worlds.Save(worldPath); err != nil {
 				s.logger.Error("save world", "path", worldPath, "error", err)
 			}
 		}
@@ -106,6 +112,11 @@ func (s *Server) saveState(worldPath, policyPath string) {
 		}
 	}
 	s.flushBlockDBs()
+}
+
+// SetSaveLevelsFn configures persistence for all loaded level managers.
+func (s *Server) SetSaveLevelsFn(fn func() error) {
+	s.saveLevelsFn = fn
 }
 
 // SaveStateNow persists world and player policy using the store's configured

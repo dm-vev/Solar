@@ -7,7 +7,6 @@
 package command
 
 import (
-	"strconv"
 	"strings"
 )
 
@@ -87,7 +86,7 @@ func viewRanksCommand(ctx Context, args []string) (string, bool) {
 	all := ctx.Ranks.All()
 	var parts []string
 	for _, r := range all {
-		parts = append(parts, r.Color+r.Name+"("+strconv.Itoa(r.Permission)+")")
+		parts = append(parts, r.Color+r.Name)
 	}
-	return "&aRanks: &7" + strings.Join(parts, " "), true
+	return ctx.tr("command.viewranks.available", strings.Join(parts, ", ")), true
 }

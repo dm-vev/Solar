@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/generator"
 )
 
@@ -124,6 +125,34 @@ func TestManagerLoadSaveRoundTrip(t *testing.T) {
 	}
 	if !bytes.Equal(got.Blocks, want.Blocks) {
 		t.Fatalf("blocks mismatch: got %v want %v", got.Blocks, want.Blocks)
+	}
+}
+
+func TestManagerSpecialBlocksSaveLoadRoundTrip(t *testing.T) {
+	t.Parallel()
+	mgr := NewManager()
+	mgr.SetCurrent(Level{Name: "special", Width: 4, Height: 4, Length: 4, Blocks: make([]byte, 64)})
+	if !mgr.SetBlock(1, 2, 3, blocks.MBWhite) || !mgr.SetSpecialBlock(1, 2, 3, &blocks.SpecialEntry{
+		Type:    blocks.SpecialMessage,
+		Message: "hello",
+	}) {
+		t.Fatal("set message block")
+	}
+
+	path := filepath.Join(t.TempDir(), "special.swld")
+	if err := mgr.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	reloaded := NewManager()
+	if err := reloaded.Load(path); err != nil {
+		t.Fatal(err)
+	}
+	entry := reloaded.SpecialBlockAt(1, 2, 3)
+	if entry == nil || entry.Type != blocks.SpecialMessage || entry.Message != "hello" {
+		t.Fatalf("special block = %+v", entry)
+	}
+	if !reloaded.SetBlock(1, 2, 3, blocks.Stone) || reloaded.SpecialBlockAt(1, 2, 3) != nil {
+		t.Fatal("replacing physical block did not remove metadata")
 	}
 }
 

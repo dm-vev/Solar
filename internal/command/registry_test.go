@@ -27,6 +27,46 @@ func TestRegistryExecuteAllowsAdminCommandsWithPermission(t *testing.T) {
 	}
 }
 
+func TestRegistryRegisterManyIfAbsent(t *testing.T) {
+	t.Parallel()
+	registry := NewRegistry()
+	called := false
+	handler := func(_ Context, args []string) (string, bool) {
+		called = len(args) == 1 && args[0] == "value"
+		return "ok", true
+	}
+	if !registry.RegisterManyIfAbsent([]string{"Example", "Ex"}, 30, "example help", handler) {
+		t.Fatal("RegisterManyIfAbsent returned false")
+	}
+	if registry.RegisterManyIfAbsent([]string{"other", "help"}, 0, "", handler) {
+		t.Fatal("registration overwrote a built-in command")
+	}
+	if _, exists := registry.handlers["other"]; exists {
+		t.Fatal("failed atomic registration left a partial command")
+	}
+
+	guest := Context{Tr: testTr, RankLevel: func() int { return 0 }}
+	if got, _ := registry.Execute(guest, "/ex value"); got != "command.shared.permission_denied" {
+		t.Fatalf("guest alias result = %q", got)
+	}
+	builder := Context{Tr: testTr, RankLevel: func() int { return 30 }}
+	if got, _ := registry.Execute(builder, "/ex value"); got != "ok" || !called {
+		t.Fatalf("builder alias result = %q called=%v", got, called)
+	}
+	if got, _ := registry.Execute(builder, "/help example"); got != "example help" {
+		t.Fatalf("plugin help = %q", got)
+	}
+	if !registry.UnregisterMany([]string{"example", "ex"}) {
+		t.Fatal("UnregisterMany returned false")
+	}
+	if _, exists := registry.handlers["example"]; exists {
+		t.Fatal("primary command remained registered")
+	}
+	if _, exists := registry.handlers["ex"]; exists {
+		t.Fatal("alias remained registered")
+	}
+}
+
 type testAuthority bool
 
 func (a testAuthority) CanAdmin() bool { return bool(a) }

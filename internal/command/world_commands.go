@@ -97,7 +97,7 @@ func levelsCommand(ctx Context, args []string) (string, bool) {
 		strings.Join(loaded, ", "), strings.Join(files, ", ")), true
 }
 
-// physicsCommand — /physics [0|1|2|3]
+// physicsCommand — /physics [0|1|2|3|4|5]
 // Sets or shows the physics mode for the current level.
 func physicsCommand(ctx Context, args []string) (string, bool) {
 	if ctx.Levels == nil {
@@ -115,8 +115,12 @@ func physicsCommand(ctx Context, args []string) (string, bool) {
 		mode = 1
 	case "2", "advanced":
 		mode = 2
-	case "3", "custom":
+	case "3", "hardcore", "custom":
 		mode = 3
+	case "4", "instant":
+		mode = 4
+	case "5", "doors":
+		mode = 5
 	default:
 		return ctx.tr("command.blocks.usage"), true
 	}

@@ -26,6 +26,7 @@ const (
 	StillLava    byte = 11
 	Sand         byte = 12
 	Gravel       byte = 13
+	TNT          byte = 46
 	Log          byte = 17
 	Leaves       byte = 18
 	Sponge       byte = 19
@@ -45,9 +46,12 @@ const (
 
 // Physics modes.
 const (
-	ModeOff      = 0
-	ModeNormal   = 1
-	ModeAdvanced = 2
+	ModeOff       = 0
+	ModeNormal    = 1
+	ModeAdvanced  = 2
+	ModeHardcore  = 3
+	ModeInstant   = 4
+	ModeDoorsOnly = 5
 )
 
 const removeFlag = 255
@@ -56,22 +60,26 @@ const removeFlag = 255
 // It accesses blocks through getBlock/setBlock callbacks so it shares
 // the same block array as the world.Manager (no copy divergence).
 type PhysicsEngine struct {
-	mu        sync.Mutex
-	width     int
-	height    int
-	length    int
-	mode      int
-	checks    []checkEntry
-	updates   []updateEntry
-	rng       *rand.Rand
-	getBlk    func(idx int) byte
-	setBlk    func(idx int, block byte)
-	broadcast func(x, y, z int, block byte)
+	mu         sync.Mutex
+	width      int
+	height     int
+	length     int
+	mode       int
+	checks     []checkEntry
+	queued     map[int]int
+	processing map[int]*checkEntry
+	updates    []updateEntry
+	staged     map[int]int
+	rng        *rand.Rand
+	getBlk     func(idx int) byte
+	setBlk     func(idx int, block byte)
+	broadcast  func(x, y, z int, block byte)
 }
 
 type checkEntry struct {
-	index int
-	data  byte
+	index  int
+	data   byte
+	debris bool
 }
 
 type updateEntry struct {
@@ -85,14 +93,17 @@ type updateEntry struct {
 // change so clients see the update.
 func NewPhysics(width, height, length int, getBlk func(int) byte, setBlk func(int, byte), broadcast func(x, y, z int, block byte)) *PhysicsEngine {
 	return &PhysicsEngine{
-		width:     width,
-		height:    height,
-		length:    length,
-		mode:      ModeNormal,
-		rng:       rand.New(rand.NewSource(rand.Int63())),
-		getBlk:    getBlk,
-		setBlk:    setBlk,
-		broadcast: broadcast,
+		width:      width,
+		height:     height,
+		length:     length,
+		mode:       ModeNormal,
+		queued:     make(map[int]int),
+		processing: make(map[int]*checkEntry),
+		staged:     make(map[int]int),
+		rng:        rand.New(rand.NewSource(rand.Int63())),
+		getBlk:     getBlk,
+		setBlk:     setBlk,
+		broadcast:  broadcast,
 	}
 }
 
@@ -106,6 +117,13 @@ func (e *PhysicsEngine) Mode() int {
 func (e *PhysicsEngine) SetMode(mode int) {
 	e.mu.Lock()
 	e.mode = mode
+	if mode == ModeOff {
+		e.checks = e.checks[:0]
+		e.updates = e.updates[:0]
+		clear(e.queued)
+		clear(e.processing)
+		clear(e.staged)
+	}
 	e.mu.Unlock()
 }
 
@@ -116,7 +134,7 @@ func (e *PhysicsEngine) Queue(x, y, z int) {
 		return
 	}
 	e.mu.Lock()
-	e.checks = append(e.checks, checkEntry{index: idx})
+	e.queueCheck(idx)
 	e.mu.Unlock()
 }
 
@@ -133,32 +151,47 @@ func (e *PhysicsEngine) Tick() {
 	checks := make([]checkEntry, len(e.checks))
 	copy(checks, e.checks)
 	e.checks = e.checks[:0]
+	clear(e.queued)
+	for i := range checks {
+		e.processing[checks[i].index] = &checks[i]
+	}
 
 	for i := range checks {
 		c := &checks[i]
+		delete(e.processing, c.index)
 		if c.index < 0 {
 			continue
 		}
 		block := e.getBlock(c.index)
 		e.processBlock(c, block, adv)
 		if c.data != removeFlag {
-			e.checks = append(e.checks, *c)
+			e.keepCheck(*c)
 		}
 	}
+	clear(e.processing)
 
 	// Apply updates.
 	for _, u := range e.updates {
 		e.applyUpdate(u)
 	}
 	e.updates = e.updates[:0]
+	clear(e.staged)
 }
 
 func (e *PhysicsEngine) processBlock(c *checkEntry, block byte, adv bool) {
 	x, y, z := e.intToPos(c.index)
+	if c.debris {
+		e.doTNTDebris(c, x, y, z, block)
+		return
+	}
+	if e.mode == ModeDoorsOnly && block != DoorLogAir {
+		c.data = removeFlag
+		return
+	}
 
 	switch block {
 	case Air:
-		// Air does nothing in basic physics.
+		c.data = removeFlag
 
 	case Water, StillWater:
 		e.doLiquid(c, x, y, z, block, false, adv)
@@ -185,7 +218,16 @@ func (e *PhysicsEngine) processBlock(c *checkEntry, block byte, adv bool) {
 		e.doFire(c, x, y, z, adv)
 
 	case TNTSmall, TNTBig, TNTNuke:
-		e.doTNT(c, x, y, z, block, adv)
+		e.doTNT(c, x, y, z, block)
+
+	case TNTExplosion:
+		if e.rng.Intn(10) < 7 {
+			e.setBlock(c.index, Air)
+			c.data = removeFlag
+		}
+
+	case DoorLogAir:
+		e.doDoor(c, x, y, z)
 
 	case Sponge:
 		e.doSponge(c, x, y, z, false)
@@ -222,16 +264,59 @@ func (e *PhysicsEngine) getBlock(idx int) byte {
 	return e.getBlk(idx)
 }
 
-func (e *PhysicsEngine) setBlock(idx int, block byte) {
-	if idx >= 0 {
-		e.updates = append(e.updates, updateEntry{index: idx, block: block})
+func (e *PhysicsEngine) setBlock(idx int, block byte) bool {
+	if idx < 0 {
+		return false
 	}
+	if position, exists := e.staged[idx]; exists {
+		if block != Sand && block != Gravel {
+			return false
+		}
+		e.updates[position].block = block
+		return true
+	}
+	e.staged[idx] = len(e.updates)
+	e.updates = append(e.updates, updateEntry{index: idx, block: block})
+	return true
 }
 
 func (e *PhysicsEngine) queueCheck(idx int) {
-	if idx >= 0 {
-		e.checks = append(e.checks, checkEntry{index: idx})
+	if idx < 0 {
+		return
 	}
+	if _, exists := e.processing[idx]; exists {
+		return
+	}
+	e.keepCheck(checkEntry{index: idx})
+}
+
+func (e *PhysicsEngine) keepCheck(check checkEntry) {
+	if position, exists := e.queued[check.index]; exists {
+		if check.debris {
+			e.checks[position].debris = true
+			e.checks[position].data = check.data
+		}
+		return
+	}
+	e.queued[check.index] = len(e.checks)
+	e.checks = append(e.checks, check)
+}
+
+func (e *PhysicsEngine) queueDebris(idx int, override bool) {
+	if idx < 0 {
+		return
+	}
+	if check := e.processing[idx]; check != nil {
+		if override {
+			check.debris = true
+			check.data = 0
+		}
+		return
+	}
+	if _, exists := e.queued[idx]; exists && !override {
+		return
+	}
+	e.keepCheck(checkEntry{index: idx, debris: true})
 }
 
 func (e *PhysicsEngine) applyUpdate(u updateEntry) {
@@ -251,14 +336,35 @@ func (e *PhysicsEngine) applyUpdate(u updateEntry) {
 }
 
 func (e *PhysicsEngine) activateNeighbours(idx int) {
-	w := e.width
-	wl := e.width * e.length
-	e.queueCheck(idx + 1)
-	e.queueCheck(idx - 1)
-	e.queueCheck(idx + w)
-	e.queueCheck(idx - w)
-	e.queueCheck(idx + wl)
-	e.queueCheck(idx - wl)
+	x, y, z := e.intToPos(idx)
+	e.queueCheck(e.posToInt(x+1, y, z))
+	e.queueCheck(e.posToInt(x-1, y, z))
+	e.queueCheck(e.posToInt(x, y, z+1))
+	e.queueCheck(e.posToInt(x, y, z-1))
+	e.queueCheck(e.posToInt(x, y+1, z))
+	e.queueCheck(e.posToInt(x, y-1, z))
+}
+
+// doDoor matches MCGalaxy's ordinary door timer and face-adjacent activation.
+func (e *PhysicsEngine) doDoor(c *checkEntry, x, y, z int) {
+	if c.data == 0 {
+		for _, pos := range [][3]int{
+			{x + 1, y, z}, {x - 1, y, z},
+			{x, y + 1, z}, {x, y - 1, z},
+			{x, y, z + 1}, {x, y, z - 1},
+		} {
+			idx := e.posToInt(pos[0], pos[1], pos[2])
+			if e.getBlock(idx) == DoorLog {
+				e.setBlock(idx, DoorLogAir)
+			}
+		}
+	}
+	if c.data > 15 {
+		e.setBlock(c.index, DoorLog)
+		c.data = removeFlag
+		return
+	}
+	c.data++
 }
 
 // ─── liquid physics (water + lava) ───
@@ -298,11 +404,11 @@ func (e *PhysicsEngine) doLiquid(c *checkEntry, x, y, z int, block byte, isLava,
 		idx  int
 	}
 	dirs := [5]dirInfo{
-		{flowedXMax, e.posToInt(x + 1, y, z)},
-		{flowedXMin, e.posToInt(x - 1, y, z)},
-		{flowedZMax, e.posToInt(x, y, z + 1)},
-		{flowedZMin, e.posToInt(x, y, z - 1)},
-		{flowedYMin, e.posToInt(x, y - 1, z)},
+		{flowedXMax, e.posToInt(x+1, y, z)},
+		{flowedXMin, e.posToInt(x-1, y, z)},
+		{flowedZMax, e.posToInt(x, y, z+1)},
+		{flowedZMin, e.posToInt(x, y, z-1)},
+		{flowedYMin, e.posToInt(x, y-1, z)},
 	}
 
 	for _, d := range dirs {
@@ -746,14 +852,15 @@ const (
 
 // ─── TNT explosion (ported from MCGalaxy TntPhysics) ───
 
-func (e *PhysicsEngine) doTNT(c *checkEntry, x, y, z int, block byte, adv bool) {
-	// MCGalaxy: physics < 3 → just remove TNT (no explosion).
-	// physics >= 3 → fuse delay (5 ticks) before explosion.
-	// physics >= 2 (advanced) → explode immediately via MakeExplosion.
-	// Solar: adv = mode >= 2. We explode immediately in advanced mode.
-	if !adv {
+func (e *PhysicsEngine) doTNT(c *checkEntry, x, y, z int, block byte) {
+	if e.mode < ModeHardcore {
 		e.setBlock(e.posToInt(x, y, z), Air)
 		c.data = removeFlag
+		return
+	}
+	if e.mode == ModeHardcore && c.data < 5 {
+		c.data++
+		e.toggleTNTFuse(x, y, z, block)
 		return
 	}
 
@@ -768,6 +875,28 @@ func (e *PhysicsEngine) doTNT(c *checkEntry, x, y, z int, block byte, adv bool) 
 	c.data = removeFlag
 }
 
+func (e *PhysicsEngine) toggleTNTFuse(x, y, z int, block byte) {
+	positions := [][3]int{{x, y + 1, z}}
+	if block == TNTBig || block == TNTNuke {
+		positions = [][3]int{
+			{x + 1, y, z}, {x - 1, y, z},
+			{x, y + 1, z}, {x, y - 1, z},
+			{x, y, z + 1}, {x, y, z - 1},
+		}
+	}
+	for _, position := range positions {
+		idx := e.posToInt(position[0], position[1], position[2])
+		if idx < 0 {
+			continue
+		}
+		if e.getBlock(idx) == StillLava {
+			e.setBlock(idx, Air)
+		} else {
+			e.setBlock(idx, StillLava)
+		}
+	}
+}
+
 // makeExplosion mirrors MCGalaxy's MakeExplosion + Explode:
 // 3 layered passes with increasing radius and decreasing probability.
 func (e *PhysicsEngine) makeExplosion(x, y, z, size int) {
@@ -776,15 +905,15 @@ func (e *PhysicsEngine) makeExplosion(x, y, z, size int) {
 	if centerIdx >= 0 {
 		e.setBlock(centerIdx, TNTExplosion)
 	}
-	// 3 layers: always destroy, 70% destroy, 30% destroy.
+	// Outer layers use MCGalaxy's 6/9 and 2/9 gates.
 	e.explodeLayer(x, y, z, size+1, -1)
 	e.explodeLayer(x, y, z, size+2, 7)
 	e.explodeLayer(x, y, z, size+3, 3)
 }
 
 // explodeLayer destroys blocks in a cube of the given radius.
-// prob < 0 means always destroy. Otherwise prob/10 chance per block.
-func (e *PhysicsEngine) explodeLayer(cx, cy, cz, size, prob int) {
+// threshold < 0 means always destroy. Otherwise a 1..9 roll must be below it.
+func (e *PhysicsEngine) explodeLayer(cx, cy, cz, size, threshold int) {
 	for x := cx - size; x <= cx+size; x++ {
 		for y := cy - size; y <= cy+size; y++ {
 			for z := cz - size; z <= cz+size; z++ {
@@ -793,33 +922,46 @@ func (e *PhysicsEngine) explodeLayer(cx, cy, cz, size, prob int) {
 					continue
 				}
 				b := e.getBlock(idx)
-				if b == Invalid || b == Air {
+				if b == Invalid {
 					continue
 				}
-				doDestroy := prob < 0 || e.rng.Intn(10) < prob
-				if !doDestroy {
-					continue
-				}
-				// Chain reaction: TNT blocks get converted to TNT_Small.
-				if b == TNTSmall || b == TNTBig || b == TNTNuke {
+				doDestroy := threshold < 0 || e.rng.Intn(9)+1 < threshold
+				if doDestroy && b != TNT && !IsTNTBlock(b) {
+					mode := e.rng.Intn(10) + 1
+					switch {
+					case mode <= 4:
+						e.setBlock(idx, TNTExplosion)
+					case mode <= 8:
+						e.setBlock(idx, Air)
+					default:
+						e.queueDebris(idx, false)
+					}
+				} else if b == TNT {
+					e.setBlock(idx, TNTSmall)
+				} else if IsTNTBlock(b) {
 					e.queueCheck(idx)
-					continue
-				}
-				// 3 outcomes (matching MCGalaxy):
-				// 40% → TNT_Explosion (visual)
-				// 40% → Air (destroyed)
-				// 20% → Air (was Drop+Dissipate, simplified to Air)
-				mode := e.rng.Intn(10) + 1
-				switch {
-				case mode <= 4:
-					e.setBlock(idx, TNTExplosion)
-				case mode <= 8:
-					e.setBlock(idx, Air)
-				default:
-					e.setBlock(idx, Air)
 				}
 			}
 		}
+	}
+}
+
+func (e *PhysicsEngine) doTNTDebris(c *checkEntry, x, y, z int, block byte) {
+	if block == Air || block == Invalid {
+		c.data = removeFlag
+		return
+	}
+	if e.rng.Intn(99) < 8 {
+		e.setBlock(c.index, Air)
+		c.data = removeFlag
+		return
+	}
+	below := e.posToInt(x, y-1, z)
+	belowBlock := e.getBlock(below)
+	if e.rng.Intn(99) < 50 && (belowBlock == Air || belowBlock == Water || belowBlock == Lava) && e.rng.Intn(99) < 49 && e.setBlock(below, block) {
+		e.setBlock(c.index, Air)
+		e.queueDebris(below, true)
+		c.data = removeFlag
 	}
 }
 

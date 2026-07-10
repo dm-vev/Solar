@@ -288,30 +288,34 @@ func (s *session) sendLevelFrom(mgr *world.Manager, fastMap bool) error {
 // changeMap switches the session's active world Manager, sends the new
 // level stream, and re-syncs entity visibility across levels.
 func (s *session) changeMap(mgr *world.Manager) error {
+	if err := s.prepareMapChange(mgr); err != nil {
+		return err
+	}
+	prevName := ""
+	if current := s.CurrentWorldManager(); current != nil {
+		prevName = current.Current().Name
+	}
+	s.teleportMu.Lock()
+	err := s.changeMapLocked(mgr)
+	s.teleportMu.Unlock()
+	if err == nil {
+		s.finishMapChange(mgr.Current().Name, prevName)
+	}
+	return err
+}
+
+func (s *session) changeMapLocked(mgr *world.Manager) error {
 	// Save last position so /back works after /goto.
-	s.saveLastPos()
+	s.saveLastPosLocked()
 
 	levelName := mgr.Current().Name
-	prevName := ""
-	if s.worlds != nil {
-		prevName = s.worlds.Current().Name
-	}
-
-	if plugin.OnJoiningLevel.HasHandlers() {
-		ctx := plugin.OnJoiningLevel.Fire(plugin.JoiningLevelData{
-			Player:    s,
-			LevelName: levelName,
-		})
-		if ctx.Cancelled() {
-			return nil
-		}
-	}
 
 	// Leave room before swapping worlds — removes entity from old level peers.
 	s.leaveRoom()
 
 	s.stateMu.Lock()
 	s.worlds = mgr
+	s.lastSpecialValid = false
 	s.stateMu.Unlock()
 
 	if err := s.sendLevelFrom(mgr, s.currentSupportsFastMap()); err != nil {
@@ -339,6 +343,26 @@ func (s *session) changeMap(mgr *world.Manager) error {
 			entityPosition(spawn.X, spawn.Y, spawn.Z), spawn.Yaw, spawn.Pitch))
 	}
 
+	return nil
+}
+
+func (s *session) prepareMapChange(mgr *world.Manager) error {
+	if mgr == nil {
+		return fmt.Errorf("nil map manager")
+	}
+	if plugin.OnJoiningLevel.HasHandlers() {
+		ctx := plugin.OnJoiningLevel.Fire(plugin.JoiningLevelData{
+			Player:    s,
+			LevelName: mgr.Current().Name,
+		})
+		if ctx.Cancelled() {
+			return fmt.Errorf("map change cancelled")
+		}
+	}
+	return nil
+}
+
+func (s *session) finishMapChange(levelName, prevName string) {
 	if plugin.OnJoinedLevel.HasHandlers() {
 		plugin.OnJoinedLevel.Fire(plugin.JoinedLevelData{
 			Player:    s,
@@ -346,7 +370,6 @@ func (s *session) changeMap(mgr *world.Manager) error {
 			PrevLevel: prevName,
 		})
 	}
-	return nil
 }
 
 func encodeLevelBegin(volume int, fastMap bool) []byte {

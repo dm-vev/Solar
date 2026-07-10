@@ -22,16 +22,18 @@ import (
 
 // pluginServer implements plugin.Server for the Solar server.
 type pluginServer struct {
-	codec      *classic.Codec
-	worlds     *world.Manager
-	multiMgr   *world.MultiManager
-	commands   *command.Registry
-	server     *Server
-	sched      plugin.Scheduler
-	entityMgr  plugin.EntityManager
-	playerDB   plugin.PlayerDB
-	blockDBs   map[string]plugin.BlockDB
-	blockDBsMu sync.Mutex
+	codec          *classic.Codec
+	worlds         *world.Manager
+	multiMgr       *world.MultiManager
+	commands       *command.Registry
+	server         *Server
+	sched          plugin.Scheduler
+	entityMgr      plugin.EntityManager
+	playerDB       plugin.PlayerDB
+	blockDBs       map[string]plugin.BlockDB
+	blockDBsMu     sync.Mutex
+	commandMu      sync.Mutex
+	commandsByName map[string][]string
 }
 
 // NewPluginServer creates a plugin.Server handle from the server's subsystems.
@@ -47,15 +49,16 @@ func NewPluginServer(codec *classic.Codec, worlds *world.Manager, commands *comm
 	srv.playerDB = pdb
 
 	return &pluginServer{
-		codec:     codec,
-		worlds:    worlds,
-		multiMgr:  mm,
-		commands:  commands,
-		server:    srv,
-		sched:     plugin.DefaultScheduler,
-		entityMgr: newEntityManager(codec, srv.entities),
-		playerDB:  pdb,
-		blockDBs:  make(map[string]plugin.BlockDB),
+		codec:          codec,
+		worlds:         worlds,
+		multiMgr:       mm,
+		commands:       commands,
+		server:         srv,
+		sched:          plugin.DefaultScheduler,
+		entityMgr:      newEntityManager(codec, srv.entities),
+		playerDB:       pdb,
+		blockDBs:       make(map[string]plugin.BlockDB),
+		commandsByName: make(map[string][]string),
 	}
 }
 
@@ -63,6 +66,7 @@ func NewPluginServer(codec *classic.Codec, worlds *world.Manager, commands *comm
 // Called by bootstrap after NewPluginServer.
 func (p *pluginServer) PostInit() {
 	p.server.SetFlushBlockDBsFn(p.flushAllBlockDBs)
+	p.server.SetSaveLevelsFn(p.saveAllLevels)
 }
 
 func (p *pluginServer) BroadcastMessage(msg string) {
@@ -148,21 +152,51 @@ func (p *pluginServer) Physics() plugin.Physics {
 }
 
 func (p *pluginServer) RegisterCommand(name string, help string, handler plugin.CommandHandler) bool {
-	if name == "" {
+	return p.RegisterCommandSpec(plugin.CommandSpec{Name: name, Help: help, Handler: handler})
+}
+
+func (p *pluginServer) RegisterCommandSpec(spec plugin.CommandSpec) bool {
+	if spec.Handler == nil {
 		return false
 	}
-	p.commands.Register(name, func(ctx command.Context, args []string) (string, bool) {
+	names := append([]string{spec.Name}, spec.Aliases...)
+	handler := spec.Handler
+	wrapped := func(ctx command.Context, args []string) (string, bool) {
 		player := p.codec.FindPlayer(ctx.Username)
 		if player == nil {
 			return "player not found", true
 		}
 		return handler(player, args), true
-	})
+	}
+
+	p.commandMu.Lock()
+	defer p.commandMu.Unlock()
+	if !p.commands.RegisterManyIfAbsent(names, spec.MinRank, spec.Help, wrapped) {
+		return false
+	}
+	group := make([]string, len(names))
+	for i, name := range names {
+		group[i] = strings.ToLower(strings.TrimSpace(name))
+	}
+	for _, name := range group {
+		p.commandsByName[name] = group
+	}
 	return true
 }
 
 func (p *pluginServer) UnregisterCommand(name string) bool {
-	return p.commands.Unregister(name)
+	key := strings.ToLower(strings.TrimSpace(name))
+	p.commandMu.Lock()
+	defer p.commandMu.Unlock()
+	group := p.commandsByName[key]
+	if len(group) == 0 {
+		return false
+	}
+	removed := p.commands.UnregisterMany(group)
+	for _, groupName := range group {
+		delete(p.commandsByName, groupName)
+	}
+	return removed
 }
 
 func (p *pluginServer) BanPlayer(name, reason string) bool {
@@ -249,6 +283,18 @@ func (p *pluginServer) BlockDB(levelName string) plugin.BlockDB {
 	}
 	p.blockDBs[key] = db
 	return db
+}
+
+func (p *pluginServer) PluginDataDir(pluginName string) (string, error) {
+	pluginName = strings.TrimSpace(pluginName)
+	if !storage.ValidName(pluginName) {
+		return "", fmt.Errorf("invalid plugin name %q", pluginName)
+	}
+	dir := p.server.store.PluginDataDir(pluginName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create plugin data directory: %w", err)
+	}
+	return dir, nil
 }
 
 func (p *pluginServer) flushAllBlockDBs() {
@@ -875,6 +921,10 @@ func (m *pluginLevelManager) Unload(name string) bool {
 	if plugin.OnLevelUnload.HasHandlers() {
 		plugin.OnLevelUnload.Fire(plugin.LevelUnloadData{Name: name})
 	}
+	path := m.srv.multiMgr.Path(name)
+	if path == "" || mgr.Save(path) != nil {
+		return false
+	}
 	removed := m.srv.multiMgr.Remove(name)
 	if !removed {
 		return false
@@ -887,18 +937,25 @@ func (m *pluginLevelManager) Unload(name string) bool {
 }
 
 func (m *pluginLevelManager) SaveAll() error {
-	for _, name := range m.srv.multiMgr.Names() {
-		mgr := m.srv.multiMgr.Get(name)
-		path := m.srv.multiMgr.Path(name)
+	if err := m.srv.saveAllLevels(); err != nil {
+		return err
+	}
+	if !m.srv.SaveState() {
+		return fmt.Errorf("save player policy failed")
+	}
+	return nil
+}
+
+func (p *pluginServer) saveAllLevels() error {
+	for _, name := range p.multiMgr.Names() {
+		mgr := p.multiMgr.Get(name)
+		path := p.multiMgr.Path(name)
 		if mgr == nil || path == "" {
 			continue
 		}
 		if err := mgr.Save(path); err != nil {
 			return fmt.Errorf("save level %q: %w", name, err)
 		}
-	}
-	if !m.srv.SaveState() {
-		return fmt.Errorf("save player policy failed")
 	}
 	return nil
 }
@@ -989,6 +1046,8 @@ func validateLevelName(name string) error {
 type pluginPhysics struct {
 	mu        sync.Mutex
 	mode      plugin.PhysicsMode
+	getMode   func() (plugin.PhysicsMode, bool)
+	setMode   func(plugin.PhysicsMode)
 	scheduled []physicsBlock
 	handlers  []plugin.PhysicsHandler
 	worlds    *world.Manager
@@ -1004,14 +1063,35 @@ func newPluginPhysics(worlds *world.Manager) *pluginPhysics {
 
 func (ph *pluginPhysics) Mode() plugin.PhysicsMode {
 	ph.mu.Lock()
-	defer ph.mu.Unlock()
-	return ph.mode
+	mode, getMode := ph.mode, ph.getMode
+	ph.mu.Unlock()
+	if getMode != nil {
+		if current, ok := getMode(); ok {
+			return current
+		}
+	}
+	return mode
 }
 
 func (ph *pluginPhysics) SetMode(mode plugin.PhysicsMode) {
 	ph.mu.Lock()
 	ph.mode = mode
+	setMode := ph.setMode
 	ph.mu.Unlock()
+	if setMode != nil {
+		setMode(mode)
+	}
+	ph.fireModeChanged(mode)
+}
+
+func (ph *pluginPhysics) syncMode(mode plugin.PhysicsMode) {
+	ph.mu.Lock()
+	ph.mode = mode
+	ph.mu.Unlock()
+	ph.fireModeChanged(mode)
+}
+
+func (ph *pluginPhysics) fireModeChanged(mode plugin.PhysicsMode) {
 	if plugin.OnPhysicsStateChanged.HasHandlers() {
 		level := ""
 		if ph.worlds != nil {

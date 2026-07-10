@@ -36,6 +36,11 @@ type Server interface {
 	// Returns false if the name is already taken.
 	RegisterCommand(name string, help string, handler command.CommandHandler) bool
 
+	// RegisterCommandSpec atomically registers a command with aliases and a
+	// minimum rank. Registration fails without changing the registry if any
+	// requested name is invalid or already taken.
+	RegisterCommandSpec(spec command.CommandSpec) bool
+
 	// UnregisterCommand removes a custom command.
 	// Returns false if not found or if it's a built-in command.
 	UnregisterCommand(name string) bool
@@ -114,4 +119,9 @@ type Server interface {
 	// BlockDB returns the block change history for the named level,
 	// or nil if BlockDB is not enabled for that level.
 	BlockDB(levelName string) blockdb.BlockDB
+
+	// PluginDataDir returns a private persistent directory for a trusted plugin.
+	// pluginName must be a safe single path component. The directory is created
+	// on first use beneath the server data directory.
+	PluginDataDir(pluginName string) (string, error)
 }

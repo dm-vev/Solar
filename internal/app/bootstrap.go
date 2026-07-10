@@ -212,6 +212,8 @@ func wirePluginRuntime(
 		pluginServer.ListLevelFiles,
 	)
 	codec.SetQueuePhysics(srv.QueueBlockPhysics)
+	codec.SetPhysicsModeCallbacks(srv.BlockPhysicsMode, srv.SetBlockPhysicsMode)
+	codec.SetSaveStateCallback(srv.SaveStateNow)
 
 	rankRegistry := ranks.NewRegistry()
 	rankRegistry.SetPlayerDB(pluginServer.PlayerDB())

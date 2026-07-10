@@ -410,8 +410,8 @@ func TestMCG_TPA(t *testing.T) {
 	t.Parallel()
 	ctx := Context{Teleport: stubTeleport{}, Tr: testTr}
 	got, _ := tpaCommand(ctx, []string{"bob"})
-	if got != "command.tpa.done" {
-		t.Fatalf("tpa: got %q, want done", got)
+	if got != "command.tpa.sent" {
+		t.Fatalf("tpa: got %q, want sent", got)
 	}
 }
 
@@ -459,10 +459,10 @@ func TestMCG_SetRankCannotRankSelf(t *testing.T) {
 	t.Parallel()
 	rr := ranks.NewRegistry()
 	ctx := Context{
-		Username:   "alice",
-		Ranks:      stubRanks{rr: rr},
-		RankLevel:  func() int { return 100 },
-		Tr:         testTr,
+		Username:  "alice",
+		Ranks:     stubRanks{rr: rr},
+		RankLevel: func() int { return 100 },
+		Tr:        testTr,
 	}
 	got, _ := setRankCommand(ctx, []string{"alice", "operator"})
 	if got != "command.setrank.self" {
@@ -474,10 +474,10 @@ func TestMCG_SetRankCannotSetBanned(t *testing.T) {
 	t.Parallel()
 	rr := ranks.NewRegistry()
 	ctx := Context{
-		Username:   "alice",
-		Ranks:      stubRanks{rr: rr},
-		RankLevel:  func() int { return 100 },
-		Tr:         testTr,
+		Username:  "alice",
+		Ranks:     stubRanks{rr: rr},
+		RankLevel: func() int { return 100 },
+		Tr:        testTr,
 	}
 	got, _ := setRankCommand(ctx, []string{"bob", "banned"})
 	if got != "command.setrank.banned" {
@@ -489,10 +489,10 @@ func TestMCG_SetRankCannotSetTooHigh(t *testing.T) {
 	t.Parallel()
 	rr := ranks.NewRegistry()
 	ctx := Context{
-		Username:   "alice",
-		Ranks:      stubRanks{rr: rr},
-		RankLevel:  func() int { return 50 }, // advbuilder
-		Tr:         testTr,
+		Username:  "alice",
+		Ranks:     stubRanks{rr: rr},
+		RankLevel: func() int { return 50 }, // advbuilder
+		Tr:        testTr,
 	}
 	got, _ := setRankCommand(ctx, []string{"bob", "operator"})
 	if got != "command.setrank.too_high" {
@@ -507,10 +507,10 @@ func TestMCG_SetRankSuccess(t *testing.T) {
 		"bob": {Name: "bob", Data: map[string]string{}},
 	}})
 	ctx := Context{
-		Username:   "alice",
-		Ranks:      stubRanks{rr: rr},
-		RankLevel:  func() int { return 100 }, // admin can set operator
-		Tr:         testTr,
+		Username:  "alice",
+		Ranks:     stubRanks{rr: rr},
+		RankLevel: func() int { return 100 }, // admin can set operator
+		Tr:        testTr,
 	}
 	got, _ := setRankCommand(ctx, []string{"bob", "operator"})
 	if got != "command.setrank.done" {
@@ -804,8 +804,14 @@ type stubTeleportFail struct{}
 
 func (stubTeleportFail) SpawnPoint() (int, int, int, byte, byte) { return 0, 0, 0, 0, 0 }
 func (stubTeleportFail) TeleportToPlayer(name string) bool       { return false }
-func (stubTeleportFail) SummonPlayer(name string) bool           { return false }
-func (stubTeleportFail) Back() bool                              { return false }
+func (stubTeleportFail) RequestTeleport(name string) (TPAStatus, string) {
+	return TPAPlayerNotFound, name
+}
+func (stubTeleportFail) RespondTeleport(accept bool) (TPAStatus, string) {
+	return TPANoPending, ""
+}
+func (stubTeleportFail) SummonPlayer(name string) bool { return false }
+func (stubTeleportFail) Back() bool                    { return false }
 
 type stubRanks struct {
 	rr *ranks.Registry
@@ -842,15 +848,15 @@ func (s stubRanks) SetPlayerRank(name string, perm int) bool {
 
 type stubLevels struct{}
 
-func (stubLevels) Goto(name string) bool              { return true }
-func (stubLevels) MainLevel() string                  { return "main" }
-func (stubLevels) LoadLevel(name string) bool         { return true }
-func (stubLevels) UnloadLevel(name string) bool       { return true }
-func (stubLevels) ReloadLevel() bool                  { return true }
-func (stubLevels) ListLevels() []string               { return []string{"main"} }
-func (stubLevels) ListLevelFiles() []string           { return []string{"main"} }
-func (stubLevels) PhysicsMode() int                   { return 1 }
-func (stubLevels) SetPhysicsMode(mode int)            {}
+func (stubLevels) Goto(name string) bool        { return true }
+func (stubLevels) MainLevel() string            { return "main" }
+func (stubLevels) LoadLevel(name string) bool   { return true }
+func (stubLevels) UnloadLevel(name string) bool { return true }
+func (stubLevels) ReloadLevel() bool            { return true }
+func (stubLevels) ListLevels() []string         { return []string{"main"} }
+func (stubLevels) ListLevelFiles() []string     { return []string{"main"} }
+func (stubLevels) PhysicsMode() int             { return 1 }
+func (stubLevels) SetPhysicsMode(mode int)      {}
 
 type stubRankPlayerDB struct {
 	entries map[string]*playerdb.PlayerEntry
@@ -873,8 +879,8 @@ func (d *stubRankPlayerDB) List() []*playerdb.PlayerEntry {
 	return out
 }
 func (d *stubRankPlayerDB) Search(prefix string) []*playerdb.PlayerEntry { return nil }
-func (d *stubRankPlayerDB) Count() int                                    { return len(d.entries) }
-func (d *stubRankPlayerDB) Flush() error                                  { return nil }
+func (d *stubRankPlayerDB) Count() int                                   { return len(d.entries) }
+func (d *stubRankPlayerDB) Flush() error                                 { return nil }
 
 type trackingDraw struct {
 	selectionStarted int
@@ -902,19 +908,63 @@ func (d *trackingDraw) CanDelete(block byte) bool                               
 
 // ─── MCGalaxy conformance: discrepancies ───
 
-// MCGalaxy: /tpa is a request-accept teleport system.
-// Solar: /tpa is a direct teleport (no request/accept flow).
-func TestMCGalaxy_TPADirectTeleportNotRequestAccept(t *testing.T) {
-	// MCGalaxy: /tpa sends a request to the target player, who must
-	// accept with /tpaccept before the teleport happens.
-	// Solar: /tpa immediately teleports the player to the target.
-	// This is a confirmed architectural difference.
-	t.Skip("architectural: /tpa is direct teleport in Solar, request-accept in MCGalaxy")
+func TestMCGalaxy_TPARequiresAcceptance(t *testing.T) {
+	service := &trackingTPA{}
+	ctx := Context{Teleport: service, Tr: testTr}
+	got, _ := tpaCommand(ctx, []string{"bob"})
+	if got != "command.tpa.sent" || service.pending != "bob" {
+		t.Fatalf("request: got %q pending=%q", got, service.pending)
+	}
+	got, _ = tpaCommand(ctx, []string{"accept"})
+	if got != "command.tpa.accepted" || service.pending != "" {
+		t.Fatalf("accept: got %q pending=%q", got, service.pending)
+	}
+	service.pending = "alice"
+	got, _ = NewRegistry().Execute(ctx, "/tpdeny")
+	if got != "command.tpa.denied" || service.pending != "" {
+		t.Fatalf("tpdeny alias: got %q pending=%q", got, service.pending)
+	}
 }
 
-// MCGalaxy: /viewranks output uses i18n.
-// Solar: /viewranks uses hardcoded English prefix "&aRanks: &7".
-func TestMCGalaxy_ViewRanksHardcodedEnglish(t *testing.T) {
-	// This is a minor i18n conformance issue, not a behavioral bug.
-	t.Skip("minor: /viewranks uses hardcoded English prefix instead of i18n key")
+type trackingTPA struct{ pending string }
+
+func (*trackingTPA) SpawnPoint() (int, int, int, byte, byte) { return 0, 0, 0, 0, 0 }
+func (t *trackingTPA) RequestTeleport(name string) (TPAStatus, string) {
+	t.pending = name
+	return TPARequestSent, name
+}
+func (t *trackingTPA) RespondTeleport(accept bool) (TPAStatus, string) {
+	name := t.pending
+	if name == "" {
+		return TPANoPending, ""
+	}
+	t.pending = ""
+	if accept {
+		return TPAAccepted, name
+	}
+	return TPADenied, name
+}
+func (*trackingTPA) SummonPlayer(string) bool { return true }
+func (*trackingTPA) Back() bool               { return false }
+
+func TestMCGalaxy_ViewRanksNoArgsFormat(t *testing.T) {
+	rr := ranks.NewRegistry()
+	var list string
+	ctx := Context{
+		Ranks: stubRanks{rr: rr},
+		Tr: func(key string, args ...any) string {
+			if key == "command.viewranks.available" {
+				list = args[0].(string)
+			}
+			return key
+		},
+	}
+	got, _ := viewRanksCommand(ctx, nil)
+	if got != "command.viewranks.available" {
+		t.Fatalf("viewranks key: got %q", got)
+	}
+	want := "&8banned, &7guest, &2builder, &3advbuilder, &coperator, &eadmin, &4owner"
+	if list != want {
+		t.Fatalf("viewranks list: got %q, want %q", list, want)
+	}
 }

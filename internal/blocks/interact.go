@@ -12,12 +12,13 @@
 // Block IDs (matching MCGalaxy):
 //   Message blocks: 130-134 (MB_White through MB_Lava)
 //   Portals: 160-162 (Portal_Air/Water/Lava), 175-176 (Portal_Blue/Orange)
-//   Doors: 201 (Door_Log_air), 168-174 (oDoor variants)
+//   Doors: 111 (Door_Log), 201 (Door_Log_air), 168-174 (oDoor variants)
 //   TNT: 182 (small), 183 (big), 186 (nuke), 184 (explosion visual)
 
 package blocks
 
 import (
+	"sort"
 	"sync"
 )
 
@@ -33,6 +34,7 @@ const (
 	PortalLava   byte = 162
 	PortalBlue   byte = 175
 	PortalOrange byte = 176
+	DoorLog      byte = 111
 	DoorLogAir   byte = 201
 )
 
@@ -55,6 +57,12 @@ type SpecialEntry struct {
 	DoorBlock   byte   // for doors: the solid block to restore
 }
 
+// SpecialRecord is the persisted coordinate and metadata for an interactive block.
+type SpecialRecord struct {
+	X, Y, Z int
+	Entry   SpecialEntry
+}
+
 // key packs coordinates into a single int64 for map key.
 func key(x, y, z int) int64 {
 	return int64(x) | int64(y)<<20 | int64(z)<<40
@@ -73,8 +81,13 @@ func NewSpecialRegistry() *SpecialRegistry {
 
 // Set registers a special block at the given coordinates.
 func (r *SpecialRegistry) Set(x, y, z int, e *SpecialEntry) {
+	if e == nil {
+		r.Remove(x, y, z)
+		return
+	}
+	entry := *e
 	r.mu.Lock()
-	r.entries[key(x, y, z)] = e
+	r.entries[key(x, y, z)] = &entry
 	r.mu.Unlock()
 }
 
@@ -83,7 +96,11 @@ func (r *SpecialRegistry) Get(x, y, z int) *SpecialEntry {
 	r.mu.RLock()
 	e := r.entries[key(x, y, z)]
 	r.mu.RUnlock()
-	return e
+	if e == nil {
+		return nil
+	}
+	entry := *e
+	return &entry
 }
 
 // Remove deletes a special block entry.
@@ -91,6 +108,31 @@ func (r *SpecialRegistry) Remove(x, y, z int) {
 	r.mu.Lock()
 	delete(r.entries, key(x, y, z))
 	r.mu.Unlock()
+}
+
+// Snapshot returns deterministic copies of all registry entries.
+func (r *SpecialRegistry) Snapshot() []SpecialRecord {
+	r.mu.RLock()
+	records := make([]SpecialRecord, 0, len(r.entries))
+	for packed, entry := range r.entries {
+		records = append(records, SpecialRecord{
+			X:     int(packed & 0xFFFFF),
+			Y:     int((packed >> 20) & 0xFFFFF),
+			Z:     int((packed >> 40) & 0xFFFFF),
+			Entry: *entry,
+		})
+	}
+	r.mu.RUnlock()
+	sort.Slice(records, func(i, j int) bool {
+		if records[i].Y != records[j].Y {
+			return records[i].Y < records[j].Y
+		}
+		if records[i].Z != records[j].Z {
+			return records[i].Z < records[j].Z
+		}
+		return records[i].X < records[j].X
+	})
+	return records
 }
 
 // IsMessageBlock returns true if the block ID is a message block type.
@@ -109,7 +151,7 @@ func IsPortal(b byte) bool {
 
 // IsDoor returns true if the block ID is a door type.
 func IsDoor(b byte) bool {
-	return b == DoorLogAir
+	return b == DoorLog || b == DoorLogAir
 }
 
 // IsTNT returns true if the block ID is a TNT type.

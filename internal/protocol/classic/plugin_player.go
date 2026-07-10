@@ -300,6 +300,37 @@ func (s *session) SetAllowBuild(allowed bool) {
 	s.stateMu.Unlock()
 }
 
+func (s *session) Rank() int { return s.PlayerRank() }
+
+func (s *session) LevelName() string {
+	manager := s.CurrentWorldManager()
+	if manager == nil {
+		return ""
+	}
+	return manager.Current().Name
+}
+
+func (s *session) SelectBlocks(markCount int, handler plugin.SelectionHandler) bool {
+	if handler == nil {
+		return false
+	}
+	return s.StartSelection(markCount, func(marks [][3]int) {
+		positions := make([]plugin.BlockPos, len(marks))
+		for i, mark := range marks {
+			positions[i] = plugin.BlockPos{X: mark[0], Y: mark[1], Z: mark[2]}
+		}
+		handler(positions)
+	})
+}
+
+func (s *session) CancelSelection() bool {
+	s.selectionMu.Lock()
+	active := s.markState != nil
+	s.markState = nil
+	s.selectionMu.Unlock()
+	return active
+}
+
 func (s *session) ChangeBlock(x, y, z int, block byte) bool {
 	return s.applyBlockChange(x, y, z, block, true) == nil
 }

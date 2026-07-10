@@ -44,6 +44,8 @@ type Server struct {
 	blockPhysics    map[*world.Manager]*blocks.PhysicsEngine
 	playerDB        plugin.PlayerDB
 	flushBlockDBsFn func()
+	saveLevelsFn    func() error
+	saveMu          sync.Mutex
 }
 
 // New creates the bootstrap server.
@@ -64,7 +66,7 @@ func New(
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	return &Server{
+	s := &Server{
 		cfg:          cfg,
 		listener:     listener,
 		codec:        codec,
@@ -76,9 +78,22 @@ func New(
 		logger:       logger,
 		sema:         make(chan struct{}, cfg.MaxPlayers),
 		pprofAddr:    "",
-		physics:      newPluginPhysics(worlds),
 		blockPhysics: make(map[*world.Manager]*blocks.PhysicsEngine),
 	}
+	s.physics = newPluginPhysics(worlds)
+	s.physics.getMode = func() (plugin.PhysicsMode, bool) {
+		engine := s.BlockPhysicsFor(worlds)
+		if engine == nil {
+			return 0, false
+		}
+		return plugin.PhysicsMode(engine.Mode()), true
+	}
+	s.physics.setMode = func(mode plugin.PhysicsMode) {
+		if engine := s.BlockPhysicsFor(worlds); engine != nil {
+			engine.SetMode(int(mode))
+		}
+	}
+	return s
 }
 
 // SetLogger configures the server logger.

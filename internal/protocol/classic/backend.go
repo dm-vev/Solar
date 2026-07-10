@@ -40,6 +40,8 @@ type SessionBackend interface {
 
 	SpawnPoint() (x, y, z int, yaw, pitch byte)
 	TeleportToPlayer(name string) bool
+	RequestTeleport(name string) (command.TPAStatus, string)
+	RespondTeleport(accept bool) (command.TPAStatus, string)
 	SummonPlayer(name string) bool
 	BackToLastPos() bool
 

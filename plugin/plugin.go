@@ -82,6 +82,15 @@ type Config = config.Config
 // CommandHandler is re-exported from plugin/command.
 type CommandHandler = command.CommandHandler
 
+// CommandSpec is re-exported from plugin/command.
+type CommandSpec = command.CommandSpec
+
+// BlockPos is re-exported from plugin/player.
+type BlockPos = player.BlockPos
+
+// SelectionHandler is re-exported from plugin/player.
+type SelectionHandler = player.SelectionHandler
+
 // CPE is re-exported from plugin/cpe.
 type CPE = cpe.CPE
 
@@ -179,6 +188,17 @@ const (
 	PhysicsBasic    = physics.PhysicsBasic
 	PhysicsAdvanced = physics.PhysicsAdvanced
 	PhysicsCustom   = physics.PhysicsCustom
+)
+
+// Built-in rank permission levels.
+const (
+	RankBanned     = player.RankBanned
+	RankGuest      = player.RankGuest
+	RankBuilder    = player.RankBuilder
+	RankAdvBuilder = player.RankAdvBuilder
+	RankOperator   = player.RankOperator
+	RankAdmin      = player.RankAdmin
+	RankOwner      = player.RankOwner
 )
 
 // ─── Re-exported color functions ───

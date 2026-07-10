@@ -3,7 +3,7 @@
 // Teleport commands:
 //   /spawn       — teleport to the world spawn point
 //   /back        — return to the last position before a teleport/death
-//   /tpa <name>  — teleport to another player (direct, no request flow)
+//   /tpa <name>  — request permission to teleport to another player
 //   /summon <name> — teleport another player to you (operator)
 //
 // Chat commands:
@@ -40,8 +40,7 @@ func backCommand(ctx Context, args []string) (string, bool) {
 	return ctx.tr("command.back.done"), true
 }
 
-// tpaCommand — /tpa <name>
-// Teleports the player to the named player (direct teleport, no request).
+// tpaCommand — /tpa <name|accept|deny>
 func tpaCommand(ctx Context, args []string) (string, bool) {
 	if ctx.Teleport == nil {
 		return ctx.tr("command.teleport.unavailable"), true
@@ -49,10 +48,41 @@ func tpaCommand(ctx Context, args []string) (string, bool) {
 	if len(args) != 1 {
 		return ctx.tr("command.tpa.usage"), true
 	}
-	if !ctx.Teleport.TeleportToPlayer(args[0]) {
-		return ctx.tr("command.moderation.player_not_found", args[0]), true
+	var status TPAStatus
+	var name string
+	switch strings.ToLower(args[0]) {
+	case "accept":
+		status, name = ctx.Teleport.RespondTeleport(true)
+	case "deny":
+		status, name = ctx.Teleport.RespondTeleport(false)
+	default:
+		status, name = ctx.Teleport.RequestTeleport(args[0])
 	}
-	return ctx.tr("command.tpa.done", args[0]), true
+
+	switch status {
+	case TPARequestSent:
+		return ctx.tr("command.tpa.sent", name), true
+	case TPAAccepted:
+		return ctx.tr("command.tpa.accepted", name), true
+	case TPADenied:
+		return ctx.tr("command.tpa.denied", name), true
+	case TPAPlayerNotFound:
+		return ctx.tr("command.moderation.player_not_found", args[0]), true
+	case TPASelf:
+		return ctx.tr("command.tpa.self"), true
+	case TPAAlreadyPending:
+		return ctx.tr("command.tpa.pending", name), true
+	case TPATargetBusy:
+		return ctx.tr("command.tpa.busy", name), true
+	case TPAAmbiguous:
+		return ctx.tr("command.tpa.ambiguous", name), true
+	case TPANoPending:
+		return ctx.tr("command.tpa.none"), true
+	case TPARequesterOffline:
+		return ctx.tr("command.tpa.offline", name), true
+	default:
+		return ctx.tr("command.teleport.failed"), true
+	}
 }
 
 // summonCommand — /summon <name>

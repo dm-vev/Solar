@@ -292,7 +292,7 @@ func TestInfoAndMiscCommands(t *testing.T) {
 	); got != 60 {
 		t.Fatalf("cuboidVolume = %d, want 60", got)
 	}
-	if got, _ := viewRanksCommand(ctx, nil); !strings.Contains(got, "Guest(0)") || !strings.Contains(got, "Op(100)") {
+	if got, _ := viewRanksCommand(ctx, nil); got != "command.viewranks.available" {
 		t.Fatalf("viewRanksCommand = %q", got)
 	}
 }

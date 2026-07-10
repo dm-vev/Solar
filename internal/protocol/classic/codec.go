@@ -79,6 +79,10 @@ type Codec struct {
 	listLoadedLevels    func() []string
 	listLevelFiles      func() []string
 	queuePhysics        func(*world.Manager, int, int, int)
+	physicsMode         func(*world.Manager) int
+	setPhysicsMode      func(*world.Manager, int)
+	saveServerState     func()
+	tpaRequests         *tpaRequestStore
 	maxPlayers          int
 	spamChecker         *player.SpamChecker
 	rankRegistry        *ranks.Registry
@@ -114,6 +118,7 @@ func NewCodec(
 		entities:          entities,
 		commands:          commands,
 		room:              sess.NewRoom[*session](),
+		tpaRequests:       newTPARequestStore(),
 		logger:            slog.Default(),
 		readDeadline:      defaultReadDeadline,
 		writeDeadline:     defaultWriteDeadline,
@@ -253,6 +258,17 @@ func (c *Codec) SetQueuePhysics(fn func(*world.Manager, int, int, int)) {
 	c.queuePhysics = fn
 }
 
+// SetPhysicsModeCallbacks wires per-level physics mode access.
+func (c *Codec) SetPhysicsModeCallbacks(get func(*world.Manager) int, set func(*world.Manager, int)) {
+	c.physicsMode = get
+	c.setPhysicsMode = set
+}
+
+// SetSaveStateCallback wires the server-wide persistence operation used by /save.
+func (c *Codec) SetSaveStateCallback(save func()) {
+	c.saveServerState = save
+}
+
 // SetMaxPlayers sets the max player cap for /serverinfo.
 func (c *Codec) SetMaxPlayers(n int) {
 	c.maxPlayers = n
@@ -342,11 +358,14 @@ func (c *Codec) ServeConn(ctx context.Context, conn net.Conn) {
 		listLoadedLevels:    c.listLoadedLevels,
 		listLevelFiles:      c.listLevelFiles,
 		queuePhysics:        c.queuePhysics,
+		physicsMode:         c.physicsMode,
+		setPhysicsMode:      c.setPhysicsMode,
+		saveServerState:     c.saveServerState,
+		tpaRequests:         c.tpaRequests,
 		maxPlayers:          c.maxPlayers,
 		color:               "&e",
 		model:               "humanoid",
 		allowBuild:          true,
-		specialBlocks:       blocks.NewSpecialRegistry(),
 		spamChecker:         c.spamChecker,
 		rankRegistry:        c.rankRegistry,
 		authEnabled:         c.authEnabled,

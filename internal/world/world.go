@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/generator"
 )
 
@@ -124,13 +125,14 @@ func DefaultEnv() Env {
 
 // Level is the minimal world state needed by the bootstrap protocol.
 type Level struct {
-	Name   string
-	Width  int
-	Height int
-	Length int
-	Blocks []byte
-	Spawn  Spawn
-	Env    Env
+	Name          string
+	Width         int
+	Height        int
+	Length        int
+	Blocks        []byte
+	Spawn         Spawn
+	Env           Env
+	SpecialBlocks []blocks.SpecialRecord
 }
 
 // Volume returns the number of blocks in the level.
@@ -151,6 +153,7 @@ type LevelStream struct {
 type Manager struct {
 	mu          sync.RWMutex
 	level       Level
+	special     *blocks.SpecialRegistry
 	ticks       atomic.Uint64
 	generation  uint64 // bumped on SetCurrent/SetSpawn (full-world changes)
 	blocksDirty bool   // set on SetBlock, cleared on next LevelStream re-compress
@@ -166,7 +169,8 @@ type levelCache struct {
 // NewManager creates the world manager with a single bootstrap world.
 func NewManager() *Manager {
 	return &Manager{
-		level: bootstrapLevel(),
+		level:   bootstrapLevel(),
+		special: blocks.NewSpecialRegistry(),
 	}
 }
 
@@ -175,7 +179,11 @@ func NewManager() *Manager {
 func (m *Manager) Current() Level {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return cloneLevel(m.level)
+	level := cloneLevel(m.level)
+	if m.special != nil {
+		level.SpecialBlocks = m.special.Snapshot()
+	}
+	return level
 }
 
 // Spawn returns the spawn point of the active world snapshot. This is a
@@ -190,8 +198,16 @@ func (m *Manager) Spawn() Spawn {
 // SetCurrent replaces the active world snapshot.
 func (m *Manager) SetCurrent(level Level) {
 	level = normalizeLevel(level)
+	special := blocks.NewSpecialRegistry()
+	for _, record := range level.SpecialBlocks {
+		if validSpecialRecord(level, record) {
+			special.Set(record.X, record.Y, record.Z, &record.Entry)
+		}
+	}
+	level.SpecialBlocks = nil
 	m.mu.Lock()
 	m.level = level
+	m.special = special
 	m.generation++
 	m.mu.Unlock()
 }
@@ -221,8 +237,65 @@ func (m *Manager) SetBlock(x, y, z int, block byte) bool {
 	}
 
 	m.level.Blocks[packIndex(m.level, x, y, z)] = block
+	if m.special != nil {
+		m.special.Remove(x, y, z)
+	}
 	m.blocksDirty = true
 	return true
+}
+
+// SetSpecialBlock stores metadata for an existing message block or portal.
+func (m *Manager) SetSpecialBlock(x, y, z int, entry *blocks.SpecialEntry) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !contains(m.level, x, y, z) || entry == nil {
+		return false
+	}
+	block := m.level.Blocks[packIndex(m.level, x, y, z)]
+	if len(entry.Message) > 4096 || len(entry.PortalLevel) > 256 ||
+		entry.Type == blocks.SpecialMessage && !blocks.IsMessageBlock(block) ||
+		entry.Type == blocks.SpecialPortal && !blocks.IsPortal(block) {
+		return false
+	}
+	if entry.Type != blocks.SpecialMessage && entry.Type != blocks.SpecialPortal {
+		return false
+	}
+	if m.special == nil {
+		m.special = blocks.NewSpecialRegistry()
+	}
+	m.special.Set(x, y, z, entry)
+	return true
+}
+
+// SetBlockWithSpecial atomically updates a block and its interactive metadata.
+func (m *Manager) SetBlockWithSpecial(x, y, z int, block byte, entry *blocks.SpecialEntry) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !contains(m.level, x, y, z) || entry == nil || len(entry.Message) > 4096 || len(entry.PortalLevel) > 256 {
+		return false
+	}
+	if entry.Type == blocks.SpecialMessage && !blocks.IsMessageBlock(block) ||
+		entry.Type == blocks.SpecialPortal && !blocks.IsPortal(block) ||
+		entry.Type != blocks.SpecialMessage && entry.Type != blocks.SpecialPortal {
+		return false
+	}
+	if m.special == nil {
+		m.special = blocks.NewSpecialRegistry()
+	}
+	m.level.Blocks[packIndex(m.level, x, y, z)] = block
+	m.special.Set(x, y, z, entry)
+	m.blocksDirty = true
+	return true
+}
+
+// SpecialBlockAt returns level-owned interactive block metadata.
+func (m *Manager) SpecialBlockAt(x, y, z int) *blocks.SpecialEntry {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.special == nil {
+		return nil
+	}
+	return m.special.Get(x, y, z)
 }
 
 // SetSpawn updates the spawn point of the active world snapshot.
@@ -367,7 +440,19 @@ func cloneLevel(level Level) Level {
 	if level.Blocks != nil {
 		clone.Blocks = append([]byte(nil), level.Blocks...)
 	}
+	if level.SpecialBlocks != nil {
+		clone.SpecialBlocks = append([]blocks.SpecialRecord(nil), level.SpecialBlocks...)
+	}
 	return clone
+}
+
+func validSpecialRecord(level Level, record blocks.SpecialRecord) bool {
+	if !contains(level, record.X, record.Y, record.Z) || len(record.Entry.Message) > 4096 || len(record.Entry.PortalLevel) > 256 {
+		return false
+	}
+	block := level.Blocks[packIndex(level, record.X, record.Y, record.Z)]
+	return record.Entry.Type == blocks.SpecialMessage && blocks.IsMessageBlock(block) ||
+		record.Entry.Type == blocks.SpecialPortal && blocks.IsPortal(block)
 }
 
 func normalizeLevel(level Level) Level {

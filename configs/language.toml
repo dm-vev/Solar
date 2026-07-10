@@ -91,6 +91,8 @@
 
 # ─── command.help ───
 "command.help.list" = "commands: %s"
+"command.help.usage" = "usage: /help [command]"
+"command.help.no_details" = "no detailed help for /%s"
 
 # ─── command.where ───
 "command.where.position" = "%s is at %d %d %d"
@@ -229,7 +231,7 @@
 "command.blocks.stats" = "&a%s: &7%d placed, %d deleted"
 "command.blocks.current" = "physics mode: %d"
 "command.blocks.set" = "physics mode set to %d"
-"command.blocks.usage" = "usage: /physics [off|basic|advanced|custom]"
+"command.blocks.usage" = "usage: /physics [off|basic|advanced|hardcore|instant|doors]"
 
 # ─── command.mapinfo ───
 "command.mapinfo.levels" = "&aLoaded levels: &7%d"
@@ -257,8 +259,21 @@
 "command.back.done" = "&aReturned to previous position"
 
 # ─── command.tpa ───
-"command.tpa.usage" = "usage: /tpa <name>"
-"command.tpa.done" = "&aTeleported to %s"
+"command.tpa.usage" = "usage: /tpa <name|accept|deny>"
+"command.tpa.sent" = "&aTeleport request sent to %s\n&7This request expires after 90 seconds"
+"command.tpa.received" = "&e%s &7would like to teleport to you\n&aType /tpaccept or &c/tpdeny&7; this request expires after 90 seconds"
+"command.tpa.accepted" = "&aAccepted %s's teleport request"
+"command.tpa.accepted_by" = "&a%s accepted your teleport request"
+"command.tpa.denied" = "&cDenied %s's teleport request"
+"command.tpa.denied_by" = "&c%s denied your teleport request"
+"command.tpa.self" = "&cYou cannot send a teleport request to yourself"
+"command.tpa.pending" = "&7You already have a pending request with %s"
+"command.tpa.busy" = "&7%s already has a pending teleport request"
+"command.tpa.ambiguous" = "&7More than one player matches %s"
+"command.tpa.none" = "&7You have no pending teleport requests"
+"command.tpa.offline" = "&7%s is no longer online"
+"command.tpa.timed_out" = "&7Your teleport request with %s timed out"
+"command.tpa.incoming_timed_out" = "&7The teleport request from %s timed out"
 
 # ─── command.summon ───
 "command.summon.usage" = "usage: /summon <name>"
@@ -319,6 +334,7 @@
 # ─── command.rankinfo ───
 "command.rankinfo.none" = "&7%s has no rank"
 "command.rankinfo.result" = "&a%s &7is rank &e%s &7(level %d)"
+"command.viewranks.available" = "Available ranks: %s"
 
 # ─── command.copy ───
 "command.copy.usage" = "usage: /copy [air]"
@@ -428,6 +444,8 @@
 
 # ─── command.help ───
 "command.help.list" = "команды: %s"
+"command.help.usage" = "использование: /help [команда]"
+"command.help.no_details" = "для /%s нет подробной справки"
 
 # ─── command.where ───
 "command.where.position" = "%s на координатах %d %d %d"
@@ -545,7 +563,7 @@
 "command.blocks.stats" = "&a%s: &7%d поставлено, %d сломано"
 "command.blocks.current" = "режим физики: %d"
 "command.blocks.set" = "режим физики установлен на %d"
-"command.blocks.usage" = "использование: /physics [off|basic|advanced|custom]"
+"command.blocks.usage" = "использование: /physics [off|basic|advanced|hardcore|instant|doors]"
 "command.mapinfo.levels" = "&aЗагружено уровней: &7%d"
 "command.mapinfo.blockdb" = "&aЗаписей BlockDB: &7%d"
 "command.mapinfo.weather" = "&aПогода: &7%s"
@@ -565,8 +583,21 @@
 "command.back.done" = "&aВозвращены на предыдущую позицию"
 
 # ─── command.tpa ───
-"command.tpa.usage" = "использование: /tpa <имя>"
-"command.tpa.done" = "&aТелепортирован к %s"
+"command.tpa.usage" = "использование: /tpa <имя|accept|deny>"
+"command.tpa.sent" = "&aЗапрос на телепортацию отправлен игроку %s\n&7Запрос истечёт через 90 секунд"
+"command.tpa.received" = "&e%s &7хочет телепортироваться к вам\n&aВведите /tpaccept или &c/tpdeny&7; запрос истечёт через 90 секунд"
+"command.tpa.accepted" = "&aЗапрос игрока %s принят"
+"command.tpa.accepted_by" = "&a%s принял ваш запрос на телепортацию"
+"command.tpa.denied" = "&cЗапрос игрока %s отклонён"
+"command.tpa.denied_by" = "&c%s отклонил ваш запрос на телепортацию"
+"command.tpa.self" = "&cНельзя отправить запрос на телепортацию самому себе"
+"command.tpa.pending" = "&7У вас уже есть активный запрос с игроком %s"
+"command.tpa.busy" = "&7У игрока %s уже есть активный запрос"
+"command.tpa.ambiguous" = "&7Имени %s соответствует несколько игроков"
+"command.tpa.none" = "&7У вас нет активных запросов на телепортацию"
+"command.tpa.offline" = "&7%s больше не в сети"
+"command.tpa.timed_out" = "&7Запрос на телепортацию с игроком %s истёк"
+"command.tpa.incoming_timed_out" = "&7Входящий запрос от игрока %s истёк"
 
 # ─── command.summon ───
 "command.summon.usage" = "использование: /summon <имя>"
@@ -605,6 +636,7 @@
 "command.setrank.target_too_high" = "&cНельзя менять ранг игрока с рангом равным или выше вашего"
 "command.rankinfo.none" = "&7%s не имеет ранга"
 "command.rankinfo.result" = "&a%s &7имеет ранг &e%s &7(уровень %d)"
+"command.viewranks.available" = "Доступные ранги: %s"
 "command.copy.usage" = "использование: /copy [air]"
 "command.paste.usage" = "использование: /paste [air]"
 "command.paste.empty" = "&7Нечего вставлять — используйте /copy сначала"

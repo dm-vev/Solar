@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/solar-mc/solar/internal/blocks"
+	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/protocol/wire"
+	"github.com/solar-mc/solar/internal/world"
 )
 
 // connectAndLogin creates a test session, logs in, and returns the session,
@@ -30,6 +32,33 @@ func connectSpecialSession(t *testing.T) (*session, net.Conn, chan struct{}) {
 	return p.(*session), client, done
 }
 
+func setSessionSpecial(t *testing.T, s *session, x, y, z int, block byte, entry *blocks.SpecialEntry) {
+	t.Helper()
+	if !s.worlds.SetBlock(x, y, z, block) || !s.worlds.SetSpecialBlock(x, y, z, entry) {
+		t.Fatal("set special block")
+	}
+}
+
+func TestMCGalaxy_SpecialBlocksSharedBetweenPlayers(t *testing.T) {
+	alice := newCoverageSession(t, "alice")
+	bob := newCoverageSession(t, "bob")
+	bob.worlds = alice.worlds
+	setSessionSpecial(t, alice, 0, 0, 0, blocks.MBWhite, &blocks.SpecialEntry{
+		Type:    blocks.SpecialMessage,
+		Message: "shared",
+	})
+
+	bob.checkSpecialBlocks(0, 0, 0)
+	select {
+	case packet := <-bob.outbox:
+		if got := string(bytesTrimRight(packet[2:], " \x00")); got != "shared" {
+			t.Fatalf("message = %q, want shared", got)
+		}
+	default:
+		t.Fatal("second player did not receive shared message block")
+	}
+}
+
 // ─── @p replacement in message blocks ───
 
 // TestSpecial_MessageBlockAtPReplacement verifies that @p is replaced with
@@ -43,7 +72,7 @@ func TestSpecial_MessageBlockAtPReplacement(t *testing.T) {
 	}()
 
 	// Register a message block with @p at the player's feet.
-	s.specialBlocks.Set(1, 1, 1, &blocks.SpecialEntry{
+	setSessionSpecial(t, s, 1, 1, 1, blocks.MBWhite, &blocks.SpecialEntry{
 		Type:    blocks.SpecialMessage,
 		Message: "Hello @p, welcome!",
 	})
@@ -81,7 +110,7 @@ func TestSpecial_MessageBlockPlain(t *testing.T) {
 		<-done
 	}()
 
-	s.specialBlocks.Set(2, 2, 2, &blocks.SpecialEntry{
+	setSessionSpecial(t, s, 2, 2, 2, blocks.MBWhite, &blocks.SpecialEntry{
 		Type:    blocks.SpecialMessage,
 		Message: "Welcome to the zone!",
 	})
@@ -111,7 +140,7 @@ func TestSpecial_MessageBlockDedup(t *testing.T) {
 		<-done
 	}()
 
-	s.specialBlocks.Set(3, 3, 3, &blocks.SpecialEntry{
+	setSessionSpecial(t, s, 3, 3, 3, blocks.MBWhite, &blocks.SpecialEntry{
 		Type:    blocks.SpecialMessage,
 		Message: "You should see this once!",
 	})
@@ -142,9 +171,9 @@ func TestSpecial_MessageBlockDedup(t *testing.T) {
 	}
 }
 
-// ─── Door toggle preserves registry entry ───
+// ─── Metadata follows the level block ───
 
-func TestSpecial_DoorTogglePreservesEntry(t *testing.T) {
+func TestSpecial_MetadataRemovedOnReplacement(t *testing.T) {
 	t.Parallel()
 	s, client, done := connectSpecialSession(t)
 	defer func() {
@@ -152,36 +181,54 @@ func TestSpecial_DoorTogglePreservesEntry(t *testing.T) {
 		<-done
 	}()
 
-	// Register a door at (5, 5, 5) with DoorBlock=Log(17).
-	s.specialBlocks.Set(5, 5, 5, &blocks.SpecialEntry{
-		Type:      blocks.SpecialDoor,
-		DoorBlock: 17, // Log
+	setSessionSpecial(t, s, 5, 5, 5, blocks.MBWhite, &blocks.SpecialEntry{
+		Type:    blocks.SpecialMessage,
+		Message: "old",
 	})
-
-	// Simulate door toggle: door block (201) → air.
-	// applyBlockChange with blockID=0 (air), placing=false.
-	// The door entry should survive because existing.Type == SpecialDoor.
-	s.applyBlockChange(5, 5, 5, 0, true)
-
-	entry := s.specialBlocks.Get(5, 5, 5)
-	if entry == nil {
-		t.Fatal("door entry was removed after toggling to air — should be preserved")
+	if err := s.applyBlockChange(5, 5, 5, blocks.Stone, true); err != nil {
+		t.Fatal(err)
 	}
-	if entry.Type != blocks.SpecialDoor {
-		t.Fatalf("entry type = %d, want SpecialDoor", entry.Type)
+	if entry := s.worlds.SpecialBlockAt(5, 5, 5); entry != nil {
+		t.Fatalf("stale metadata after replacement: %+v", entry)
 	}
+}
 
-	// Simulate second toggle: air → Log (17).
-	// applyBlockChange with blockID=17 (Log), placing=true.
-	// The door entry should survive because existing.Type == SpecialDoor.
-	s.applyBlockChange(5, 5, 5, 17, true)
-
-	entry = s.specialBlocks.Get(5, 5, 5)
-	if entry == nil {
-		t.Fatal("door entry was removed after toggling to solid — should be preserved")
+func TestSpecial_DeniedPlacementCannotOverwriteMetadata(t *testing.T) {
+	t.Parallel()
+	s := newCoverageSession(t, "guest")
+	setSessionSpecial(t, s, 1, 1, 1, blocks.MBWhite, &blocks.SpecialEntry{
+		Type:    blocks.SpecialMessage,
+		Message: "original",
+	})
+	if s.SetSpecialBlock(1, 1, 1, command.SpecialBlockEntry{Type: int(blocks.SpecialMessage), Message: "/ban owner"}) {
+		t.Fatal("guest overwrote protected message block metadata")
 	}
-	if entry.Type != blocks.SpecialDoor {
-		t.Fatalf("entry type = %d, want SpecialDoor", entry.Type)
+	entry := s.worlds.SpecialBlockAt(1, 1, 1)
+	if entry == nil || entry.Message != "original" {
+		t.Fatalf("metadata = %+v, want original", entry)
+	}
+}
+
+func TestSpecial_DoorDeletionUsesPhysics(t *testing.T) {
+	t.Parallel()
+	s := newCoverageSession(t, "alice")
+	s.physicsMode = func(*world.Manager) int { return blocks.ModeAdvanced }
+	queued := false
+	s.queuePhysics = func(_ *world.Manager, x, y, z int) {
+		queued = x == 1 && y == 1 && z == 1
+	}
+	if !s.worlds.SetBlock(1, 1, 1, blocks.DoorLog) {
+		t.Fatal("place door")
+	}
+	if err := s.applyBlockChange(1, 1, 1, blocks.Air, false); err != nil {
+		t.Fatal(err)
+	}
+	block, _ := s.worlds.BlockAt(1, 1, 1)
+	if block != blocks.DoorLogAir || !queued {
+		t.Fatalf("activated door = %d queued=%v", block, queued)
+	}
+	if s.worlds.SpecialBlockAt(1, 1, 1) != nil {
+		t.Fatal("door should not use special metadata")
 	}
 }
 
@@ -195,8 +242,7 @@ func TestSpecial_DoorEntryRemovedOnManualDelete(t *testing.T) {
 		<-done
 	}()
 
-	// Place a message block (not a door) at (3, 3, 3).
-	s.specialBlocks.Set(3, 3, 3, &blocks.SpecialEntry{
+	setSessionSpecial(t, s, 3, 3, 3, blocks.MBWhite, &blocks.SpecialEntry{
 		Type:    blocks.SpecialMessage,
 		Message: "test",
 	})
@@ -205,7 +251,7 @@ func TestSpecial_DoorEntryRemovedOnManualDelete(t *testing.T) {
 	s.applyBlockChange(3, 3, 3, 0, true)
 
 	// The message block entry should be removed (not a door).
-	entry := s.specialBlocks.Get(3, 3, 3)
+	entry := s.worlds.SpecialBlockAt(3, 3, 3)
 	if entry != nil {
 		t.Fatal("message block entry should be removed when block is deleted")
 	}
@@ -222,7 +268,7 @@ func TestSpecial_PortalSameLevelTeleport(t *testing.T) {
 	}()
 
 	// Register a same-level portal at (1, 1, 1) → teleport to (50, 60, 70).
-	s.specialBlocks.Set(1, 1, 1, &blocks.SpecialEntry{
+	setSessionSpecial(t, s, 1, 1, 1, blocks.PortalAir, &blocks.SpecialEntry{
 		Type:      blocks.SpecialPortal,
 		PortalDst: [3]int{50, 60, 70},
 	})
@@ -260,7 +306,7 @@ func TestSpecial_MessageBlockCommandExecution(t *testing.T) {
 	}()
 
 	// Register a message block with a /where command.
-	s.specialBlocks.Set(1, 1, 1, &blocks.SpecialEntry{
+	setSessionSpecial(t, s, 1, 1, 1, blocks.MBWhite, &blocks.SpecialEntry{
 		Type:    blocks.SpecialMessage,
 		Message: "/where",
 	})
@@ -298,7 +344,7 @@ func TestSpecial_MessageBlockPipedCommands(t *testing.T) {
 	}()
 
 	// Register a message block with text + piped command.
-	s.specialBlocks.Set(1, 1, 1, &blocks.SpecialEntry{
+	setSessionSpecial(t, s, 1, 1, 1, blocks.MBWhite, &blocks.SpecialEntry{
 		Type:    blocks.SpecialMessage,
 		Message: "Hello |/where",
 	})

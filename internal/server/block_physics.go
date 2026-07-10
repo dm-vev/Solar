@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/world"
+	"github.com/solar-mc/solar/plugin"
 )
 
 // RegisterBlockPhysics creates or replaces the physics engine for a level.
@@ -85,6 +86,24 @@ func (s *Server) BlockPhysicsFor(manager *world.Manager) *blocks.PhysicsEngine {
 	engine := s.blockPhysics[manager]
 	s.blockPhysicsMu.RUnlock()
 	return engine
+}
+
+// BlockPhysicsMode returns the active physics mode for a level.
+func (s *Server) BlockPhysicsMode(manager *world.Manager) int {
+	if engine := s.BlockPhysicsFor(manager); engine != nil {
+		return engine.Mode()
+	}
+	return blocks.ModeOff
+}
+
+// SetBlockPhysicsMode changes the active physics mode for a level.
+func (s *Server) SetBlockPhysicsMode(manager *world.Manager, mode int) {
+	if engine := s.BlockPhysicsFor(manager); engine != nil {
+		engine.SetMode(mode)
+		if manager == s.worlds && s.physics != nil {
+			s.physics.syncMode(plugin.PhysicsMode(mode))
+		}
+	}
 }
 
 func (s *Server) tickBlockPhysics() {

@@ -176,13 +176,22 @@ func newLevelCommand(ctx Context, args []string) (string, bool) {
 	if err != nil {
 		return ctx.tr("command.shared.invalid_width", err), true
 	}
+	if width <= 0 {
+		return ctx.tr("command.shared.invalid_width", "must be positive"), true
+	}
 	height, err := strconv.Atoi(args[3])
 	if err != nil {
 		return ctx.tr("command.shared.invalid_height", err), true
 	}
+	if height <= 0 {
+		return ctx.tr("command.shared.invalid_height", "must be positive"), true
+	}
 	length, err := strconv.Atoi(args[4])
 	if err != nil {
 		return ctx.tr("command.shared.invalid_length", err), true
+	}
+	if length <= 0 {
+		return ctx.tr("command.shared.invalid_length", "must be positive"), true
 	}
 	seed := ""
 	if len(args) > 5 {

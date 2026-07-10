@@ -8,7 +8,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/solar-mc/solar/internal/blocks"
 )
+
+const maxSpecialData = 16 << 20
 
 // LoadLevel reads a world snapshot from disk.
 func LoadLevel(path string) (Level, error) {
@@ -162,8 +166,25 @@ func encodeLevel(level Level) ([]byte, error) {
 		buf.WriteByte(0)
 	}
 	// MOTD
+	if len(level.Env.MOTD) > int(^uint16(0)) {
+		return nil, fmt.Errorf("MOTD length %d exceeds uint16", len(level.Env.MOTD))
+	}
 	binary.Write(&buf, binary.LittleEndian, uint16(len(level.Env.MOTD)))
 	buf.WriteString(level.Env.MOTD)
+	special, err := json.Marshal(level.SpecialBlocks)
+	if err != nil {
+		return nil, fmt.Errorf("encode special blocks: %w", err)
+	}
+	if len(special) > maxSpecialData {
+		return nil, fmt.Errorf("special block payload length %d exceeds limit %d", len(special), maxSpecialData)
+	}
+	buf.WriteString("SPCL")
+	if err := binary.Write(&buf, binary.LittleEndian, uint32(len(special))); err != nil {
+		return nil, fmt.Errorf("write special block length: %w", err)
+	}
+	if _, err := buf.Write(special); err != nil {
+		return nil, fmt.Errorf("write special blocks: %w", err)
+	}
 	return buf.Bytes(), nil
 }
 
@@ -197,14 +218,20 @@ func decodeLevel(data []byte) (Level, error) {
 		return Level{}, err
 	}
 
+	env := readEnv(reader)
+	special, err := readSpecialBlocks(reader, dims[0]*dims[1]*dims[2])
+	if err != nil {
+		return Level{}, err
+	}
 	return Level{
-		Name:   name,
-		Width:  dims[0],
-		Height: dims[1],
-		Length: dims[2],
-		Blocks: blocks,
-		Spawn:  spawn,
-		Env:    readEnv(reader),
+		Name:          name,
+		Width:         dims[0],
+		Height:        dims[1],
+		Length:        dims[2],
+		Blocks:        blocks,
+		Spawn:         spawn,
+		Env:           env,
+		SpecialBlocks: special,
 	}, nil
 }
 
@@ -216,6 +243,7 @@ func readEnv(reader *bytes.Reader) Env {
 		return env // no env section, use defaults
 	}
 	if string(envMagic) != "ENV1" {
+		_, _ = reader.Seek(-4, io.SeekCurrent)
 		return env // unknown section, use defaults
 	}
 	var b byte
@@ -249,6 +277,38 @@ func readEnv(reader *bytes.Reader) Env {
 		}
 	}
 	return env
+}
+
+func readSpecialBlocks(reader *bytes.Reader, volume int) ([]blocks.SpecialRecord, error) {
+	if reader.Len() == 0 {
+		return nil, nil
+	}
+	magic := make([]byte, 4)
+	if _, err := io.ReadFull(reader, magic); err != nil {
+		return nil, fmt.Errorf("read special block magic: %w", err)
+	}
+	if string(magic) != "SPCL" {
+		return nil, nil
+	}
+	size, err := readUint32(reader)
+	if err != nil {
+		return nil, err
+	}
+	if size > maxSpecialData || int64(size) > int64(reader.Len()) {
+		return nil, fmt.Errorf("invalid special block payload length %d", size)
+	}
+	data := make([]byte, size)
+	if _, err := io.ReadFull(reader, data); err != nil {
+		return nil, fmt.Errorf("read special blocks: %w", err)
+	}
+	var records []blocks.SpecialRecord
+	if err := json.Unmarshal(data, &records); err != nil {
+		return nil, fmt.Errorf("decode special blocks: %w", err)
+	}
+	if len(records) > volume {
+		return nil, fmt.Errorf("special block count %d exceeds world volume %d", len(records), volume)
+	}
+	return records, nil
 }
 
 func readMagic(reader *bytes.Reader) error {

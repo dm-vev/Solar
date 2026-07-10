@@ -531,9 +531,10 @@ func TestMCG_TNTNormalModeJustRemoves(t *testing.T) {
 	}
 }
 
-// MCGalaxy: in advanced mode, small TNT explodes and destroys nearby blocks.
-func TestMCG_TNTSmallExplodesInAdvanced(t *testing.T) {
+// MCGalaxy: in instant mode, small TNT explodes and destroys nearby blocks.
+func TestMCG_TNTSmallExplodesInInstantMode(t *testing.T) {
 	e, blocks := makeEngine(7, 7, 7)
+	e.SetMode(ModeInstant)
 	blocks[e.posToInt(3, 3, 3)] = TNTSmall
 	for x := 0; x < 7; x++ {
 		for y := 0; y < 7; y++ {
@@ -566,6 +567,7 @@ func TestMCG_TNTSmallExplodesInAdvanced(t *testing.T) {
 // MCGalaxy: TNT chain reaction — exploding TNT triggers adjacent TNT.
 func TestMCG_TNTChainReaction(t *testing.T) {
 	e, blocks := makeEngine(7, 7, 7)
+	e.SetMode(ModeInstant)
 	for x := 0; x < 7; x++ {
 		for y := 0; y < 7; y++ {
 			for z := 0; z < 7; z++ {
@@ -605,6 +607,7 @@ func TestMCG_TNTNukeLargerThanBig(t *testing.T) {
 func tntDestroyCount(t *testing.T, tntType byte) int {
 	t.Helper()
 	e, blocks := makeEngine(15, 15, 15)
+	e.SetMode(ModeInstant)
 	for x := 0; x < 15; x++ {
 		for y := 0; y < 15; y++ {
 			for z := 0; z < 15; z++ {
@@ -1406,7 +1409,7 @@ func TestMCG_LeafFloodFillAllDirections(t *testing.T) {
 	// Test propagation in all 6 directions by placing logs at each face
 	// of a central leaf, connected via leaf paths.
 	for _, tc := range []struct {
-		name string
+		name       string
 		dx, dy, dz int
 	}{
 		{"+X", 2, 0, 0}, {"-X", -2, 0, 0},

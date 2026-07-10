@@ -329,8 +329,17 @@ type stubTeleport struct{}
 
 func (stubTeleport) SpawnPoint() (int, int, int, byte, byte) { return 0, 0, 0, 0, 0 }
 func (stubTeleport) TeleportToPlayer(name string) bool       { return true }
-func (stubTeleport) SummonPlayer(name string) bool           { return true }
-func (stubTeleport) Back() bool                              { return false }
+func (stubTeleport) RequestTeleport(name string) (TPAStatus, string) {
+	return TPARequestSent, name
+}
+func (stubTeleport) RespondTeleport(accept bool) (TPAStatus, string) {
+	if accept {
+		return TPAAccepted, "alice"
+	}
+	return TPADenied, "alice"
+}
+func (stubTeleport) SummonPlayer(name string) bool { return true }
+func (stubTeleport) Back() bool                    { return false }
 
 // stubChat implements ChatService.
 type stubChat struct{}

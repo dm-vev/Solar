@@ -205,7 +205,7 @@ func TestEdge_Kick_NoModerationService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := kickCommand(ctx, []string{"alice"})
 	if got != "command.kick.unavailable" {
-		t.Fatalf("kick no moderation: got %q, want command.chat.unavailable", got)
+		t.Fatalf("kick no moderation: got %q, want unavailable", got)
 	}
 }
 
@@ -216,7 +216,7 @@ func TestEdge_Ban_NoModerationService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := banCommand(ctx, []string{"griefer"})
 	if got != "command.ban.unavailable" {
-		t.Fatalf("ban no moderation: got %q, want command.chat.unavailable", got)
+		t.Fatalf("ban no moderation: got %q, want unavailable", got)
 	}
 }
 
@@ -225,7 +225,7 @@ func TestEdge_Ban_NoArgs(t *testing.T) {
 	ctx := Context{Moderation: stubModeration{}, Tr: testTr}
 	got, _ := banCommand(ctx, nil)
 	if got != "command.ban.usage" {
-		t.Fatalf("ban no args: got %q, want command.shared.invalid_x", got)
+		t.Fatalf("ban no args: got %q, want usage", got)
 	}
 }
 
@@ -236,7 +236,7 @@ func TestEdge_Unban_NoArgs(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := unbanCommand(ctx, nil)
 	if got != "command.unban.unavailable" {
-		t.Fatalf("unban no args: got %q, want command.chat.unavailable", got)
+		t.Fatalf("unban no args: got %q, want unavailable", got)
 	}
 }
 
@@ -245,7 +245,7 @@ func TestEdge_Unban_TooManyArgs(t *testing.T) {
 	ctx := Context{Moderation: stubModeration{}, Tr: testTr}
 	got, _ := unbanCommand(ctx, []string{"alice", "extra"})
 	if got != "command.unban.usage" {
-		t.Fatalf("unban too many args: got %q, want command.shared.invalid_x", got)
+		t.Fatalf("unban too many args: got %q, want usage", got)
 	}
 }
 
@@ -255,10 +255,8 @@ func TestEdge_SetBlock_NegativeBlock(t *testing.T) {
 	t.Parallel()
 	ctx := Context{World: stubWorld{}, Authority: testAuthority(true), Tr: testTr}
 	got, _ := setBlockCommand(ctx, []string{"1", "2", "3", "-1"})
-	// parseBlock accepts -1 as valid (strconv.Atoi succeeds, -1 < 0 → false)
-	// But setBlockCommand may parse differently. Check actual behavior.
-	if got == "command.setblock.done" {
-		t.Skip("setblock -1: accepted by stubWorld (no real bounds check) — behavior depends on world impl")
+	if got != "command.shared.invalid_block" {
+		t.Fatalf("setblock -1: got %q, want invalid_block", got)
 	}
 }
 
@@ -344,7 +342,7 @@ func TestEdge_Fill_NoDrawService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := fillCommand(ctx, []string{"1"})
 	if got != "command.draw.unavailable" {
-		t.Fatalf("fill no draw: got %q, want command.chat.unavailable", got)
+		t.Fatalf("fill no draw: got %q, want unavailable", got)
 	}
 }
 
@@ -361,7 +359,7 @@ func TestEdge_SetRank_UnknownRankName(t *testing.T) {
 	}
 	got, _ := setRankCommand(ctx, []string{"bob", "superadmin"})
 	if got != "command.setrank.not_found" {
-		t.Fatalf("setrank unknown rank: got %q, want command.whitelist.remove.not_found", got)
+		t.Fatalf("setrank unknown rank: got %q, want not_found", got)
 	}
 }
 
@@ -375,7 +373,7 @@ func TestEdge_SetRank_NoArgs(t *testing.T) {
 	}
 	got, _ := setRankCommand(ctx, nil)
 	if got != "command.setrank.usage" {
-		t.Fatalf("setrank no args: got %q, want command.shared.invalid_x", got)
+		t.Fatalf("setrank no args: got %q, want usage", got)
 	}
 }
 
@@ -389,7 +387,7 @@ func TestEdge_SetRank_OneArg(t *testing.T) {
 	}
 	got, _ := setRankCommand(ctx, []string{"bob"})
 	if got != "command.setrank.usage" {
-		t.Fatalf("setrank one arg: got %q, want command.shared.invalid_x", got)
+		t.Fatalf("setrank one arg: got %q, want usage", got)
 	}
 }
 
@@ -417,7 +415,7 @@ func TestEdge_SetRank_NoRanksService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := setRankCommand(ctx, []string{"bob", "operator"})
 	if got != "command.rank.unavailable" {
-		t.Fatalf("setrank no ranks: got %q, want command.chat.unavailable", got)
+		t.Fatalf("setrank no ranks: got %q, want unavailable", got)
 	}
 }
 
@@ -455,36 +453,29 @@ func TestEdge_Whitelist_NoArgs(t *testing.T) {
 
 func TestEdge_NewLvl_InvalidDims(t *testing.T) {
 	t.Parallel()
-	ctx := Context{World: stubWorld{}, Tr: testTr}
-	got, _ := newLevelCommand(ctx, []string{"world", "flat", "abc", "64", "128"})
-	if got != "command.shared.invalid_width" {
-		t.Fatalf("newlvl invalid width: got %q, want invalid_width", got)
+	tests := []struct {
+		name                  string
+		width, height, length string
+		want                  string
+	}{
+		{"text width", "abc", "64", "128", "command.shared.invalid_width"},
+		{"text height", "128", "abc", "128", "command.shared.invalid_height"},
+		{"text length", "128", "64", "abc", "command.shared.invalid_length"},
+		{"negative width", "-1", "64", "128", "command.shared.invalid_width"},
+		{"zero width", "0", "64", "128", "command.shared.invalid_width"},
+		{"negative height", "128", "-1", "128", "command.shared.invalid_height"},
+		{"zero height", "128", "0", "128", "command.shared.invalid_height"},
+		{"negative length", "128", "64", "-1", "command.shared.invalid_length"},
+		{"zero length", "128", "64", "0", "command.shared.invalid_length"},
 	}
-}
-
-func TestEdge_NewLvl_NegativeDims(t *testing.T) {
-	t.Parallel()
-	ctx := Context{World: stubWorld{}, Tr: testTr}
-	got, _ := newLevelCommand(ctx, []string{"world", "flat", "-1", "64", "128"})
-	// stubWorld.GenerateWorld always returns true — no real validation.
-	// The command may accept negative dims because stub doesn't reject.
-	if got == "command.newlvl.done" {
-		t.Skip("newlvl negative dims: accepted by stubWorld (no real validation) — behavior depends on world impl")
-	}
-	if got != "command.shared.invalid_width" {
-		t.Fatalf("newlvl negative width: got %q", got)
-	}
-}
-
-func TestEdge_NewLvl_ZeroDims(t *testing.T) {
-	t.Parallel()
-	ctx := Context{World: stubWorld{}, Tr: testTr}
-	got, _ := newLevelCommand(ctx, []string{"world", "flat", "0", "0", "0"})
-	if got == "command.newlvl.done" {
-		t.Skip("newlvl zero dims: accepted by stubWorld (no real validation) — behavior depends on world impl")
-	}
-	if got != "command.shared.invalid_width" {
-		t.Fatalf("newlvl zero dims: got %q", got)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := Context{World: stubWorld{}, Tr: testTr}
+			got, _ := newLevelCommand(ctx, []string{"world", "flat", test.width, test.height, test.length})
+			if got != test.want {
+				t.Fatalf("newlvl invalid dimensions: got %q, want %q", got, test.want)
+			}
+		})
 	}
 }
 
@@ -495,7 +486,7 @@ func TestEdge_Seen_NoPlayerDB(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := seenCommand(ctx, []string{"alice"})
 	if got != "command.info.unavailable" {
-		t.Fatalf("seen no playerdb: got %q, want command.chat.unavailable", got)
+		t.Fatalf("seen no playerdb: got %q, want unavailable", got)
 	}
 }
 
@@ -504,7 +495,7 @@ func TestEdge_Seen_NoArgs(t *testing.T) {
 	ctx := Context{PlayerDB: stubPlayerDB{}, Tr: testTr}
 	got, _ := seenCommand(ctx, nil)
 	if got != "command.seen.usage" {
-		t.Fatalf("seen no args: got %q, want command.shared.invalid_x", got)
+		t.Fatalf("seen no args: got %q, want usage", got)
 	}
 }
 
@@ -513,7 +504,7 @@ func TestEdge_Seen_TooManyArgs(t *testing.T) {
 	ctx := Context{PlayerDB: stubPlayerDB{}, Tr: testTr}
 	got, _ := seenCommand(ctx, []string{"alice", "extra"})
 	if got != "command.seen.usage" {
-		t.Fatalf("seen too many args: got %q, want command.shared.invalid_x", got)
+		t.Fatalf("seen too many args: got %q, want usage", got)
 	}
 }
 
@@ -524,7 +515,7 @@ func TestEdge_Whisper_NoArgs(t *testing.T) {
 	ctx := Context{Chat: stubChat{}, Tr: testTr}
 	got, _ := whisperCommand(ctx, nil)
 	if got != "command.whisper.usage" {
-		t.Fatalf("whisper no args: got %q, want command.shared.invalid_x", got)
+		t.Fatalf("whisper no args: got %q, want usage", got)
 	}
 }
 
@@ -533,7 +524,7 @@ func TestEdge_Whisper_OneArg(t *testing.T) {
 	ctx := Context{Chat: stubChat{}, Tr: testTr}
 	got, _ := whisperCommand(ctx, []string{"bob"})
 	if got != "command.whisper.usage" {
-		t.Fatalf("whisper one arg: got %q, want command.shared.invalid_x", got)
+		t.Fatalf("whisper one arg: got %q, want usage", got)
 	}
 }
 
@@ -553,7 +544,7 @@ func TestEdge_Me_NoArgs(t *testing.T) {
 	ctx := Context{Chat: stubChat{}, Tr: testTr}
 	got, _ := meCommand(ctx, nil)
 	if got != "command.me.usage" {
-		t.Fatalf("me no args: got %q, want command.shared.invalid_x", got)
+		t.Fatalf("me no args: got %q, want usage", got)
 	}
 }
 
@@ -573,7 +564,7 @@ func TestEdge_Ignore_NoArgs(t *testing.T) {
 	ctx := Context{Chat: stubChat{}, Tr: testTr}
 	got, _ := ignoreCommand(ctx, nil)
 	if got != "command.ignore.usage" {
-		t.Fatalf("ignore no args: got %q, want command.shared.invalid_x", got)
+		t.Fatalf("ignore no args: got %q, want usage", got)
 	}
 }
 
@@ -593,7 +584,7 @@ func TestEdge_AFK_NoModerationService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := afkCommand(ctx, nil)
 	if got != "command.moderation.unavailable" {
-		t.Fatalf("afk no moderation: got %q, want command.chat.unavailable", got)
+		t.Fatalf("afk no moderation: got %q, want unavailable", got)
 	}
 }
 
@@ -614,7 +605,7 @@ func TestEdge_Hide_NoModerationService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := hideCommand(ctx, nil)
 	if got != "command.moderation.unavailable" {
-		t.Fatalf("hide no moderation: got %q, want command.chat.unavailable", got)
+		t.Fatalf("hide no moderation: got %q, want unavailable", got)
 	}
 }
 
@@ -625,7 +616,7 @@ func TestEdge_TPA_NoArgs(t *testing.T) {
 	ctx := Context{Teleport: stubTeleport{}, Tr: testTr}
 	got, _ := tpaCommand(ctx, nil)
 	if got != "command.tpa.usage" {
-		t.Fatalf("tpa no args: got %q, want command.shared.invalid_x", got)
+		t.Fatalf("tpa no args: got %q, want usage", got)
 	}
 }
 
@@ -634,7 +625,7 @@ func TestEdge_TPA_NoTeleportService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := tpaCommand(ctx, []string{"bob"})
 	if got != "command.teleport.unavailable" {
-		t.Fatalf("tpa no teleport: got %q, want command.chat.unavailable", got)
+		t.Fatalf("tpa no teleport: got %q, want unavailable", got)
 	}
 }
 
@@ -645,7 +636,7 @@ func TestEdge_Spawn_NoTeleportService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := spawnCommand(ctx, nil)
 	if got != "command.teleport.unavailable" {
-		t.Fatalf("spawn no teleport: got %q, want command.chat.unavailable", got)
+		t.Fatalf("spawn no teleport: got %q, want unavailable", got)
 	}
 }
 
@@ -656,7 +647,7 @@ func TestEdge_Back_NoTeleportService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := backCommand(ctx, nil)
 	if got != "command.teleport.unavailable" {
-		t.Fatalf("back no teleport: got %q, want command.chat.unavailable", got)
+		t.Fatalf("back no teleport: got %q, want unavailable", got)
 	}
 }
 
@@ -689,12 +680,22 @@ func TestEdge_Physics_AdvancedAlias(t *testing.T) {
 	}
 }
 
+func TestEdge_Physics_InstantAlias(t *testing.T) {
+	t.Parallel()
+	levels := stubLevels{}
+	ctx := Context{Levels: levels, Tr: testTr}
+	got, _ := physicsCommand(ctx, []string{"instant"})
+	if got != "command.blocks.set" {
+		t.Fatalf("physics instant: got %q, want set", got)
+	}
+}
+
 func TestEdge_Physics_NoLevelService(t *testing.T) {
 	t.Parallel()
 	ctx := Context{Tr: testTr}
 	got, _ := physicsCommand(ctx, nil)
 	if got != "command.level.unavailable" {
-		t.Fatalf("physics no levels: got %q, want command.chat.unavailable", got)
+		t.Fatalf("physics no levels: got %q, want unavailable", got)
 	}
 }
 
@@ -705,7 +706,7 @@ func TestEdge_Goto_LevelNotFound(t *testing.T) {
 	ctx := Context{Levels: stubLevelsFail{}, Tr: testTr}
 	got, _ := gotoCommand(ctx, []string{"nonexistent"})
 	if got != "command.goto.not_found" {
-		t.Fatalf("goto not found: got %q, want command.whitelist.remove.not_found", got)
+		t.Fatalf("goto not found: got %q, want not_found", got)
 	}
 }
 
@@ -714,7 +715,7 @@ func TestEdge_Goto_NoLevelService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := gotoCommand(ctx, []string{"main"})
 	if got != "command.level.unavailable" {
-		t.Fatalf("goto no levels: got %q, want command.chat.unavailable", got)
+		t.Fatalf("goto no levels: got %q, want unavailable", got)
 	}
 }
 
@@ -800,7 +801,7 @@ func TestEdge_Copy_NoDrawService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := copyCommand(ctx, nil)
 	if got != "command.draw.unavailable" {
-		t.Fatalf("copy no draw: got %q, want command.chat.unavailable", got)
+		t.Fatalf("copy no draw: got %q, want unavailable", got)
 	}
 }
 
@@ -811,7 +812,7 @@ func TestEdge_Paste_NoDrawService(t *testing.T) {
 	ctx := Context{Tr: testTr}
 	got, _ := pasteCommand(ctx, nil)
 	if got != "command.draw.unavailable" {
-		t.Fatalf("paste no draw: got %q, want command.chat.unavailable", got)
+		t.Fatalf("paste no draw: got %q, want unavailable", got)
 	}
 }
 

@@ -71,6 +71,8 @@ type session struct {
 	stop                chan struct{}
 	writerDone          chan struct{}
 	stateMu             sync.RWMutex
+	teleportMu          sync.Mutex
+	selectionMu         sync.Mutex
 	stopOnce            sync.Once
 	connOnce            sync.Once
 	username            string
@@ -97,6 +99,10 @@ type session struct {
 	listLoadedLevels    func() []string
 	listLevelFiles      func() []string
 	queuePhysics        func(*world.Manager, int, int, int)
+	physicsMode         func(*world.Manager) int
+	setPhysicsMode      func(*world.Manager, int)
+	saveServerState     func()
+	tpaRequests         *tpaRequestStore
 	maxPlayers          int
 
 	// ponytail: plugin.Player stub state, guarded by stateMu
@@ -112,6 +118,7 @@ type session struct {
 	// lastTeleportPos tracks the position before the last teleport
 	// for /back. Updated by TeleportSelf, changeMap, and Respawn.
 	lastTeleportPos   [3]int
+	lastTeleportWorld *world.Manager
 	lastTeleportValid bool
 
 	// ignoredPlayers tracks chat ignores for this session.
@@ -125,15 +132,14 @@ type session struct {
 	// clipboard holds the last /copy region for /paste.
 	clipboard *blocks.CopyState
 
-	// specialBlocks holds per-level interactive blocks (doors, portals, MBs).
-	specialBlocks    *blocks.SpecialRegistry
 	spamChecker      *player.SpamChecker
 	undoStack        *player.UndoStack
 	batchChanges     []player.BlockChange
 	rankRegistry     *ranks.Registry
 	authEnabled      bool
 	authSalt         string
-	lastSpecialBlock [3]int    // last block coords checked for special blocks
+	lastSpecialBlock [3]int // last block coords checked for special blocks
+	lastSpecialValid bool
 	lastAction       time.Time // last player activity (for AFK detection)
 	afkSince         time.Time // when the player became AFK (for AFK kick timing)
 }
@@ -146,6 +152,94 @@ type markSelection struct {
 }
 
 type markPos struct{ X, Y, Z int }
+
+const tpaRequestTimeout = 90 * time.Second
+
+type tpaRequest struct {
+	id        uint64
+	requester string
+	target    string
+	timer     *time.Timer
+}
+
+type tpaRequestStore struct {
+	mu          sync.Mutex
+	nextID      uint64
+	byRequester map[string]*tpaRequest
+	byTarget    map[string]*tpaRequest
+}
+
+func newTPARequestStore() *tpaRequestStore {
+	return &tpaRequestStore{
+		byRequester: make(map[string]*tpaRequest),
+		byTarget:    make(map[string]*tpaRequest),
+	}
+}
+
+func tpaKey(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
+
+func (s *tpaRequestStore) add(requester, target string, onExpire func(string, uint64)) (*tpaRequest, string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if pending := s.byRequester[tpaKey(requester)]; pending != nil {
+		return nil, pending.target, false
+	}
+	if pending := s.byTarget[tpaKey(target)]; pending != nil {
+		return nil, pending.target, true
+	}
+	s.nextID++
+	req := &tpaRequest{id: s.nextID, requester: requester, target: target}
+	s.byRequester[tpaKey(requester)] = req
+	s.byTarget[tpaKey(target)] = req
+	req.timer = time.AfterFunc(tpaRequestTimeout, func() { onExpire(target, req.id) })
+	return req, "", false
+}
+
+func (s *tpaRequestStore) take(target string) (tpaRequest, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	req := s.byTarget[tpaKey(target)]
+	if req == nil {
+		return tpaRequest{}, false
+	}
+	s.removeLocked(req)
+	return *req, true
+}
+
+func (s *tpaRequestStore) expire(target string, id uint64) (tpaRequest, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	req := s.byTarget[tpaKey(target)]
+	if req == nil || req.id != id {
+		return tpaRequest{}, false
+	}
+	s.removeLocked(req)
+	return *req, true
+}
+
+func (s *tpaRequestStore) cancel(name string) []tpaRequest {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	requests := make([]tpaRequest, 0, 2)
+	seen := make(map[uint64]bool, 2)
+	for _, req := range []*tpaRequest{s.byRequester[tpaKey(name)], s.byTarget[tpaKey(name)]} {
+		if req == nil || seen[req.id] {
+			continue
+		}
+		seen[req.id] = true
+		requests = append(requests, *req)
+		s.removeLocked(req)
+	}
+	return requests
+}
+
+func (s *tpaRequestStore) removeLocked(req *tpaRequest) {
+	delete(s.byRequester, tpaKey(req.requester))
+	delete(s.byTarget, tpaKey(req.target))
+	if req.timer != nil {
+		req.timer.Stop()
+	}
+}
 
 func (s *session) RoomEntityID() uint32 {
 	return s.currentEntityID()
@@ -276,6 +370,7 @@ func (s *session) cleanup() {
 		})
 	}
 	s.leaveRoom()
+	s.cancelTeleportRequests()
 	username, entityID, tracked := s.sessionIdentity()
 	if s.players != nil && tracked && username != "" {
 		s.players.Remove(username)

@@ -74,26 +74,36 @@ func (s *session) handleSetBlock() error {
 	if !place {
 		blockID = 0
 	}
+	manager := s.CurrentWorldManager()
 
 	// If a drawing selection is active, intercept the click as a mark.
-	if s.markState != nil {
+	s.selectionMu.Lock()
+	selection := s.markState
+	if selection != nil {
+		selection.marks[selection.index] = markPos{x, y, z}
+		selection.index++
+		markNumber := selection.index
+		var callback func([]markPos)
+		var marks []markPos
+		if selection.index >= len(selection.marks) {
+			callback = selection.callback
+			marks = append([]markPos(nil), selection.marks...)
+			s.markState = nil
+		}
+		s.selectionMu.Unlock()
 		s.touchLastAction()
 		s.RevertBlock(x, y, z) // don't actually place the block
-		s.markState.marks[s.markState.index] = markPos{x, y, z}
-		s.markState.index++
-		s.Message(s.Tr("command.draw.mark") + " #" + fmt.Sprintf("%d", s.markState.index))
-		if s.markState.index >= len(s.markState.marks) {
-			cb := s.markState.callback
-			marks := s.markState.marks
-			s.markState = nil // clear selection
-			cb(marks)
+		s.Message(s.Tr("command.draw.mark") + " #" + fmt.Sprintf("%d", markNumber))
+		if callback != nil {
+			callback(marks)
 		}
 		return nil
 	}
+	s.selectionMu.Unlock()
 
 	if !s.AllowBuild() {
-		if s.worlds != nil {
-			if block, ok := s.worlds.BlockAt(x, y, z); ok {
+		if manager != nil {
+			if block, ok := manager.BlockAt(x, y, z); ok {
 				s.SendBlockChange(x, y, z, block)
 			}
 		}
@@ -102,8 +112,8 @@ func (s *session) handleSetBlock() error {
 
 	// Per-block permission check.
 	if place && !s.CanPlaceBlock(blockID) {
-		if s.worlds != nil {
-			if block, ok := s.worlds.BlockAt(x, y, z); ok {
+		if manager != nil {
+			if block, ok := manager.BlockAt(x, y, z); ok {
 				s.SendBlockChange(x, y, z, block)
 			}
 		}
@@ -112,8 +122,8 @@ func (s *session) handleSetBlock() error {
 	}
 	if !place {
 		// Check the block being deleted
-		if s.worlds != nil {
-			if old, ok := s.worlds.BlockAt(x, y, z); ok {
+		if manager != nil {
+			if old, ok := manager.BlockAt(x, y, z); ok {
 				if !s.CanDeleteBlock(old) {
 					s.SendBlockChange(x, y, z, old)
 					s.Message(s.Tr("command.draw.cannot_delete", old))
@@ -401,34 +411,26 @@ func (s *session) buildCommandContextFn() command.Context {
 	return command.Context{}
 }
 
-func specialBlockType(b byte) blocks.SpecialType {
-	if blocks.IsMessageBlock(b) {
-		return blocks.SpecialMessage
-	}
-	if blocks.IsPortal(b) {
-		return blocks.SpecialPortal
-	}
-	if blocks.IsDoor(b) {
-		return blocks.SpecialDoor
-	}
-	return blocks.SpecialNone
-}
-
 // checkSpecialBlocks fires message blocks and portals at the player's position.
 // Only fires once per block — tracks the last checked position to avoid spam.
 func (s *session) checkSpecialBlocks(x, y, z int) {
-	if s.specialBlocks == nil || s.worlds == nil {
+	manager := s.CurrentWorldManager()
+	if manager == nil {
 		return
 	}
 	// Skip if same block as last check.
-	if x == s.lastSpecialBlock[0] && y == s.lastSpecialBlock[1] && z == s.lastSpecialBlock[2] {
+	s.stateMu.Lock()
+	if s.lastSpecialValid && x == s.lastSpecialBlock[0] && y == s.lastSpecialBlock[1] && z == s.lastSpecialBlock[2] {
+		s.stateMu.Unlock()
 		return
 	}
 	s.lastSpecialBlock = [3]int{x, y, z}
+	s.lastSpecialValid = true
+	s.stateMu.Unlock()
 
 	// Check the block at feet level and one below.
 	for dy := 0; dy >= -1; dy-- {
-		entry := s.specialBlocks.Get(x, y+dy, z)
+		entry := manager.SpecialBlockAt(x, y+dy, z)
 		if entry == nil {
 			continue
 		}
@@ -468,26 +470,12 @@ func (s *session) checkSpecialBlocks(x, y, z int) {
 				// Same-level portal — teleport.
 				s.teleportSelf(entry.PortalDst[0], entry.PortalDst[1], entry.PortalDst[2], s.Yaw(), s.Pitch())
 			}
-		case blocks.SpecialDoor:
-			// Door toggle: air ↔ solid block.
-			if s.worlds != nil {
-				b, ok := s.worlds.BlockAt(x, y+dy, z)
-				if ok {
-					if b == 0 {
-						s.applyBlockChange(x, y+dy, z, entry.DoorBlock, true)
-					} else {
-						s.applyBlockChange(x, y+dy, z, 0, true)
-					}
-				}
-			}
 		}
+		return
 	}
 }
 
 func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
-	if s.worlds == nil {
-		return nil
-	}
 	placing := blockID != 0
 	if plugin.OnBlockChange.HasHandlers() {
 		ctx := plugin.OnBlockChange.Fire(plugin.BlockChangeData{
@@ -502,11 +490,26 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 			return nil
 		}
 	}
+	s.teleportMu.Lock()
+	defer s.teleportMu.Unlock()
+	manager := s.CurrentWorldManager()
+	if manager == nil {
+		return nil
+	}
 
 	// Record old block before overwriting.
 	var oldBlock byte
-	if b, ok := s.worlds.BlockAt(x, y, z); ok {
+	if b, ok := manager.BlockAt(x, y, z); ok {
 		oldBlock = b
+	}
+	if oldBlock == blocks.DoorLog && blockID == blocks.Air && s.CurrentPhysicsMode() != blocks.ModeOff {
+		blockID = blocks.DoorLogAir
+		placing = true
+	} else if oldBlock == blocks.DoorLogAir && blockID == blocks.Air {
+		if echo {
+			s.SendBlockChange(x, y, z, oldBlock)
+		}
+		return nil
 	}
 
 	// Anti-spam block check (before SetBlock so we can reject).
@@ -515,8 +518,8 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 		if r.Exceeded {
 			s.handleSpamResult(r)
 			// Revert the block on the client so they see it didn't work.
-			if s.worlds != nil {
-				if block, ok := s.worlds.BlockAt(x, y, z); ok {
+			if manager != nil {
+				if block, ok := manager.BlockAt(x, y, z); ok {
 					s.SendBlockChange(x, y, z, block)
 				}
 			}
@@ -524,44 +527,13 @@ func (s *session) applyBlockChange(x, y, z int, blockID byte, echo bool) error {
 		}
 	}
 
-	if !s.worlds.SetBlock(x, y, z, blockID) {
+	if !manager.SetBlock(x, y, z, blockID) {
 		return fmt.Errorf("block position out of bounds: %d %d %d", x, y, z)
-	}
-
-	// Register/remove special blocks.
-	if s.specialBlocks != nil {
-		if placing {
-			if blocks.IsSpecialBlock(blockID) && !blocks.IsTNT(blockID) {
-				s.specialBlocks.Set(x, y, z, &blocks.SpecialEntry{
-					Type: specialBlockType(blockID),
-				})
-			}
-			// Remove special block entry if overwriting one with a non-special block.
-			// But preserve door entries — the door toggle places solid blocks (Log, etc.)
-			// which are not special, and we must not delete the door's registry entry.
-			if !blocks.IsSpecialBlock(blockID) {
-				if existing := s.specialBlocks.Get(x, y, z); existing != nil {
-					if existing.Type != blocks.SpecialDoor {
-						s.specialBlocks.Remove(x, y, z)
-					}
-				}
-			}
-		} else {
-			// Block deleted (air) — remove any special block entry at this position.
-			// Door toggle uses applyBlockChange with blockID=0, but door entries
-			// must survive the toggle. We detect the door toggle by checking if
-			// the existing entry is a door — if so, keep it.
-			if existing := s.specialBlocks.Get(x, y, z); existing != nil {
-				if existing.Type != blocks.SpecialDoor {
-					s.specialBlocks.Remove(x, y, z)
-				}
-			}
-		}
 	}
 
 	// Queue block for physics processing.
 	if s.queuePhysics != nil {
-		s.queuePhysics(s.worlds, x, y, z)
+		s.queuePhysics(manager, x, y, z)
 	}
 
 	// Record in BlockDB.

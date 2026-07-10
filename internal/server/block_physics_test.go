@@ -80,6 +80,29 @@ func TestUnregisterBlockPhysicsRemovesLevelEngine(t *testing.T) {
 	}
 }
 
+func TestBlockPhysicsModeDrivesTNTFuse(t *testing.T) {
+	t.Parallel()
+	manager := managerWithLevel("main", 7, 7, 7)
+	srv := &Server{worlds: manager, blockPhysics: make(map[*world.Manager]*blocks.PhysicsEngine)}
+	srv.RegisterBlockPhysics(manager)
+	srv.SetBlockPhysicsMode(manager, blocks.ModeHardcore)
+	if got := srv.BlockPhysicsMode(manager); got != blocks.ModeHardcore {
+		t.Fatalf("mode = %d, want hardcore", got)
+	}
+	manager.SetBlock(3, 3, 3, blocks.TNTSmall)
+	srv.QueueBlockPhysics(manager, 3, 3, 3)
+	for range 5 {
+		srv.tickBlockPhysics()
+	}
+	if block, _ := manager.BlockAt(3, 3, 3); block != blocks.TNTSmall {
+		t.Fatalf("TNT exploded before fuse completed: %d", block)
+	}
+	srv.tickBlockPhysics()
+	if block, _ := manager.BlockAt(3, 3, 3); block == blocks.TNTSmall {
+		t.Fatal("TNT did not explode after fuse")
+	}
+}
+
 func managerWithLevel(name string, width, height, length int) *world.Manager {
 	manager := world.NewManager()
 	manager.SetCurrent(world.Level{

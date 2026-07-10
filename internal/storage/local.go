@@ -71,6 +71,11 @@ func (s *LocalStore) BlockDBFile(levelName string) string {
 	return filepath.Join(s.BlockDBsDir(), safeName(levelName)+".cbdb")
 }
 
+// PluginDataDir returns the persistent data directory for a plugin name.
+func (s *LocalStore) PluginDataDir(pluginName string) string {
+	return filepath.Join(s.root, "plugin-data", pluginName)
+}
+
 // ValidName reports whether name is safe to use as a single storage filename stem.
 func ValidName(name string) bool {
 	name = strings.TrimSpace(name)

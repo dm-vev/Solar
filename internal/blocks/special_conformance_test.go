@@ -86,8 +86,10 @@ func TestMCG_IsPortal(t *testing.T) {
 }
 
 func TestMCG_IsDoor(t *testing.T) {
-	if !IsDoor(DoorLogAir) {
-		t.Fatal("IsDoor(201) should be true")
+	for _, block := range []byte{DoorLog, DoorLogAir} {
+		if !IsDoor(block) {
+			t.Fatalf("IsDoor(%d) should be true", block)
+		}
 	}
 	for _, b := range []byte{0, 1, 200, 202, 255} {
 		if IsDoor(b) {
@@ -112,7 +114,7 @@ func TestMCG_IsTNT(t *testing.T) {
 func TestMCG_IsSpecialBlock(t *testing.T) {
 	specials := []byte{MBWhite, MBBlack, MBAir, MBWater, MBLava,
 		PortalAir, PortalWater, PortalLava, PortalBlue, PortalOrange,
-		DoorLogAir, TNTSmall, TNTBig, TNTNuke}
+		DoorLog, DoorLogAir, TNTSmall, TNTBig, TNTNuke}
 	for _, b := range specials {
 		if !IsSpecialBlock(b) {
 			t.Fatalf("IsSpecialBlock(%d) should be true", b)
@@ -165,49 +167,6 @@ func TestMCG_KeyPacking(t *testing.T) {
 			t.Fatalf("key round-trip: (%d,%d,%d) → key=%d → (%d,%d,%d)",
 				tc.x, tc.y, tc.z, k, x, y, z)
 		}
-	}
-}
-
-// ─── MCGalaxy conformance: door toggle ───
-// MCGalaxy DoorPhysics: door toggles between air and solid block.
-// When a player steps on a door, it becomes air. When they step off and
-// back on, it becomes solid again. The toggle is triggered by player
-// movement, not by physics.
-//
-// FIXED: Solar's door toggle no longer removes the registry entry when
-// placing the solid block (Log=17, non-special). The fix in applyBlockChange
-// preserves door entries during toggle.
-
-// TestMCGalaxy_DoorEntryPreservedAfterSolidToggle verifies that the door
-// registry entry survives when a non-special solid block is placed at the
-// door coordinate (simulating the toggle to solid).
-func TestMCGalaxy_DoorEntryPreservedAfterSolidToggle(t *testing.T) {
-	r := NewSpecialRegistry()
-	r.Set(5, 10, 5, &SpecialEntry{
-		Type:      SpecialDoor,
-		DoorBlock: 17, // Log
-	})
-
-	// Simulate: door toggle places Log (17) at the door coordinate.
-	// Old behavior: applyBlockChange would Remove the entry because 17 is not special.
-	// New behavior: door entries are preserved.
-	// We simulate the fixed logic: only remove if existing entry is NOT a door.
-	if existing := r.Get(5, 10, 5); existing != nil {
-		if existing.Type != SpecialDoor {
-			r.Remove(5, 10, 5)
-		}
-	}
-
-	// Entry should still exist.
-	entry := r.Get(5, 10, 5)
-	if entry == nil {
-		t.Fatal("door entry was removed after toggling to solid — should be preserved")
-	}
-	if entry.Type != SpecialDoor {
-		t.Fatalf("entry type = %d, want SpecialDoor(3)", entry.Type)
-	}
-	if entry.DoorBlock != 17 {
-		t.Fatalf("DoorBlock = %d, want 17", entry.DoorBlock)
 	}
 }
 
@@ -327,26 +286,6 @@ func TestMCGalaxy_MessageBlockPipedCommands(t *testing.T) {
 	}
 }
 
-// ─── MCGalaxy conformance: special block persistence ───
-// MCGalaxy: portals and message blocks are persisted to a database per level
-// (Portals{map} and Messages{map} tables). They survive server restarts
-// and are shared between all players.
-// Solar: SpecialRegistry is per-session, in-memory, not persisted, not shared.
-// ARCHITECTURAL DIFFERENCE — requires multi-level manager refactor.
-
-// TestMCGalaxy_SpecialBlocksNotSharedBetweenPlayers documents that Solar's
-// special block registry is per-session, not shared.
-func TestMCGalaxy_SpecialBlocksNotSharedBetweenPlayers(t *testing.T) {
-	// MCGalaxy: portals/MBs are level-global. Player A creates /mb →
-	// player B stepping on it also sees the message.
-	//
-	// Solar: each session has its own SpecialRegistry. Player A's /mb
-	// only fires for player A.
-	//
-	// This is an architectural difference requiring a shared per-level registry.
-	t.Skip("architectural: special blocks per-session, not shared — requires shared per-level registry refactor")
-}
-
 // ─── MCGalaxy conformance: door behavior ───
 // MCGalaxy DoorPhysics.Do:
 //   - Door is triggered by physics (PhysicsArgs.Custom), not by stepping.
@@ -355,14 +294,41 @@ func TestMCGalaxy_SpecialBlocksNotSharedBetweenPlayers(t *testing.T) {
 //   - Door_Air and Door_AirActivatable are "instant" doors.
 // ARCHITECTURAL DIFFERENCE — requires physics-based door system.
 
-// TestMCGalaxy_DoorTriggerMechanism documents the architectural difference
-// in door trigger mechanisms.
 func TestMCGalaxy_DoorTriggerMechanism(t *testing.T) {
-	// MCGalaxy: doors are physics-triggered with timer and adjacent activation.
-	// Solar: doors are step-triggered with immediate toggle on single block.
-	// Both work, but the mechanism differs. The step-toggle approach is
-	// a valid simplification — the door still toggles air↔solid correctly.
-	t.Skip("architectural: door trigger mechanism differs — MCGalaxy uses physics+timer+adjacent, Solar uses step-toggle (valid simplification)")
+	e, cells := makeEngine(5, 5, 5)
+	center := e.posToInt(2, 2, 2)
+	neighbours := []int{
+		e.posToInt(3, 2, 2), e.posToInt(1, 2, 2),
+		e.posToInt(2, 3, 2), e.posToInt(2, 1, 2),
+		e.posToInt(2, 2, 3), e.posToInt(2, 2, 1),
+	}
+	cells[center] = DoorLogAir
+	for _, index := range neighbours {
+		cells[index] = DoorLog
+	}
+	e.Queue(2, 2, 2)
+	e.Tick()
+	for _, index := range neighbours {
+		if cells[index] != DoorLogAir {
+			t.Fatalf("adjacent door = %d, want DoorLogAir", cells[index])
+		}
+	}
+	for range 15 {
+		e.Tick()
+	}
+	if cells[center] != DoorLogAir {
+		t.Fatalf("center door closed too early: %d", cells[center])
+	}
+	e.Tick()
+	if cells[center] != DoorLog {
+		t.Fatalf("center door = %d, want DoorLog after timer", cells[center])
+	}
+	e.Tick()
+	for _, index := range neighbours {
+		if cells[index] != DoorLog {
+			t.Fatalf("adjacent door = %d, want DoorLog after timer", cells[index])
+		}
+	}
 }
 
 // ─── MCGalaxy conformance: message block repeat prevention ───

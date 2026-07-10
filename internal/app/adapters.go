@@ -186,8 +186,11 @@ type sessionTeleport struct{ backend classic.SessionBackend }
 func (s sessionTeleport) SpawnPoint() (int, int, int, byte, byte) {
 	return s.backend.SpawnPoint()
 }
-func (s sessionTeleport) TeleportToPlayer(name string) bool {
-	return s.backend.TeleportToPlayer(name)
+func (s sessionTeleport) RequestTeleport(name string) (command.TPAStatus, string) {
+	return s.backend.RequestTeleport(name)
+}
+func (s sessionTeleport) RespondTeleport(accept bool) (command.TPAStatus, string) {
+	return s.backend.RespondTeleport(accept)
 }
 func (s sessionTeleport) SummonPlayer(name string) bool {
 	return s.backend.SummonPlayer(name)

@@ -74,20 +74,22 @@ func (s *session) TeleportSelf(x, y, z int, yaw, pitch byte) bool {
 }
 
 func (s *session) SetSpawn(spawn world.Spawn) bool {
-	if s.worlds == nil {
+	manager := s.CurrentWorldManager()
+	if manager == nil {
 		return false
 	}
-	s.worlds.SetSpawn(spawn)
+	manager.SetSpawn(spawn)
 	return true
 }
 
 // ─── TeleportService methods ───
 
 func (s *session) SpawnPoint() (x, y, z int, yaw, pitch byte) {
-	if s.worlds == nil {
+	manager := s.CurrentWorldManager()
+	if manager == nil {
 		return 0, 0, 0, 0, 0
 	}
-	sp := s.worlds.Spawn()
+	sp := manager.Spawn()
 	return sp.X, sp.Y, sp.Z, sp.Yaw, sp.Pitch
 }
 
@@ -100,11 +102,66 @@ func (s *session) TeleportToPlayer(name string) bool {
 	if target.IsHidden() {
 		return false
 	}
-	s.saveLastPos()
-	tx, ty, tz := target.Position()
-	tx, ty, tz = wireCoordsToBlocks(tx, ty, tz)
-	targetYaw, targetPitch := target.Yaw(), target.Pitch()
-	return s.teleportSelf(tx, ty, tz, targetYaw, targetPitch)
+	return s.teleportToSession(target)
+}
+
+func (s *session) RequestTeleport(name string) (command.TPAStatus, string) {
+	target, ok, ambiguous := s.findTPATarget(name)
+	if ambiguous {
+		return command.TPAAmbiguous, name
+	}
+	if !ok || target.IsHidden() {
+		return command.TPAPlayerNotFound, name
+	}
+	targetName := target.currentUsername()
+	if target == s {
+		return command.TPASelf, targetName
+	}
+	if target.isIgnoring(s.currentUsername()) {
+		return command.TPARequestSent, targetName
+	}
+	if s.tpaRequests == nil {
+		return command.TPAFailed, targetName
+	}
+	_, pending, busy := s.tpaRequests.add(s.currentUsername(), targetName, s.expireTeleportRequest)
+	if pending != "" {
+		if busy {
+			return command.TPATargetBusy, pending
+		}
+		return command.TPAAlreadyPending, pending
+	}
+	if current, online := s.room.FindByName(targetName); !online || current != target {
+		s.tpaRequests.cancel(s.currentUsername())
+		return command.TPAPlayerNotFound, targetName
+	}
+	target.Message(target.Translate("command.tpa.received", s.currentUsername()))
+	return command.TPARequestSent, targetName
+}
+
+func (s *session) RespondTeleport(accept bool) (command.TPAStatus, string) {
+	if s.tpaRequests == nil {
+		return command.TPAFailed, ""
+	}
+	req, ok := s.tpaRequests.take(s.currentUsername())
+	if !ok {
+		return command.TPANoPending, ""
+	}
+	if s.room == nil {
+		return command.TPARequesterOffline, req.requester
+	}
+	requester, ok := s.room.FindByName(req.requester)
+	if !ok {
+		return command.TPARequesterOffline, req.requester
+	}
+	if !accept {
+		requester.Message(requester.Translate("command.tpa.denied_by", s.currentUsername()))
+		return command.TPADenied, req.requester
+	}
+	if !requester.teleportToSession(s) {
+		return command.TPAFailed, req.requester
+	}
+	requester.Message(requester.Translate("command.tpa.accepted_by", s.currentUsername()))
+	return command.TPAAccepted, req.requester
 }
 
 func (s *session) SummonPlayer(name string) bool {
@@ -112,38 +169,174 @@ func (s *session) SummonPlayer(name string) bool {
 	if !ok {
 		return false
 	}
-	target.saveLastPos()
-	mx, my, mz := s.Position()
-	mx, my, mz = wireCoordsToBlocks(mx, my, mz)
-	myaw, mpitch := s.Yaw(), s.Pitch()
-	return target.teleportSelf(mx, my, mz, myaw, mpitch)
+	return target.teleportToSession(s)
 }
 
 func (s *session) BackToLastPos() bool {
-	if !s.lastTeleportValid {
+	s.stateMu.RLock()
+	valid := s.lastTeleportValid
+	position := s.lastTeleportPos
+	previousWorld := s.lastTeleportWorld
+	s.stateMu.RUnlock()
+	if !valid {
 		return false
 	}
-	x, y, z := s.lastTeleportPos[0], s.lastTeleportPos[1], s.lastTeleportPos[2]
+	currentWorld := s.CurrentWorldManager()
+	if previousWorld != nil && previousWorld != currentWorld {
+		if err := s.prepareMapChange(previousWorld); err != nil {
+			return false
+		}
+	}
+	s.teleportMu.Lock()
+	s.stateMu.RLock()
+	unchanged := s.lastTeleportValid && s.lastTeleportPos == position && s.lastTeleportWorld == previousWorld
+	s.stateMu.RUnlock()
+	if !unchanged {
+		s.teleportMu.Unlock()
+		return false
+	}
+	changedMap := previousWorld != nil && previousWorld != s.CurrentWorldManager()
+	prevName := ""
+	if changedMap && currentWorld != nil {
+		prevName = currentWorld.Current().Name
+	}
+	if previousWorld != nil && previousWorld != s.CurrentWorldManager() {
+		if err := s.changeMapLocked(previousWorld); err != nil {
+			s.teleportMu.Unlock()
+			return false
+		}
+	}
+	x, y, z := position[0], position[1], position[2]
 	yaw, pitch := s.Yaw(), s.Pitch()
-	s.lastTeleportValid = false
-	// Don't call teleportSelf — it would saveLastPos and overwrite.
-	// Teleport directly without saving.
 	entityID := s.currentEntityID()
 	if s.entities == nil || entityID == 0 {
+		s.teleportMu.Unlock()
 		return false
 	}
 	pos := entityPosition(x, y, z)
 	if !s.entities.SetLocation(entityID, pos, yaw, pitch) {
+		s.teleportMu.Unlock()
 		return false
 	}
-	return s.writePacket(encodeEntityTeleport(byte(entityID), pos, yaw, pitch)) == nil
+	if s.writePacket(encodeEntityTeleport(byte(entityID), pos, yaw, pitch)) != nil {
+		s.teleportMu.Unlock()
+		return false
+	}
+	s.stateMu.Lock()
+	s.lastTeleportValid = false
+	s.lastTeleportWorld = nil
+	s.stateMu.Unlock()
+	s.teleportMu.Unlock()
+	if changedMap {
+		s.finishMapChange(previousWorld.Current().Name, prevName)
+	}
+	return true
 }
 
-func (s *session) saveLastPos() {
+func (s *session) saveLastPosLocked() {
 	x, y, z := s.Position()
 	x, y, z = wireCoordsToBlocks(x, y, z)
+	s.stateMu.Lock()
 	s.lastTeleportPos = [3]int{x, y, z}
+	s.lastTeleportWorld = s.worlds
 	s.lastTeleportValid = true
+	s.stateMu.Unlock()
+}
+
+func (s *session) findTPATarget(name string) (*session, bool, bool) {
+	if target, ok := s.findTarget(name); ok {
+		return target, true, false
+	}
+	if s.room == nil {
+		return nil, false, false
+	}
+	key := tpaKey(name)
+	var match *session
+	for _, peer := range s.room.Snapshot() {
+		if peer.IsHidden() || !strings.HasPrefix(tpaKey(peer.currentUsername()), key) {
+			continue
+		}
+		if match != nil {
+			return nil, false, true
+		}
+		match = peer
+	}
+	return match, match != nil, false
+}
+
+func (s *session) teleportToSession(target *session) bool {
+	if target == nil {
+		return false
+	}
+	origin := s.CurrentWorldManager()
+	ox, oy, oz := s.Position()
+	ox, oy, oz = wireCoordsToBlocks(ox, oy, oz)
+	targetWorld := target.CurrentWorldManager()
+	if origin != targetWorld {
+		if err := s.prepareMapChange(targetWorld); err != nil {
+			return false
+		}
+	}
+	s.teleportMu.Lock()
+	changedMap := origin != targetWorld
+	if origin != targetWorld {
+		if target.CurrentWorldManager() != targetWorld || s.changeMapLocked(targetWorld) != nil {
+			s.teleportMu.Unlock()
+			return false
+		}
+	}
+	tx, ty, tz := target.Position()
+	tx, ty, tz = wireCoordsToBlocks(tx, ty, tz)
+	if !s.teleportSelfLocked(tx, ty, tz, target.Yaw(), target.Pitch()) {
+		s.teleportMu.Unlock()
+		return false
+	}
+	s.stateMu.Lock()
+	s.lastTeleportPos = [3]int{ox, oy, oz}
+	s.lastTeleportWorld = origin
+	s.lastTeleportValid = true
+	s.stateMu.Unlock()
+	s.teleportMu.Unlock()
+	if changedMap {
+		prevName := ""
+		if origin != nil {
+			prevName = origin.Current().Name
+		}
+		s.finishMapChange(targetWorld.Current().Name, prevName)
+	}
+	return true
+}
+
+func (s *session) expireTeleportRequest(target string, id uint64) {
+	if s.tpaRequests == nil {
+		return
+	}
+	req, ok := s.tpaRequests.expire(target, id)
+	if !ok || s.room == nil {
+		return
+	}
+	if requester, ok := s.room.FindByName(req.requester); ok {
+		requester.Message(requester.Translate("command.tpa.timed_out", req.target))
+	}
+	if recipient, ok := s.room.FindByName(req.target); ok {
+		recipient.Message(recipient.Translate("command.tpa.incoming_timed_out", req.requester))
+	}
+}
+
+func (s *session) cancelTeleportRequests() {
+	if s.tpaRequests == nil || s.room == nil {
+		return
+	}
+	name := s.currentUsername()
+	for _, req := range s.tpaRequests.cancel(name) {
+		other := req.requester
+		if strings.EqualFold(other, name) {
+			other = req.target
+		}
+		if peer, ok := s.room.FindByName(other); ok {
+			peer.Message(peer.Translate("command.tpa.offline", name))
+		}
+	}
 }
 
 // ─── ChatService methods ───
@@ -199,9 +392,10 @@ func (s *session) isIgnoring(name string) bool {
 // ─── DrawService methods ───
 
 func (s *session) StartSelection(markCount int, callback func(marks [][3]int)) bool {
-	if markCount < 1 || markCount > 3 {
+	if markCount < 1 || markCount > 3 || callback == nil {
 		return false
 	}
+	s.selectionMu.Lock()
 	s.markState = &markSelection{
 		marks: make([]markPos, markCount),
 		callback: func(marks []markPos) {
@@ -212,18 +406,21 @@ func (s *session) StartSelection(markCount int, callback func(marks [][3]int)) b
 			callback(out)
 		},
 	}
+	s.selectionMu.Unlock()
 	return true
 }
 
 func (s *session) GetBlockAt(x, y, z int) (byte, bool) {
-	if s.worlds == nil {
+	manager := s.CurrentWorldManager()
+	if manager == nil {
 		return 0, false
 	}
-	return s.worlds.BlockAt(x, y, z)
+	return manager.BlockAt(x, y, z)
 }
 
 func (s *session) PlaceBlock(x, y, z int, block byte) bool {
-	if s.worlds == nil {
+	manager := s.CurrentWorldManager()
+	if manager == nil {
 		return false
 	}
 	// Check per-block permissions for both the new block (place) and
@@ -232,12 +429,12 @@ func (s *session) PlaceBlock(x, y, z int, block byte) bool {
 	if !s.CanPlaceBlock(block) {
 		return false
 	}
-	if old, ok := s.worlds.BlockAt(x, y, z); ok && old != block {
+	if old, ok := manager.BlockAt(x, y, z); ok && old != block {
 		if !s.CanDeleteBlock(old) {
 			return false
 		}
 	}
-	if !s.worlds.SetBlock(x, y, z, block) {
+	if !manager.SetBlock(x, y, z, block) {
 		return false
 	}
 	pkt := encodeSetBlock(x, y, z, block)
@@ -247,10 +444,11 @@ func (s *session) PlaceBlock(x, y, z int, block byte) bool {
 }
 
 func (s *session) LevelDims() (width, height, length int) {
-	if s.worlds == nil {
+	manager := s.CurrentWorldManager()
+	if manager == nil {
 		return 0, 0, 0
 	}
-	lvl := s.worlds.Current()
+	lvl := manager.Current()
 	return lvl.Width, lvl.Height, lvl.Length
 }
 
@@ -297,16 +495,32 @@ func (s *session) PasteAt(origin [3]int, pasteAir bool) int {
 }
 
 func (s *session) SetSpecialBlock(x, y, z int, entry command.SpecialBlockEntry) bool {
-	if s.specialBlocks == nil {
+	manager := s.CurrentWorldManager()
+	if manager == nil {
 		return false
 	}
-	s.specialBlocks.Set(x, y, z, &blocks.SpecialEntry{
+	block := blocks.MBWhite
+	if blocks.SpecialType(entry.Type) == blocks.SpecialPortal {
+		block = blocks.PortalAir
+	}
+	if !s.CanPlaceBlock(block) {
+		return false
+	}
+	if old, ok := manager.BlockAt(x, y, z); ok && old != block && !s.CanDeleteBlock(old) {
+		return false
+	}
+	if !manager.SetBlockWithSpecial(x, y, z, block, &blocks.SpecialEntry{
 		Type:        blocks.SpecialType(entry.Type),
 		Message:     entry.Message,
 		PortalDst:   [3]int{entry.PortalX, entry.PortalY, entry.PortalZ},
 		PortalLevel: entry.PortalLevel,
 		DoorBlock:   entry.DoorBlock,
-	})
+	}) {
+		return false
+	}
+	pkt := encodeSetBlock(x, y, z, block)
+	_ = s.writePacket(pkt)
+	s.broadcastToPeers(pkt)
 	return true
 }
 
@@ -448,6 +662,7 @@ var blockPlacePerms = [256]int{
 	162: ranks.PermAdvBuilder, // Portal_Lava
 	175: ranks.PermAdvBuilder, // Portal_Blue
 	176: ranks.PermAdvBuilder, // Portal_Orange
+	111: ranks.PermBuilder,    // Door_Log
 	130: ranks.PermAdvBuilder, // MB_White
 	131: ranks.PermAdvBuilder, // MB_Black
 	132: ranks.PermAdvBuilder, // MB_Air
@@ -658,7 +873,13 @@ func (s *session) currentLocation() (world.Spawn, byte, byte) {
 }
 
 func (s *session) teleportSelf(x, y, z int, yaw, pitch byte) bool {
-	s.saveLastPos()
+	s.teleportMu.Lock()
+	defer s.teleportMu.Unlock()
+	return s.teleportSelfLocked(x, y, z, yaw, pitch)
+}
+
+func (s *session) teleportSelfLocked(x, y, z int, yaw, pitch byte) bool {
+	s.saveLastPosLocked()
 	entityID := s.currentEntityID()
 	if s.entities == nil || entityID == 0 {
 		return false
@@ -674,6 +895,14 @@ func (s *session) teleportSelf(x, y, z int, yaw, pitch byte) bool {
 }
 
 func (s *session) saveState() bool {
+	if s.saveServerState != nil {
+		save := s.saveServerState
+		if s.workers != nil {
+			return s.workers.Submit(save)
+		}
+		go save()
+		return true
+	}
 	if s.worldPath == "" && s.policyPath == "" {
 		return false
 	}
@@ -1002,13 +1231,18 @@ func (s *session) ListLevelFiles() []string {
 }
 
 func (s *session) CurrentPhysicsMode() int {
-	// ponytail: physics mode is on pluginServer, not session. Return 0 for now.
-	return 0
+	manager := s.CurrentWorldManager()
+	if s.physicsMode == nil || manager == nil {
+		return blocks.ModeOff
+	}
+	return s.physicsMode(manager)
 }
 
 func (s *session) SetCurrentPhysicsMode(mode int) {
-	_ = mode
-	// ponytail: physics mode is on pluginServer, not session. No-op for now.
+	manager := s.CurrentWorldManager()
+	if s.setPhysicsMode != nil && manager != nil {
+		s.setPhysicsMode(manager, mode)
+	}
 }
 
 // ─── LevelEnvService methods ───

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/solar-mc/solar/internal/blocks"
 	"github.com/solar-mc/solar/internal/command"
 	"github.com/solar-mc/solar/internal/config"
 	"github.com/solar-mc/solar/internal/entity"
@@ -21,6 +22,18 @@ func TestPluginServerPostInitAndLevelLoad(t *testing.T) {
 	if srv.flushBlockDBsFn == nil {
 		t.Fatal("PostInit did not wire blockdb flush")
 	}
+	if srv.saveLevelsFn == nil {
+		t.Fatal("PostInit did not wire level persistence")
+	}
+	engine := srv.RegisterBlockPhysics(srv.worlds)
+	host.Physics().SetMode(plugin.PhysicsAdvanced)
+	if engine.Mode() != int(plugin.PhysicsAdvanced) {
+		t.Fatalf("plugin mode did not reach block physics: %d", engine.Mode())
+	}
+	srv.SetBlockPhysicsMode(srv.worlds, blocks.ModeHardcore)
+	if host.Physics().Mode() != plugin.PhysicsMode(blocks.ModeHardcore) {
+		t.Fatalf("block physics mode not visible to plugin: %d", host.Physics().Mode())
+	}
 
 	manager := world.NewManager()
 	manager.SetCurrent(world.Level{Name: "loadme", Width: 4, Height: 4, Length: 4, Blocks: make([]byte, 64)})
@@ -30,8 +43,20 @@ func TestPluginServerPostInitAndLevelLoad(t *testing.T) {
 	if !host.LoadLevelByName("loadme") {
 		t.Fatal("LoadLevelByName returned false")
 	}
+	loaded := host.multiMgr.Get("loadme")
+	loaded.SetBlock(1, 1, 1, blocks.MBWhite)
+	if !loaded.SetSpecialBlock(1, 1, 1, &blocks.SpecialEntry{Type: blocks.SpecialMessage, Message: "saved"}) {
+		t.Fatal("set secondary-level metadata")
+	}
 	if !host.UnloadLevelByName("loadme") {
 		t.Fatal("UnloadLevelByName returned false")
+	}
+	reloaded := world.NewManager()
+	if err := reloaded.Load(srv.store.WorldFile("loadme")); err != nil {
+		t.Fatal(err)
+	}
+	if entry := reloaded.SpecialBlockAt(1, 1, 1); entry == nil || entry.Message != "saved" {
+		t.Fatalf("secondary metadata after unload = %+v", entry)
 	}
 }
 
@@ -53,6 +78,44 @@ func TestPluginPhysics(t *testing.T) {
 	physics.Tick()
 	if !called {
 		t.Fatal("physics handler was not called")
+	}
+}
+
+func TestPluginCommandSpecAndDataDir(t *testing.T) {
+	host, srv := newPluginHostFixture(t)
+	spec := plugin.CommandSpec{
+		Name:    "sample",
+		Aliases: []string{"s"},
+		Help:    "sample help",
+		MinRank: 30,
+		Handler: func(plugin.Player, []string) string { return "ok" },
+	}
+	if !host.RegisterCommandSpec(spec) {
+		t.Fatal("RegisterCommandSpec returned false")
+	}
+	if host.RegisterCommandSpec(plugin.CommandSpec{Name: "other", Aliases: []string{"help"}, Handler: spec.Handler}) {
+		t.Fatal("RegisterCommandSpec overwrote a built-in alias")
+	}
+	if !host.UnregisterCommand("s") {
+		t.Fatal("unregister by alias returned false")
+	}
+	if host.commands.SetCommandRank("sample", 0) {
+		t.Fatal("primary command remained after alias unregister")
+	}
+
+	dir, err := host.PluginDataDir("sample")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := srv.store.PluginDataDir("sample")
+	if dir != want {
+		t.Fatalf("PluginDataDir = %q, want %q", dir, want)
+	}
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		t.Fatalf("plugin data directory missing: info=%v err=%v", info, err)
+	}
+	if _, err := host.PluginDataDir("../escape"); err == nil {
+		t.Fatal("PluginDataDir accepted path traversal")
 	}
 }
 

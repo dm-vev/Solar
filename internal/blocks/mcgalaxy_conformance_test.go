@@ -1,6 +1,7 @@
 package blocks
 
 import (
+	"math/rand"
 	"testing"
 )
 
@@ -262,16 +263,51 @@ func TestMCGalaxy_FireSpreadsDiagonally(t *testing.T) {
 // have different behavior (physics 2 = still just remove, physics 3 = fuse).
 // Solar has no fuse mode at all.
 
-// TestMCGalaxy_TNTFuseMode verifies that TNT has a fuse delay before explosion.
-// In MCGalaxy, physics level 3 triggers a 5-tick fuse before exploding.
-// Solar doesn't have this — it explodes immediately in advanced mode.
 func TestMCGalaxy_TNTFuseMode(t *testing.T) {
-	// This test documents the missing fuse mode.
-	// Solar's ModeAdvanced (2) maps to immediate explosion,
-	// while MCGalaxy needs physics >= 4 for that.
-	// MCGalaxy physics 3 = fuse (5 ticks delay with visual).
-	// Skip this test until Solar adds a physics level 3 equivalent.
-	t.Skip("TNT fuse mode (physics==3) not implemented in Solar — MCGalaxy has 5-tick fuse delay before explosion")
+	e, cells := makeEngine(9, 9, 9)
+	e.SetMode(ModeHardcore)
+	center := e.posToInt(4, 4, 4)
+	above := e.posToInt(4, 5, 4)
+	cells[center] = TNTSmall
+	e.Queue(4, 4, 4)
+	for tick := 1; tick <= 5; tick++ {
+		e.Tick()
+		if cells[center] != TNTSmall {
+			t.Fatalf("tick %d: TNT exploded before fuse completed", tick)
+		}
+		want := StillLava
+		if tick%2 == 0 {
+			want = Air
+		}
+		if cells[above] != want {
+			t.Fatalf("tick %d: fuse block = %d, want %d", tick, cells[above], want)
+		}
+	}
+	e.Tick()
+	if cells[center] == TNTSmall {
+		t.Fatal("TNT did not explode on the sixth processing")
+	}
+
+	for _, test := range []struct {
+		name string
+		mode int
+		want byte
+	}{
+		{"advanced removes", ModeAdvanced, Air},
+		{"instant explodes", ModeInstant, TNTExplosion},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			e, cells := makeEngine(7, 7, 7)
+			e.SetMode(test.mode)
+			index := e.posToInt(3, 3, 3)
+			cells[index] = TNTSmall
+			e.Queue(3, 3, 3)
+			e.Tick()
+			if cells[index] != test.want {
+				t.Fatalf("center = %d, want %d", cells[index], test.want)
+			}
+		})
+	}
 }
 
 // ─── 9. TNT explosion outcomes ───
@@ -290,23 +326,84 @@ func TestMCGalaxy_TNTFuseMode(t *testing.T) {
 // DISCREPANCY: MCGalaxy has 20% Drop+Dissipate (block survives temporarily),
 // Solar replaces with Air (always destroyed).
 
-// TestMCGalaxy_TNTExplosionHasDropOutcome verifies that some blocks survive
-// the explosion as drops (not immediately destroyed). In MCGalaxy, 20% of
-// destroyed blocks become Drop+Dissipate (they briefly persist).
-// Solar replaces this with Air (immediate destruction).
 func TestMCGalaxy_TNTExplosionHasDropOutcome(t *testing.T) {
-	// In MCGalaxy, the Drop+Dissipate outcome means the block is added as
-	// a check with Drop/Dissipate physics args, not immediately set to Air.
-	// Solar always sets to Air or TNTExplosion.
-	// 
-	// We can verify this by checking that the ratio of TNTExplosion to Air
-	// is roughly 40/60 (MCGalaxy) vs 40/60 (Solar also 40/60 for ≤8).
-	// Actually the difference is subtle — Drop+Dissipate eventually becomes
-	// Air anyway. The observable difference is timing, not final state.
-	//
-	// This is hard to test without mocking the physics args.
-	// Marking as a known discrepancy.
-	t.Skip("TNT Drop+Dissipate outcome not distinguishable from Air in final state — timing difference only")
+	var debrisSeed int64 = -1
+	for seed := int64(0); seed < 1000; seed++ {
+		e, cells := makeEngine(1, 1, 1)
+		cells[0] = Stone
+		e.rng = rand.New(rand.NewSource(seed))
+		e.explodeLayer(0, 0, 0, 0, -1)
+		if len(e.updates) == 0 && len(e.checks) == 1 && e.checks[0].debris {
+			debrisSeed = seed
+			break
+		}
+	}
+	if debrisSeed < 0 {
+		t.Fatal("no deterministic debris outcome found")
+	}
+
+	moveSeed := seedForTNTDebris(t, func(r *rand.Rand) bool {
+		return r.Intn(99) >= 8 && r.Intn(99) < 50 && r.Intn(99) < 49
+	})
+	e, cells := makeEngine(1, 3, 1)
+	cells[e.posToInt(0, 2, 0)] = Stone
+	e.rng = rand.New(rand.NewSource(moveSeed))
+	e.queueDebris(e.posToInt(0, 2, 0), true)
+	e.Tick()
+	if cells[e.posToInt(0, 2, 0)] != Air || cells[e.posToInt(0, 1, 0)] != Stone {
+		t.Fatalf("debris did not fall one block: %v", cells)
+	}
+
+	dissipateSeed := seedForTNTDebris(t, func(r *rand.Rand) bool { return r.Intn(99) < 8 })
+	e.rng = rand.New(rand.NewSource(dissipateSeed))
+	e.Tick()
+	if cells[e.posToInt(0, 1, 0)] != Air {
+		t.Fatal("debris did not dissipate")
+	}
+}
+
+func seedForTNTDebris(t *testing.T, matches func(*rand.Rand) bool) int64 {
+	t.Helper()
+	for seed := int64(0); seed < 10000; seed++ {
+		if matches(rand.New(rand.NewSource(seed))) {
+			return seed
+		}
+	}
+	t.Fatal("no deterministic TNT seed found")
+	return 0
+}
+
+func TestMCGalaxy_TNTCheckDedupPreservesFuseState(t *testing.T) {
+	e, cells := makeEngine(9, 9, 9)
+	e.SetMode(ModeHardcore)
+	first := e.posToInt(3, 4, 4)
+	second := e.posToInt(4, 4, 4)
+	cells[first], cells[second] = TNTSmall, TNTSmall
+	e.checks = []checkEntry{{index: first, data: 5}, {index: second, data: 3}}
+	e.queued[first], e.queued[second] = 0, 1
+	e.Tick()
+	for _, check := range e.checks {
+		if check.index == second && check.data == 4 {
+			return
+		}
+	}
+	t.Fatalf("second fuse state was reset: %+v", e.checks)
+}
+
+func TestMCGalaxy_TNTDebrisDoesNotMoveIntoStagedUpdate(t *testing.T) {
+	e, cells := makeEngine(1, 3, 1)
+	source := e.posToInt(0, 2, 0)
+	below := e.posToInt(0, 1, 0)
+	cells[source] = Stone
+	e.setBlock(below, Glass)
+	e.rng = rand.New(rand.NewSource(seedForTNTDebris(t, func(r *rand.Rand) bool {
+		return r.Intn(99) >= 8 && r.Intn(99) < 50 && r.Intn(99) < 49
+	})))
+	e.queueDebris(source, true)
+	e.Tick()
+	if cells[source] != Stone || cells[below] != Glass {
+		t.Fatalf("debris was lost on staged destination: %v", cells)
+	}
 }
 
 // ─── 10. Water flow: MCGalaxy separates random and blocked checks ───

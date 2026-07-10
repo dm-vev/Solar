@@ -7,10 +7,26 @@ import (
 )
 
 func helpCommand(registry *Registry) Handler {
-	return func(ctx Context, _ []string) (string, bool) {
+	return func(ctx Context, args []string) (string, bool) {
 		playerRank := 0
 		if ctx.RankLevel != nil {
 			playerRank = ctx.RankLevel()
+		}
+		if len(args) == 1 {
+			name := strings.ToLower(strings.TrimPrefix(args[0], "/"))
+			registry.mu.RLock()
+			entry, ok := registry.handlers[name]
+			registry.mu.RUnlock()
+			if !ok || playerRank < entry.minRank {
+				return ctx.tr("command.shared.unknown", name), true
+			}
+			if entry.help == "" {
+				return ctx.tr("command.help.no_details", name), true
+			}
+			return entry.help, true
+		}
+		if len(args) > 1 {
+			return ctx.tr("command.help.usage"), true
 		}
 		registry.mu.RLock()
 		names := make([]string, 0, len(registry.handlers))
