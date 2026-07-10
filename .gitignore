@@ -11,5 +11,6 @@ logs/security/
 
 # Build artifacts
 solar
-data/players/playerdb.json
-data/worlds/*.swld
+
+# Local server runtime data
+data/
